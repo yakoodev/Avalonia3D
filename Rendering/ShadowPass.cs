@@ -64,7 +64,7 @@ namespace Avalonia3D.Rendering
             obj.RenderModel();
         }
 
-        private void EnsureResources(GL gl)
+        private unsafe void EnsureResources(GL gl)
         {
             if (_depthMap != 0 && _framebuffer != 0)
             {

@@ -3,7 +3,7 @@ using Avalonia.Input;
 using Avalonia.Media.Imaging;
 using Avalonia.OpenGL;
 using Avalonia.OpenGL.Controls;
-using Avalonia3D.Controls.Avalonia3D.Rendering;
+using Avalonia3D.Rendering;
 using Avalonia3D.Model;
 using Silk.NET.OpenGL;
 using System;

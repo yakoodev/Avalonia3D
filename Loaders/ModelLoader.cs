@@ -277,7 +277,7 @@ namespace Avalonia3D.Loaders
             }
         }
 
-        private static Vector4 GetChannelColor(MaterialChannel channel, Vector4 fallback)
+        private static Vector4 GetChannelColor(MaterialChannel? channel, Vector4 fallback)
         {
             if (channel == null)
             {
@@ -293,7 +293,7 @@ namespace Avalonia3D.Loaders
             return fallback;
         }
 
-        private static float GetChannelStrength(MaterialChannel channel, float fallback)
+        private static float GetChannelStrength(MaterialChannel? channel, float fallback)
         {
             if (channel == null)
             {

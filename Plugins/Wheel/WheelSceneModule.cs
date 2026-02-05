@@ -4,6 +4,7 @@ using Avalonia3D.Model;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace Avalonia3D.Plugins.Wheel
 {
@@ -14,7 +15,7 @@ namespace Avalonia3D.Plugins.Wheel
         public Wheel? Wheel { get; private set; }
         public WheelCut? WheelCut { get; private set; }
 
-        public IReadOnlyList<Weigth> Weigths => Wheel?.Weigths ?? Array.Empty<Weigth>();
+        public IReadOnlyList<Weigth> Weigths => Wheel?.Weigths ?? Array.Empty<Weigth>().ToList();
 
         public void Attach(Scene3D scene)
         {
