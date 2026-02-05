@@ -1,0 +1,19 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="Avalonia3D.MainView"
+			 xmlns:controls="clr-namespace:Avalonia3D.Controls;assembly=Avalonia3D"
+			 xmlns:models="clr-namespace:Avalonia3D.Model;assembly=Avalonia3D"
+			 xmlns:local="clr-namespace:Avalonia3D.Extensions;assembly=Avalonia3D"
+			 >
+	<Grid Background="Gray">
+		<controls:WheelPresenter3D Grid.Column="0"
+		  x:Name="ModelViewer"		  
+            Background="Transparent"
+            RotationSensitivity="0.008"
+            PanSensitivity="0.005">
+		</controls:WheelPresenter3D>
+	</Grid>
+</UserControl>

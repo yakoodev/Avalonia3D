@@ -1,0 +1,108 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+		<ApplicationManifest>app.manifest</ApplicationManifest>
+		<AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+	</PropertyGroup>
+	<ItemGroup>
+		<AvaloniaXaml Remove="Assets\cube\**" />
+		<AvaloniaXaml Remove="Assets\fish\**" />
+		<AvaloniaXaml Remove="Converters\**" />
+		<AvaloniaXaml Remove="Wrappers\**" />
+		<Compile Remove="Assets\cube\**" />
+		<Compile Remove="Assets\fish\**" />
+		<Compile Remove="Converters\**" />
+		<Compile Remove="Wrappers\**" />
+		<EmbeddedResource Remove="Assets\cube\**" />
+		<EmbeddedResource Remove="Assets\fish\**" />
+		<EmbeddedResource Remove="Converters\**" />
+		<EmbeddedResource Remove="Wrappers\**" />
+		<None Remove="Assets\cube\**" />
+		<None Remove="Assets\fish\**" />
+		<None Remove="Converters\**" />
+		<None Remove="Wrappers\**" />
+	</ItemGroup>
+	<ItemGroup>
+		<Compile Remove="Controls\OpenGlControlBase.cs" />
+	</ItemGroup>
+	<ItemGroup>
+		<None Remove="Assets\Air_Balloon.blend" />
+		<None Remove="Assets\Air_Balloon.fbx" />
+		<None Remove="Assets\Air_Balloon.obj" />
+		<None Remove="Assets\cnek.obj" />
+		<None Remove="Assets\cube.obj" />
+		<None Remove="Assets\Duck.gltf" />
+		<None Remove="Assets\ps4-stik.glb" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Avalonia" Version="11.3.5" />
+		<PackageReference Include="Avalonia.Desktop" Version="11.3.5" />
+		<PackageReference Include="Avalonia.LinuxFramebuffer" Version="11.3.5" />
+		<PackageReference Include="Avalonia.Skia" Version="11.3.5" />
+		<PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.5" />
+		<PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.5" />
+		<!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
+		<PackageReference Include="Avalonia.Diagnostics" Version="11.3.5">
+			<IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
+			<PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
+		</PackageReference>
+		<PackageReference Include="Serilog" Version="4.3.0" />
+		<PackageReference Include="SharpGLTF.Core" Version="1.0.5" />
+		<PackageReference Include="SharpGLTF.Runtime" Version="1.0.5" />
+		<PackageReference Include="SharpGLTF.Toolkit" Version="1.0.5" />
+		<PackageReference Include="Silk.NET.OpenGL" Version="2.22.0" />
+		<PackageReference Include="Silk.NET.OpenGLES" Version="2.22.0" />
+		<PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
+		<PackageReference Include="System.Numerics.Vectors" Version="4.6.1" />
+		<PackageReference Include="System.Text.Json" Version="9.0.9" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Update="Assets\gltf\GlueWeigthInside.glb">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\gltf\GlueWeigthOutside.glb">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\gltf\ground.glb">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\gltf\SpringWeigthInnerOutside.glb">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\gltf\SpringWeigthInside.glb">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\gltf\SpringWeigthOutside.glb">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\gltf\stand.glb">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\gltf\wheel.glb">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\gltf\model.bin">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\gltf\model.gltf">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\gltf\wheelcut.glb">
+		  <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\gltf\wheel_AO-wheel_roughness-wheel_metallic.png">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\gltf\wheel_basecolor.png">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\gltf\wheel_normal.png">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+</Project>
