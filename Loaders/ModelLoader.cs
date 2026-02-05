@@ -183,38 +183,165 @@ namespace Avalonia3D.Loaders
                 LocalMatrix = node.LocalMatrix
             };
 
-            // Загрузка текстуры с кешированием
-            LoadTextureForModel(model, prim);
+            // Загрузка материала и текстур с кешированием
+            LoadMaterialForModel(model, prim);
 
             return model;
         }
 
-        private static void LoadTextureForModel(Model.Model model, MeshPrimitive prim)
+        private static void LoadMaterialForModel(Model.Model model, MeshPrimitive prim)
         {
-            var tex = prim.Material?.FindChannel("BaseColor")?.Texture?.PrimaryImage;
-            if (tex == null) return;
+            if (model == null)
+            {
+                return;
+            }
 
-            var textureKey = tex.Content.GetHashCode().ToString();
+            var material = prim.Material;
+            if (material == null)
+            {
+                return;
+            }
+
+            var result = new Avalonia3D.Model.Material();
+            ApplyPbrFactors(material, result);
+            result.Opacity = result.BaseColorFactor.W;
+
+            var baseColorChannel = material.FindChannel("BaseColor");
+            result.BaseColorTexture = LoadTextureFromChannel(baseColorChannel);
+            if (baseColorChannel != null)
+            {
+                var baseColor = GetChannelColor(baseColorChannel, result.BaseColorFactor);
+                result.BaseColorFactor = baseColor;
+                result.Opacity = baseColor.W;
+            }
+
+            var normalChannel = material.FindChannel("Normal");
+            result.NormalTexture = LoadTextureFromChannel(normalChannel);
+
+            var metallicRoughnessChannel = material.FindChannel("MetallicRoughness");
+            result.MetallicRoughnessTexture = LoadTextureFromChannel(metallicRoughnessChannel);
+
+            var occlusionChannel = material.FindChannel("Occlusion");
+            result.OcclusionTexture = LoadTextureFromChannel(occlusionChannel);
+            if (occlusionChannel != null)
+            {
+                result.OcclusionStrength = GetChannelStrength(occlusionChannel, result.OcclusionStrength);
+            }
+
+            var emissiveChannel = material.FindChannel("Emissive");
+            result.EmissiveTexture = LoadTextureFromChannel(emissiveChannel);
+            if (emissiveChannel != null)
+            {
+                var emissiveColor = GetChannelColor(emissiveChannel, new Vector4(result.EmissiveFactor, 1f));
+                result.EmissiveFactor = new Vector3(emissiveColor.X, emissiveColor.Y, emissiveColor.Z);
+            }
+
+            if (result.Opacity < 0.999f)
+            {
+                result.IsTransparent = true;
+            }
+
+            model.Material = result;
+            model.TextureData = result.BaseColorTexture;
+        }
+
+        private static TextureData? LoadTextureFromChannel(MaterialChannel? channel)
+        {
+            var image = channel?.Texture?.PrimaryImage;
+            if (image == null)
+            {
+                return null;
+            }
+
+            return LoadTextureFromImage(image);
+        }
+
+        private static TextureData? LoadTextureFromImage(SharpGLTF.Schema2.Image image)
+        {
+            var textureKey = image.Content.GetHashCode().ToString();
 
             lock (TextureCacheLock)
             {
-                // Проверяем кеш текстур
                 if (TextureCache.TryGetValue(textureKey, out var weakRef) &&
                     weakRef.TryGetTarget(out var cachedBytes))
                 {
-                    // Создаем копию для этой модели
                     var copyBytes = new byte[cachedBytes.Length];
                     Array.Copy(cachedBytes, copyBytes, cachedBytes.Length);
-                    model.TextureData = LoadTextureFromImage(copyBytes);
+                    return LoadTextureFromImage(copyBytes);
+                }
+
+                var texBytes = image.Content.Content.ToArray();
+                var textureData = LoadTextureFromImage(texBytes);
+                TextureCache[textureKey] = new WeakReference<byte[]>(texBytes);
+                return textureData;
+            }
+        }
+
+        private static Vector4 GetChannelColor(MaterialChannel channel, Vector4 fallback)
+        {
+            if (channel == null)
+            {
+                return fallback;
+            }
+
+            var colorProperty = channel.GetType().GetProperty("Color");
+            if (colorProperty?.GetValue(channel) is Vector4 color)
+            {
+                return color;
+            }
+
+            return fallback;
+        }
+
+        private static float GetChannelStrength(MaterialChannel channel, float fallback)
+        {
+            if (channel == null)
+            {
+                return fallback;
+            }
+
+            var strengthProperty = channel.GetType().GetProperty("Strength");
+            if (strengthProperty?.GetValue(channel) is float strength)
+            {
+                return strength;
+            }
+
+            return fallback;
+        }
+
+        private static void ApplyPbrFactors(SharpGLTF.Schema2.Material material, Avalonia3D.Model.Material target)
+        {
+            if (material == null || target == null)
+            {
+                return;
+            }
+
+            var pbrProp = material.GetType().GetProperty("PbrMetallicRoughness");
+            if (pbrProp?.GetValue(material) is not null)
+            {
+                var pbr = pbrProp.GetValue(material);
+                if (pbr == null)
+                {
                     return;
                 }
 
-                // Загружаем новую текстуру
-                var texBytes = tex.Content.Content.ToArray();
-                model.TextureData = LoadTextureFromImage(texBytes);
+                var baseColorProp = pbr.GetType().GetProperty("BaseColorFactor");
+                if (baseColorProp?.GetValue(pbr) is Vector4 baseColor)
+                {
+                    target.BaseColorFactor = baseColor;
+                }
 
-                // Сохраняем в кеш с weak reference
-                TextureCache[textureKey] = new WeakReference<byte[]>(texBytes);
+                var metallicProp = pbr.GetType().GetProperty("MetallicFactor");
+                if (metallicProp?.GetValue(pbr) is float metallic)
+                {
+                    target.MetallicFactor = metallic;
+                }
+
+                var roughnessProp = pbr.GetType().GetProperty("RoughnessFactor");
+                if (roughnessProp?.GetValue(pbr) is float roughness)
+                {
+                    target.RoughnessFactor = roughness;
+                }
             }
         }
 

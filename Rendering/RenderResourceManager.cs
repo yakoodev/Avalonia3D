@@ -21,7 +21,11 @@ namespace Avalonia3D.Rendering
         public uint Vao { get; internal set; }
         public uint Vbo { get; internal set; }
         public uint Ebo { get; internal set; }
-        public uint TextureId { get; internal set; }
+        public uint BaseColorTextureId { get; internal set; }
+        public uint NormalTextureId { get; internal set; }
+        public uint MetallicRoughnessTextureId { get; internal set; }
+        public uint OcclusionTextureId { get; internal set; }
+        public uint EmissiveTextureId { get; internal set; }
         public int VertexCount { get; internal set; }
         public int IndexCount { get; internal set; }
         public bool IndicesUShort { get; internal set; }
@@ -191,10 +195,11 @@ namespace Avalonia3D.Rendering
                 Gl.DeleteBuffer(resources.Ebo);
             }
 
-            if (resources.TextureId != 0)
-            {
-                Gl.DeleteTexture(resources.TextureId);
-            }
+            DeleteTextureIfNeeded(resources.BaseColorTextureId);
+            DeleteTextureIfNeeded(resources.NormalTextureId);
+            DeleteTextureIfNeeded(resources.MetallicRoughnessTextureId);
+            DeleteTextureIfNeeded(resources.OcclusionTextureId);
+            DeleteTextureIfNeeded(resources.EmissiveTextureId);
         }
 
         private unsafe RenderResources CreateResources(Model model)
@@ -218,12 +223,38 @@ namespace Avalonia3D.Rendering
             Gl.BindBuffer(GLEnum.ArrayBuffer, 0);
             Gl.BindVertexArray(0);
 
-            if (model.TextureData != null)
-            {
-                resources.TextureId = SetupTexture(model.TextureData);
-            }
+            SetupMaterialTextures(model, resources);
 
             return resources;
+        }
+
+        private void DeleteTextureIfNeeded(uint textureId)
+        {
+            if (textureId != 0)
+            {
+                Gl.DeleteTexture(textureId);
+            }
+        }
+
+        private void SetupMaterialTextures(Model model, RenderResources resources)
+        {
+            var material = model.Material;
+
+            if (material == null)
+            {
+                if (model.TextureData != null)
+                {
+                    resources.BaseColorTextureId = SetupTexture(model.TextureData);
+                }
+
+                return;
+            }
+
+            resources.BaseColorTextureId = SetupTexture(material.BaseColorTexture ?? model.TextureData);
+            resources.NormalTextureId = SetupTexture(material.NormalTexture);
+            resources.MetallicRoughnessTextureId = SetupTexture(material.MetallicRoughnessTexture);
+            resources.OcclusionTextureId = SetupTexture(material.OcclusionTexture);
+            resources.EmissiveTextureId = SetupTexture(material.EmissiveTexture);
         }
 
         private unsafe void UploadVertexData(Vertex[] vertices, RenderResources resources)
@@ -336,7 +367,7 @@ namespace Avalonia3D.Rendering
             }
         }
 
-        private unsafe uint SetupTexture(TextureData textureData)
+        private unsafe uint SetupTexture(TextureData? textureData)
         {
             if (textureData == null || textureData.Data == null)
             {
