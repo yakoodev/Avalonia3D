@@ -6,6 +6,7 @@ using Avalonia3D.Interfaces;
 using Avalonia3D.Lights;
 using Avalonia3D.Model;
 using Avalonia3D.Plugins.Wheel;
+using Avalonia3D.Rendering;
 using Avalonia3D.Shaders;
 using Serilog;
 using Silk.NET.OpenGL;
@@ -23,11 +24,13 @@ namespace Avalonia3D.Controls
             private GL? _gl;
             private byte[]? _pixelBuffer;
             private WriteableBitmap? _bitmap;            
+            private readonly RenderPipeline _renderPipeline = new();
 
             public Scene3D Scene { get; } = new();
             private readonly WheelSceneModule _wheelModule = new();
 
             public GL? GL => _gl;
+            public RenderFrameState FrameState { get; } = new();
 
             public event Action<WriteableBitmap>? FrameReady;
 
@@ -64,9 +67,8 @@ namespace Avalonia3D.Controls
                         AlphaFormat.Unpremul);
                 }
 
-                // Рисуем сцену                
-                _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-                Scene.Render(this);
+                // Рисуем сцену
+                _renderPipeline.Execute(this, w, h);
 
                 // Чтение пикселей
                 fixed (byte* ptr = _pixelBuffer)
