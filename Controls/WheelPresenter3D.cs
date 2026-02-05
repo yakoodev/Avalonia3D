@@ -6,6 +6,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Threading;
 using Avalonia3D.Model.Workflow;
+using Avalonia3D.Plugins.Wheel;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -133,6 +134,8 @@ namespace Avalonia3D.Controls
 
         #region Проксируемые свойства      
 
+        private WheelSceneModule? WheelModule => _model3DControl.Scene.GetModule<WheelSceneModule>();
+
        
         [Category("Interaction")]
         public float RotationSensitivity
@@ -151,11 +154,13 @@ namespace Avalonia3D.Controls
         [Category("Interaction")]
         public float WheelAngle
         {
-            get => _model3DControl.Scene.Wheel.Angle;
+            get => WheelModule?.Wheel?.Angle ?? 0f;
             set
             {
-                if (_model3DControl.Scene.Wheel != null)
-                    _model3DControl.Scene.Wheel.Angle = value;
+                if (WheelModule?.Wheel != null)
+                {
+                    WheelModule.Wheel.Angle = value;
+                }
             }
         }
         
@@ -170,22 +175,40 @@ namespace Avalonia3D.Controls
         [Category("Interaction")]
         public Complex InsideWeigth
         {
-            get => _model3DControl.Scene.Wheel.InsideWeigth;
-            set => _model3DControl.Scene.Wheel.InsideWeigth = value;
+            get => WheelModule?.Wheel?.InsideWeigth ?? default;
+            set
+            {
+                if (WheelModule?.Wheel != null)
+                {
+                    WheelModule.Wheel.InsideWeigth = value;
+                }
+            }
         }
 
         [Category("Interaction")]
         public Complex OutsideWeigth
         {
-            get => _model3DControl.Scene.Wheel.OutsideWeigth;
-            set => _model3DControl.Scene.Wheel.OutsideWeigth = value;
+            get => WheelModule?.Wheel?.OutsideWeigth ?? default;
+            set
+            {
+                if (WheelModule?.Wheel != null)
+                {
+                    WheelModule.Wheel.OutsideWeigth = value;
+                }
+            }
         }
 
         [Category("Interaction")]
         public WeightScheme WeightScheme
         {
-            get => _model3DControl.Scene.Wheel.WeightScheme;
-            set => _model3DControl.Scene.Wheel.WeightScheme = value;
+            get => WheelModule?.Wheel?.WeightScheme ?? default;
+            set
+            {
+                if (WheelModule?.Wheel != null)
+                {
+                    WheelModule.Wheel.WeightScheme = value;
+                }
+            }
         }
 
         #endregion

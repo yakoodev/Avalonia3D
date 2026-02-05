@@ -1,6 +1,6 @@
 ﻿using Avalonia3D.Model.Workflow;
 
-namespace Avalonia3D.Model.StandObjects
+namespace Avalonia3D.Plugins.Wheel
 {
     public class GlueWeigthInside : InsideWeigth
     {

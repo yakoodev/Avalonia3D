@@ -5,6 +5,7 @@ using Avalonia.Threading;
 using Avalonia3D.Interfaces;
 using Avalonia3D.Lights;
 using Avalonia3D.Model;
+using Avalonia3D.Plugins.Wheel;
 using Avalonia3D.Shaders;
 using Serilog;
 using Silk.NET.OpenGL;
@@ -23,8 +24,8 @@ namespace Avalonia3D.Controls
             private byte[]? _pixelBuffer;
             private WriteableBitmap? _bitmap;            
 
-
             public Scene3D Scene { get; } = new();
+            private readonly WheelSceneModule _wheelModule = new();
 
             public GL? GL => _gl;
 
@@ -35,7 +36,8 @@ namespace Avalonia3D.Controls
                 _gl = gl;
                 Scene.Init(gl);                
                 Scene.Shaders.Add(GLShader.Create(gl));                
-                Scene.LoadModel(Path.Combine(AppContext.BaseDirectory, "Assets", "gltf"));
+                Scene.RegisterModule(_wheelModule);
+                _wheelModule.Load(Path.Combine(AppContext.BaseDirectory, "Assets", "gltf"), Scene.Importer);
                 ConfigureOpenGLState();
                 InitializeCamera();
             }
