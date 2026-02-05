@@ -1,13 +1,10 @@
 ﻿// File: MemoryManager.cs
-using Avalonia3D.Model.StandObjects;
+using Avalonia3D.Rendering;
 using Serilog;
-using Silk.NET.OpenGL;
 using System;
 using System.Buffers;
-using System.Collections.Generic;
 using System.Runtime;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace Avalonia3D.Memory
 {
@@ -16,6 +13,7 @@ namespace Avalonia3D.Memory
         private static Timer _cleanupTimer;
         private static readonly object _lock = new();
         private static bool _isInitialized = false;
+        private static RenderResourceManager _resourceManager;
 
         // Настройки управления памятью
         public static class Settings
@@ -27,11 +25,13 @@ namespace Avalonia3D.Memory
             public static bool AggressiveGC { get; set; } = true;
         }
 
-        public static void Initialize()
+        public static void Initialize(RenderResourceManager resourceManager)
         {
             lock (_lock)
             {
                 if (_isInitialized) return;
+
+                _resourceManager = resourceManager;
 
                 // Настройка сборщика мусора для 3D приложений
                 GCSettings.LatencyMode = GCLatencyMode.Interactive;
@@ -46,20 +46,18 @@ namespace Avalonia3D.Memory
             }
         }
 
-        public static void Shutdown(GL gl = null)
+        public static void Shutdown()
         {
             lock (_lock)
             {
                 _cleanupTimer?.Dispose();
                 _cleanupTimer = null;
 
-                if (gl != null)
-                {
-                    MeshObject.ClearGeometryCache(gl);
-                }
+                _resourceManager?.ClearAll();
 
                 // Финальная очистка
                 PerformAggressiveCleanup();
+                _resourceManager = null;
                 _isInitialized = false;
             }
         }
@@ -69,7 +67,7 @@ namespace Avalonia3D.Memory
             try
             {
                 // Очистка старых записей в кеше геометрии
-                MeshObject.CleanupOldCacheEntries(Settings.MaxCacheEntryAge);
+                _resourceManager?.CleanupOldCacheEntries(Settings.MaxCacheEntryAge);
 
                 // Проверка общего потребления памяти
                 var currentMemoryMB = GC.GetTotalMemory(false) / 1024.0 / 1024.0;
@@ -130,7 +128,7 @@ namespace Avalonia3D.Memory
              Log.Information($"Gen 1 Collections: {GC.CollectionCount(1)}");
              Log.Information($"Gen 2 Collections: {GC.CollectionCount(2)}");
 
-            MeshObject.LogCacheStats();
+            _resourceManager?.LogCacheStats();
 
             // Проверка лимитов
             if (totalMemoryMB > Settings.MaxTotalMemoryMB)

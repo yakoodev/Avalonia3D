@@ -39,7 +39,7 @@ namespace Avalonia3D.Model.StandObjects
 
         public void Add(MeshObject obj)
         {
-            obj.Parent = this;
+            Node.AddChild(obj.Node);
             _children.Add(obj);
             RecalculateGravity();
         }     
