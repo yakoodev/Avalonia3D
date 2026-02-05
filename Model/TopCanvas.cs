@@ -1,5 +1,6 @@
 ﻿using Avalonia.Media.Imaging;
 using Avalonia3D.Helpers;
+using Avalonia3D.Plugins.Wheel;
 using SkiaSharp;
 
 namespace Avalonia3D.Model
@@ -22,9 +23,17 @@ namespace Avalonia3D.Model
 
            //ViewCameraParams(canvas);
 
-            foreach (var w in _scene.Wheel.Weigths)
-                if (w.IsVisible)
-                    w.RenderSurface(_scene, canvas, bitmap.PixelSize.Width, bitmap.PixelSize.Height);
+            var wheelModule = _scene.GetModule<WheelSceneModule>();
+            if (wheelModule?.Wheel != null)
+            {
+                foreach (var w in wheelModule.Weigths)
+                {
+                    if (w.IsVisible)
+                    {
+                        w.RenderSurface(_scene, canvas, bitmap.PixelSize.Width, bitmap.PixelSize.Height);
+                    }
+                }
+            }
 
             // Важно: фиксируем результат
             canvas.Flush();

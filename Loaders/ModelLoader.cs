@@ -92,20 +92,7 @@ namespace Avalonia3D.Loaders
             {
                 foreach (var node in gltf.LogicalNodes)
                 {
-                    if (node.Mesh == null) continue;                   
-
-                    foreach (var prim in node.Mesh.Primitives)
-                    {
-                        var model = LoadPrimitive(prim, node);
-                        if (model != null)
-                        {
-                            models.Add(model);
-
-                            // Логирование потребления памяти
-                            var mem = EstimateModelMemory(model);
-                            Log.Information($"Loaded model '{model.Name}' CPU memory: {mem:N0} bytes");
-                        }
-                    }
+                    models.AddRange(LoadModelsForNode(node));
                 }
 
                 // Принудительная сборка мусора после загрузки
@@ -121,7 +108,30 @@ namespace Avalonia3D.Loaders
             }
         }
 
-        private static Model.Model LoadPrimitive(MeshPrimitive prim, Node node)
+        public static List<Model.Model> LoadModelsForNode(Node node)
+        {
+            var models = new List<Model.Model>();
+            if (node?.Mesh == null)
+            {
+                return models;
+            }
+
+            foreach (var prim in node.Mesh.Primitives)
+            {
+                var model = LoadPrimitive(prim, node);
+                if (model != null)
+                {
+                    models.Add(model);
+
+                    var mem = EstimateModelMemory(model);
+                    Log.Information($"Loaded model '{model.Name}' CPU memory: {mem:N0} bytes");
+                }
+            }
+
+            return models;
+        }
+
+        internal static Model.Model LoadPrimitive(MeshPrimitive prim, Node node)
         {
             var posAccessor = prim.GetVertexAccessor("POSITION");
             if (posAccessor == null) return null;

@@ -1,10 +1,12 @@
 ﻿using Avalonia3D.Controls2D;
 using Avalonia3D.Helpers;
+using Avalonia3D.Model;
+using Avalonia3D.Model.StandObjects;
 using SkiaSharp;
 using System.Collections.Generic;
 using System.Numerics;
 
-namespace Avalonia3D.Model.StandObjects
+namespace Avalonia3D.Plugins.Wheel
 {
     public class InsideWeigth : Weigth
     {

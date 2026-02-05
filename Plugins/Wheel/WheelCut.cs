@@ -1,5 +1,7 @@
-﻿
-namespace Avalonia3D.Model.StandObjects
+﻿using Avalonia3D.Model;
+using Avalonia3D.Model.StandObjects;
+
+namespace Avalonia3D.Plugins.Wheel
 {
     public class WheelCut : MeshGroup
     {

@@ -56,5 +56,10 @@ namespace Avalonia3D.Model
         {
             return Root.FindByName(name);
         }
+
+        public SceneNode? FindNode(string name)
+        {
+            return Root.FindByName(name);
+        }
     }
 }

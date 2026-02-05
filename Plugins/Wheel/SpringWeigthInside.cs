@@ -1,7 +1,7 @@
 ﻿using Avalonia3D.Model.Workflow;
 using System.Numerics;
 
-namespace Avalonia3D.Model.StandObjects
+namespace Avalonia3D.Plugins.Wheel
 {
     public class SpringWeigthInside : InsideWeigth
     {
