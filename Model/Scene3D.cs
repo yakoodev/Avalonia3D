@@ -6,6 +6,7 @@ using Avalonia3D.Loaders;
 using Avalonia3D.Memory;
 using Avalonia3D.Model.StandObjects;
 using Avalonia3D.Model.Workflow;
+using Avalonia3D.Rendering;
 using Serilog;
 using SharpGLTF.Schema2;
 using Silk.NET.OpenGL;
@@ -34,7 +35,7 @@ namespace Avalonia3D.Model
     {
         private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
         private double _lastTime = 0;
-        private readonly List<SceneObject> _objects = [];
+        public SceneGraph SceneGraph { get; } = new();
 
         private static readonly Dictionary<string, List<Model>> _modelsCaches = [];
 
@@ -59,11 +60,12 @@ namespace Avalonia3D.Model
 
         internal Animator Animator { get; private set; } = new();
 
-        private GL _gl;
+        private RenderResourceManager? _resourceManager;
 
         public void Init(GL gl)
         {
-            _gl = gl;
+            _resourceManager = new RenderResourceManager(gl);
+            MemoryManager.Initialize(_resourceManager);
         }
 
 
@@ -94,30 +96,34 @@ namespace Avalonia3D.Model
 
         public void Render(IRenderContext context)
         {
-            foreach(var shader in context.Scene.Shaders)
+            foreach (var shader in context.Scene.Shaders)
             {
                 shader.Use();
                 float deltaTime = GetDeltaTime();
                 Animator.Update(deltaTime);
-                foreach (var obj in _objects)
+                foreach (var obj in SceneGraph.RootObjects)
+                {
                     if (obj.IsVisible)
+                    {
                         obj.Render(context);
+                    }
+                }
             }
         }
 
         public void Clear()
         {
             // Очистка mesh объектов
-            foreach (var item in _objects)
+            foreach (var item in SceneGraph.RootObjects)
                 item.Dispose();
 
-            _objects.Clear();
+            SceneGraph.Clear();
             // Очистка кешей
-            MeshObject.ClearGeometryCache(_gl);
+            _resourceManager?.ClearAll();
             ModelLoader.ClearAllCaches();
 
             // Shutdown MemoryManager
-            MemoryManager.Shutdown(_gl);
+            MemoryManager.Shutdown();
         }
 
         public void LoadModel(string source)
@@ -125,46 +131,47 @@ namespace Avalonia3D.Model
             var wPath = Path.Combine(source, "wheel.glb");
             Wheel.Name = Path.GetFileNameWithoutExtension(wPath);            
             LoadGltfModel(wPath, Wheel);
-            _objects.Add(Wheel);           
+            SceneGraph.AddRoot(Wheel);           
 
             _glueWeigthOutside = new GlueWeigthOutside(Wheel);
             var glueWeigthOutsidePath = Path.Combine(source, "GlueWeigthOutside.glb");
             _glueWeigthOutside.Name = Path.GetFileNameWithoutExtension(glueWeigthOutsidePath);
             LoadGltfModel(glueWeigthOutsidePath, _glueWeigthOutside);
-            _objects.Add(_glueWeigthOutside);
+            SceneGraph.AddRoot(_glueWeigthOutside);
 
 
             _glueWeigthInside = new GlueWeigthInside(Wheel);
             var glueWeigthInsidePath = Path.Combine(source, "GlueWeigthInside.glb");
             _glueWeigthInside.Name = Path.GetFileNameWithoutExtension(glueWeigthInsidePath);
             LoadGltfModel(glueWeigthInsidePath, _glueWeigthInside);
-            _objects.Add(_glueWeigthInside);
+            SceneGraph.AddRoot(_glueWeigthInside);
 
 
             _springWeigthInside = new SpringWeigthInside(Wheel);
             var springWeigthInsidePath = Path.Combine(source, "SpringWeigthInside.glb");
             _springWeigthInside.Name = Path.GetFileNameWithoutExtension(springWeigthInsidePath);
             LoadGltfModel(springWeigthInsidePath, _springWeigthInside);
-            _objects.Add(_springWeigthInside);
+            SceneGraph.AddRoot(_springWeigthInside);
 
             _springWeigthOutside = new SpringWeigthOutside(Wheel);
             var springWeigthOutsidePath = Path.Combine(source, "SpringWeigthOutside.glb");
             _springWeigthOutside.Name = Path.GetFileNameWithoutExtension(springWeigthOutsidePath);
             LoadGltfModel(springWeigthOutsidePath, _springWeigthOutside);
-            _objects.Add(_springWeigthOutside);
+            SceneGraph.AddRoot(_springWeigthOutside);
 
 
             _springWeigthInnerOutside = new SpringWeigthInnerOutside(Wheel);
             var springWeigthInnerOutsidePath = Path.Combine(source, "SpringWeigthInnerOutside.glb");
             _springWeigthOutside.Name = Path.GetFileNameWithoutExtension(springWeigthInnerOutsidePath);
             LoadGltfModel(springWeigthInnerOutsidePath, _springWeigthInnerOutside);
-            _objects.Add(_springWeigthInnerOutside);            
+            SceneGraph.AddRoot(_springWeigthInnerOutside);            
 
             Wheel.Weigths.Add(_glueWeigthInside);
             Wheel.Weigths.Add(_glueWeigthOutside);
             Wheel.Weigths.Add(_springWeigthInside);
             Wheel.Weigths.Add(_springWeigthOutside);
             Wheel.Weigths.Add(_springWeigthInnerOutside);
+            BuildRenderResources();
             LookChanged?.Invoke(this, _lookState);
         }
 
@@ -201,8 +208,7 @@ namespace Avalonia3D.Model
 
                 Log.Information($"Loaded {loaded.Count} model parts");
 
-                // Если GL уже инициализирован - сразу создаём GPU-ресурсы
-                ProcessModelsImmediately(loaded, holder);
+                ProcessModelsForSceneGraph(loaded, holder);
 
                 MemoryManager.LogMemoryState("After GLTF load");
             }
@@ -215,7 +221,7 @@ namespace Avalonia3D.Model
             }
         }
 
-        private void ProcessModelsImmediately(List<Model> models, MeshGroup holder)
+        private void ProcessModelsForSceneGraph(List<Model> models, MeshGroup holder)
         {
             foreach (var model in models)
             {
@@ -235,7 +241,7 @@ namespace Avalonia3D.Model
                     Scale = model.LocalMatrix.GetScale(),
                     Rotation = model.LocalMatrix.GetRotation(),
                 };
-                meshObject.Setup(_gl, model);
+                meshObject.AssignModel(model);
                 holder.Add(meshObject);
             }
         
@@ -244,6 +250,35 @@ namespace Avalonia3D.Model
 
             // Принудительная сборка мусора после обработки
             MemoryManager.PerformAggressiveCleanup();
+        }
+
+        private void BuildRenderResources()
+        {
+            if (_resourceManager == null)
+            {
+                return;
+            }
+
+            foreach (var obj in SceneGraph.RootObjects)
+            {
+                BuildRenderResourcesRecursive(obj);
+            }
+        }
+
+        private void BuildRenderResourcesRecursive(SceneObject obj)
+        {
+            if (obj is MeshObject meshObject)
+            {
+                meshObject.BuildRenderResources(_resourceManager);
+            }
+
+            if (obj is MeshGroup meshGroup)
+            {
+                foreach (var child in meshGroup)
+                {
+                    BuildRenderResourcesRecursive(child);
+                }
+            }
         }
 
         internal void UpdateLook()
