@@ -1,5 +1,7 @@
 ﻿using Avalonia3D.Interfaces;
+using Avalonia3D.Model;
 using Avalonia3D.Model.StandObjects;
+using Avalonia3D.Rendering;
 using Silk.NET.OpenGL;
 using System;
 using System.Numerics;
@@ -88,9 +90,8 @@ namespace Avalonia3D.Shaders
                 _gl.DeleteProgram(_program);
         }
 
-        public void BindTexture(uint textureId, uint? shadowMapId = null)
+        public void BindMaterial(RenderResources resources, Material? material, uint? shadowMapId = null)
         {
-          //  throw new NotImplementedException();
         }
 
         public unsafe void SetUniforms(IRenderContext renderContext, SceneObject sceneObject, Matrix4x4 lightSpaceMatrix = default)

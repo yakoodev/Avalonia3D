@@ -2,11 +2,12 @@ using Avalonia3D.Interfaces;
 using Avalonia3D.Model;
 using Avalonia3D.Rendering;
 using Silk.NET.OpenGL;
+using System.Linq;
 using System.Numerics;
 
 namespace Avalonia3D.Model.StandObjects
 {
-    public class MeshObject : SceneObject
+    public class MeshObject : SceneObject, IMaterialProvider
     {
         private RenderResources? _resources;
         private RenderResourceManager? _resourceManager;
@@ -24,9 +25,21 @@ namespace Avalonia3D.Model.StandObjects
             }
 
             Gravity = GetCenterOfGravity(model.Vertices);
+
+            if (model.Material != null)
+            {
+                BaseColor = new Vector3(model.Material.BaseColorFactor.X, model.Material.BaseColorFactor.Y, model.Material.BaseColorFactor.Z);
+                EmissionColor = model.Material.EmissiveFactor;
+                Opacity = model.Material.Opacity;
+            }
         }
 
         public void BuildRenderResources(RenderResourceManager resourceManager)
+        {
+            Setup(resourceManager);
+        }
+
+        public void Setup(RenderResourceManager resourceManager)
         {
             if (resourceManager == null || _model == null)
             {
@@ -42,6 +55,8 @@ namespace Avalonia3D.Model.StandObjects
             _gl = resourceManager.Gl;
             _resources = resourceManager.Acquire(_model);
         }
+
+        public Material? Material => _model?.Material;
 
         private static Vector3 GetCenterOfGravity(Vertex[] vertices)
         {
@@ -67,12 +82,20 @@ namespace Avalonia3D.Model.StandObjects
                 return;
             }
 
-            foreach (var shader in renderContext.Scene.Shaders)
+            var shader = Material?.Shader as IShader3D ?? renderContext.Scene.Shaders.FirstOrDefault();
+            if (shader == null)
             {
-                shader.BindTexture(_resources.TextureId);
-                shader.SetUniforms(renderContext, this);
-                RenderModel();
+                return;
             }
+
+            ApplyMaterialState(Material);
+
+            shader.Use();
+            shader.BindMaterial(_resources, Material);
+            shader.SetUniforms(renderContext, this);
+            RenderModel();
+
+            ResetMaterialState(Material);
         }
 
         public unsafe void RenderModel()
@@ -116,6 +139,40 @@ namespace Avalonia3D.Model.StandObjects
             _resourceManager = null;
             _model = null;
             _gl = null;
+        }
+
+        private void ApplyMaterialState(Material? material)
+        {
+            if (_gl == null)
+            {
+                return;
+            }
+
+            bool transparent = material?.IsTransparent == true || Opacity < 1f;
+            if (transparent)
+            {
+                _gl.Enable(EnableCap.Blend);
+                _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+                _gl.DepthMask(false);
+            }
+            else
+            {
+                _gl.Disable(EnableCap.Blend);
+                _gl.DepthMask(true);
+            }
+        }
+
+        private void ResetMaterialState(Material? material)
+        {
+            if (_gl == null)
+            {
+                return;
+            }
+
+            if (material?.IsTransparent == true || Opacity < 1f)
+            {
+                _gl.DepthMask(true);
+            }
         }
     }
 }

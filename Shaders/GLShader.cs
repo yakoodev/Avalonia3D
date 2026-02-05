@@ -1,9 +1,10 @@
 ﻿using Avalonia3D.Interfaces;
+using Avalonia3D.Model;
 using Avalonia3D.Model.StandObjects;
+using Avalonia3D.Rendering;
 using Serilog;
 using Silk.NET.OpenGL;
 using System;
-using System.Diagnostics;
 using System.Numerics;
 
 namespace Avalonia3D.Shaders
@@ -16,8 +17,16 @@ namespace Avalonia3D.Shaders
         private int _lightPosLocation = -1;
         private int _viewPosLocation = -1;
         private int _lightColorLocation = -1;
-        private int _hasTextureLocation = -1;
-        private int _textureLocation = -1;
+        private int _baseColorMapLocation = -1;
+        private int _normalMapLocation = -1;
+        private int _metallicRoughnessMapLocation = -1;
+        private int _occlusionMapLocation = -1;
+        private int _emissiveMapLocation = -1;
+        private int _hasBaseColorMapLocation = -1;
+        private int _hasNormalMapLocation = -1;
+        private int _hasMetallicRoughnessMapLocation = -1;
+        private int _hasOcclusionMapLocation = -1;
+        private int _hasEmissiveMapLocation = -1;
         private int _shadowMapLocation = -1;
         private int _lightSpaceMatrixLocation = -1;
         private int _modelColorLocation = -1;
@@ -27,6 +36,11 @@ namespace Avalonia3D.Shaders
         private int _shininessLocation = -1;
         private int _alphaLocation = -1;
         private int _modelEmissionColorLocation = -1;
+        private int _baseColorFactorLocation = -1;
+        private int _metallicFactorLocation = -1;
+        private int _roughnessFactorLocation = -1;
+        private int _occlusionStrengthLocation = -1;
+        private int _emissiveFactorLocation = -1;
 
         public uint Handle => _shaderProgram;
         private GL _gl;
@@ -87,8 +101,17 @@ in vec4 FragPosLightSpace;
 
 out vec4 FragColor;
 
-uniform sampler2D uTexture;
-uniform int uHasTexture;
+uniform sampler2D uBaseColorMap;
+uniform sampler2D uNormalMap;
+uniform sampler2D uMetallicRoughnessMap;
+uniform sampler2D uOcclusionMap;
+uniform sampler2D uEmissiveMap;
+
+uniform int uHasBaseColorMap;
+uniform int uHasNormalMap;
+uniform int uHasMetallicRoughnessMap;
+uniform int uHasOcclusionMap;
+uniform int uHasEmissiveMap;
 
 uniform sampler2D uShadowMap;
 uniform vec3 uLightPos[2];
@@ -104,14 +127,20 @@ uniform int uShininess;
 uniform vec3 uModelColor;
 uniform vec3 uEmissionColor;
 
-uniform float uAlpha; 
+uniform vec4 uBaseColorFactor;
+uniform float uMetallicFactor;
+uniform float uRoughnessFactor;
+uniform float uOcclusionStrength;
+uniform vec3 uEmissiveFactor;
+
+uniform float uAlpha;
 
 float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
 {
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     projCoords = projCoords * 0.5 + 0.5;
 
-    float closestDepth = texture(uShadowMap, projCoords.xy).r;  
+    float closestDepth = texture(uShadowMap, projCoords.xy).r;
     float currentDepth = projCoords.z;
 
     float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.0005);
@@ -122,9 +151,9 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
     {
         for(int y = -1; y <= 1; ++y)
         {
-            float pcfDepth = texture(uShadowMap, projCoords.xy + vec2(x, y) * texelSize).r; 
-            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;        
-        }    
+            float pcfDepth = texture(uShadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
+            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+        }
     }
     shadow /= 9.0;
 
@@ -134,43 +163,89 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
     return shadow;
 }
 
+vec3 GetNormal()
+{
+    vec3 norm = normalize(Normal);
+    if (uHasNormalMap == 0)
+    {
+        return norm;
+    }
+
+    vec3 tangentNormal = texture(uNormalMap, TexCoord).xyz * 2.0 - 1.0;
+
+    vec3 Q1 = dFdx(FragPos);
+    vec3 Q2 = dFdy(FragPos);
+    vec2 st1 = dFdx(TexCoord);
+    vec2 st2 = dFdy(TexCoord);
+
+    vec3 T = normalize(Q1 * st2.t - Q2 * st1.t);
+    vec3 B = -normalize(cross(norm, T));
+    mat3 TBN = mat3(T, B, norm);
+
+    return normalize(TBN * tangentNormal);
+}
+
 void main()
 {
-    vec3 resultLight = vec3(0.0);
-    vec3 norm = normalize(Normal);
+    vec3 norm = GetNormal();
     vec3 viewDir = normalize(uViewPos - FragPos);
 
-    for (int i = 0; i < 2; i++) {
+    vec4 baseColor = uBaseColorFactor;
+    if (uHasBaseColorMap == 1)
+    {
+        baseColor *= texture(uBaseColorMap, TexCoord);
+    }
+
+    float metallic = uMetallicFactor;
+    float roughness = uRoughnessFactor;
+    if (uHasMetallicRoughnessMap == 1)
+    {
+        vec4 mrSample = texture(uMetallicRoughnessMap, TexCoord);
+        metallic *= mrSample.b;
+        roughness *= mrSample.g;
+    }
+
+    float ao = 1.0;
+    if (uHasOcclusionMap == 1)
+    {
+        float aoSample = texture(uOcclusionMap, TexCoord).r;
+        ao = mix(1.0, aoSample, uOcclusionStrength);
+    }
+
+    vec3 emissive = uEmissiveFactor;
+    if (uHasEmissiveMap == 1)
+    {
+        emissive *= texture(uEmissiveMap, TexCoord).rgb;
+    }
+
+    vec3 albedo = baseColor.rgb;
+    vec3 diffuseColor = albedo * (1.0 - metallic);
+    vec3 specularColor = mix(vec3(0.04), albedo, metallic);
+
+    vec3 resultLight = vec3(0.0);
+
+    float smoothness = clamp(1.0 - roughness, 0.04, 1.0);
+    float shininess = mix(2.0, float(uShininess), smoothness);
+
+    for (int i = 0; i < 2; i++)
+    {
         vec3 ambient = uAmbientStrength * uLightColor[i];
 
         vec3 lightDir = normalize(uLightPos[i] - FragPos);
         float diff = max(dot(norm, lightDir), 0.0);
-        vec3 diffuse = diff * uLightColor[i];
+        vec3 diffuse = diff * diffuseColor * uLightColor[i];
 
         vec3 reflectDir = reflect(-lightDir, norm);
-        float spec = pow(max(dot(viewDir, reflectDir), 0.0), float(uShininess));
-        vec3 specular = uSpecularStrength * spec * uLightColor[i];
+        float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
+        vec3 specular = uSpecularStrength * spec * specularColor * uLightColor[i];
 
         float shadow = ShadowCalculation(FragPosLightSpace, norm, lightDir);
-
         resultLight += (ambient + (1.0 - shadow) * (diffuse + specular)) * uIntensity[i];
     }
 
-    vec3 result;
-    float alpha;
-
-    if (uHasTexture == 1) {
-        vec4 texColor = texture(uTexture, TexCoord);
-        result = resultLight * texColor.rgb;
-        alpha = texColor.a * uAlpha;
-        FragColor = vec4(result, alpha);
-    }
-    else {
-        result = resultLight * uModelColor;
-        result += uEmissionColor;
-        alpha = uAlpha;
-        FragColor = vec4(result, alpha);
-    }
+    vec3 result = resultLight * ao + emissive + uEmissionColor;
+    float alpha = baseColor.a * uAlpha;
+    FragColor = vec4(result, alpha);
 }";
 
             uint vertexShader = CompileShader(ShaderType.VertexShader, vertSource);
@@ -239,12 +314,25 @@ void main()
             _lightPosLocation = _gl.GetUniformLocation(_shaderProgram, "uLightPos");
             _viewPosLocation = _gl.GetUniformLocation(_shaderProgram, "uViewPos");
             _lightColorLocation = _gl.GetUniformLocation(_shaderProgram, "uLightColor");
-            _hasTextureLocation = _gl.GetUniformLocation(_shaderProgram, "uHasTexture");
-            _textureLocation = _gl.GetUniformLocation(_shaderProgram, "uTexture");
+            _baseColorMapLocation = _gl.GetUniformLocation(_shaderProgram, "uBaseColorMap");
+            _normalMapLocation = _gl.GetUniformLocation(_shaderProgram, "uNormalMap");
+            _metallicRoughnessMapLocation = _gl.GetUniformLocation(_shaderProgram, "uMetallicRoughnessMap");
+            _occlusionMapLocation = _gl.GetUniformLocation(_shaderProgram, "uOcclusionMap");
+            _emissiveMapLocation = _gl.GetUniformLocation(_shaderProgram, "uEmissiveMap");
+            _hasBaseColorMapLocation = _gl.GetUniformLocation(_shaderProgram, "uHasBaseColorMap");
+            _hasNormalMapLocation = _gl.GetUniformLocation(_shaderProgram, "uHasNormalMap");
+            _hasMetallicRoughnessMapLocation = _gl.GetUniformLocation(_shaderProgram, "uHasMetallicRoughnessMap");
+            _hasOcclusionMapLocation = _gl.GetUniformLocation(_shaderProgram, "uHasOcclusionMap");
+            _hasEmissiveMapLocation = _gl.GetUniformLocation(_shaderProgram, "uHasEmissiveMap");
             _shadowMapLocation = _gl.GetUniformLocation(_shaderProgram, "uShadowMap");
             _lightSpaceMatrixLocation = _gl.GetUniformLocation(_shaderProgram, "uLightSpaceMatrix");
             _modelColorLocation = _gl.GetUniformLocation(_shaderProgram, "uModelColor");
             _modelEmissionColorLocation = _gl.GetUniformLocation(_shaderProgram, "uEmissionColor");
+            _baseColorFactorLocation = _gl.GetUniformLocation(_shaderProgram, "uBaseColorFactor");
+            _metallicFactorLocation = _gl.GetUniformLocation(_shaderProgram, "uMetallicFactor");
+            _roughnessFactorLocation = _gl.GetUniformLocation(_shaderProgram, "uRoughnessFactor");
+            _occlusionStrengthLocation = _gl.GetUniformLocation(_shaderProgram, "uOcclusionStrength");
+            _emissiveFactorLocation = _gl.GetUniformLocation(_shaderProgram, "uEmissiveFactor");
             _ambientLocation = _gl.GetUniformLocation(_shaderProgram, "uAmbientStrength");
             _specularLocation = _gl.GetUniformLocation(_shaderProgram, "uSpecularStrength");
             _intensityLocation = _gl.GetUniformLocation(_shaderProgram, "uIntensity");
@@ -306,14 +394,38 @@ void main()
             if (_viewPosLocation != -1)
                 _gl.Uniform3(_viewPosLocation, camera.Position.X, camera.Position.Y, camera.Position.Z);
 
+            var material = (sceneObject as Interfaces.IMaterialProvider)?.Material;
+            var baseColorFactor = material?.BaseColorFactor ?? new Vector4(sceneObject.BaseColor, 1f);
+            var emissiveFactor = material?.EmissiveFactor ?? sceneObject.EmissionColor;
+            var metallicFactor = material?.MetallicFactor ?? 0f;
+            var roughnessFactor = material?.RoughnessFactor ?? 1f;
+            var occlusionStrength = material?.OcclusionStrength ?? 1f;
+            var alpha = material?.Opacity ?? sceneObject.Opacity;
+            var emissionColor = material != null ? Vector3.Zero : sceneObject.EmissionColor;
+
             if (_modelColorLocation != -1)
                 _gl.Uniform3(_modelColorLocation, sceneObject.BaseColor.X, sceneObject.BaseColor.Y, sceneObject.BaseColor.Z);
 
             if (_modelEmissionColorLocation != -1)
-                _gl.Uniform3(_modelEmissionColorLocation, sceneObject.EmissionColor.X, sceneObject.EmissionColor.Y, sceneObject.EmissionColor.Z);
+                _gl.Uniform3(_modelEmissionColorLocation, emissionColor.X, emissionColor.Y, emissionColor.Z);
+
+            if (_baseColorFactorLocation != -1)
+                _gl.Uniform4(_baseColorFactorLocation, baseColorFactor.X, baseColorFactor.Y, baseColorFactor.Z, baseColorFactor.W);
+
+            if (_emissiveFactorLocation != -1)
+                _gl.Uniform3(_emissiveFactorLocation, emissiveFactor.X, emissiveFactor.Y, emissiveFactor.Z);
+
+            if (_metallicFactorLocation != -1)
+                _gl.Uniform1(_metallicFactorLocation, metallicFactor);
+
+            if (_roughnessFactorLocation != -1)
+                _gl.Uniform1(_roughnessFactorLocation, roughnessFactor);
+
+            if (_occlusionStrengthLocation != -1)
+                _gl.Uniform1(_occlusionStrengthLocation, occlusionStrength);
 
             if (_alphaLocation != -1)
-                _gl.Uniform1(_alphaLocation, sceneObject.Opacity);
+                _gl.Uniform1(_alphaLocation, alpha);
 
             if (_ambientLocation != -1)
                 _gl.Uniform1(_ambientLocation, lights[0].AmbientStrength);
@@ -325,30 +437,35 @@ void main()
                 _gl.Uniform1(_shininessLocation, lights[0].Shininess);
         }
 
-        public void BindTexture(uint textureId, uint? shadowMapId)
+        public void BindMaterial(RenderResources resources, Material? material, uint? shadowMapId)
         {
-            if (textureId != 0)
-            {
-                _gl.ActiveTexture(TextureUnit.Texture0);
-                _gl.BindTexture(TextureTarget.Texture2D, textureId);
-                if (_textureLocation != -1)
-                    _gl.Uniform1(_textureLocation, 0);
-            }
-            else
-            {
-                //Debug.WriteLine("No texture to bind (textureId = 0)");
-            }
-
-            if (_hasTextureLocation != -1)
-                _gl.Uniform1(_hasTextureLocation, textureId != 0 ? 1 : 0);
+            BindTextureUnit(resources.BaseColorTextureId, _baseColorMapLocation, _hasBaseColorMapLocation, 0);
+            BindTextureUnit(resources.NormalTextureId, _normalMapLocation, _hasNormalMapLocation, 1);
+            BindTextureUnit(resources.MetallicRoughnessTextureId, _metallicRoughnessMapLocation, _hasMetallicRoughnessMapLocation, 2);
+            BindTextureUnit(resources.OcclusionTextureId, _occlusionMapLocation, _hasOcclusionMapLocation, 3);
+            BindTextureUnit(resources.EmissiveTextureId, _emissiveMapLocation, _hasEmissiveMapLocation, 4);
 
             if (shadowMapId.HasValue)
             {
-                _gl.ActiveTexture(TextureUnit.Texture1);
+                _gl.ActiveTexture(TextureUnit.Texture5);
                 _gl.BindTexture(TextureTarget.Texture2D, shadowMapId.Value);
                 if (_shadowMapLocation != -1)
-                    _gl.Uniform1(_shadowMapLocation, 1);
+                    _gl.Uniform1(_shadowMapLocation, 5);
             }
+        }
+
+        private void BindTextureUnit(uint textureId, int samplerLocation, int hasTextureLocation, int unit)
+        {
+            if (textureId != 0)
+            {
+                _gl.ActiveTexture(TextureUnit.Texture0 + unit);
+                _gl.BindTexture(TextureTarget.Texture2D, textureId);
+                if (samplerLocation != -1)
+                    _gl.Uniform1(samplerLocation, unit);
+            }
+
+            if (hasTextureLocation != -1)
+                _gl.Uniform1(hasTextureLocation, textureId != 0 ? 1 : 0);
         }
     }
 }

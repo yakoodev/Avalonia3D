@@ -105,17 +105,13 @@ namespace Avalonia3D.Model
 
         public void Render(IRenderContext context)
         {
-            foreach (var shader in context.Scene.Shaders)
+            float deltaTime = GetDeltaTime();
+            Animator.Update(deltaTime);
+            foreach (var obj in SceneGraph.RootObjects)
             {
-                shader.Use();
-                float deltaTime = GetDeltaTime();
-                Animator.Update(deltaTime);
-                foreach (var obj in SceneGraph.RootObjects)
+                if (obj.IsVisible)
                 {
-                    if (obj.IsVisible)
-                    {
-                        obj.Render(context);
-                    }
+                    obj.Render(context);
                 }
             }
         }

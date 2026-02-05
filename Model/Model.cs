@@ -12,6 +12,7 @@ namespace Avalonia3D.Model
         public uint[] Indices { get; set; } = [];
 
         public TextureData TextureData { get; set; }
+        public Material? Material { get; set; }
 
         public Matrix4x4 LocalMatrix { get; set; }
         
