@@ -91,8 +91,8 @@ namespace Avalonia3D.Model.StandObjects
             ApplyMaterialState(Material);
 
             shader.Use();
-            shader.BindMaterial(_resources, Material);
-            shader.SetUniforms(renderContext, this);
+            shader.BindMaterial(_resources, Material, renderContext.FrameState.ShadowMapId);
+            shader.SetUniforms(renderContext, this, renderContext.FrameState.LightSpaceMatrix);
             RenderModel();
 
             ResetMaterialState(Material);

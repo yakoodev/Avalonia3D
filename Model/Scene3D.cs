@@ -103,10 +103,15 @@ namespace Avalonia3D.Model
             return deltaTime;
         }
 
-        public void Render(IRenderContext context)
+        public void UpdateFrame()
         {
             float deltaTime = GetDeltaTime();
             Animator.Update(deltaTime);
+        }
+
+        public void Render(IRenderContext context)
+        {
+            UpdateFrame();
             foreach (var obj in SceneGraph.RootObjects)
             {
                 if (obj.IsVisible)
