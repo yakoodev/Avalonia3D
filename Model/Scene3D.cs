@@ -45,6 +45,12 @@ namespace Avalonia3D.Model
         public Unit Unit { get; set; }
         public List<IShader3D> Shaders { get; } = [];
         internal Animator Animator { get; private set; } = new();
+        public AnimatorComponent AnimatorComponent { get; private set; }
+
+        public Scene3D()
+        {
+            AnimatorComponent = new AnimatorComponent(SceneGraph, Animator);
+        }
 
         public void Init(GL gl)
         {
@@ -143,6 +149,7 @@ namespace Avalonia3D.Model
         {
             ResetSceneGraph();
             SceneGraph = Importer.Import(gltfPath);
+            AnimatorComponent.SetSceneGraph(SceneGraph);
             BuildRenderResources();
             LookChanged?.Invoke(this, _lookState);
             return SceneGraph;
