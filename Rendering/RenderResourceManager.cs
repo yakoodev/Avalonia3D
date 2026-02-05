@@ -5,6 +5,7 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Avalonia3D.Model;
+using Model3D = Avalonia3D.Model.Model;
 
 namespace Avalonia3D.Rendering
 {
@@ -51,7 +52,7 @@ namespace Avalonia3D.Rendering
             public DateTime LastAccessed { get; set; }
         }
 
-        public RenderResources Acquire(Model model)
+        public RenderResources Acquire(Model3D model)
         {
             if (model == null)
             {
@@ -202,7 +203,7 @@ namespace Avalonia3D.Rendering
             DeleteTextureIfNeeded(resources.EmissiveTextureId);
         }
 
-        private unsafe RenderResources CreateResources(Model model)
+        private unsafe RenderResources CreateResources(Model3D model)
         {
             var resources = new RenderResources();
 
@@ -236,7 +237,7 @@ namespace Avalonia3D.Rendering
             }
         }
 
-        private void SetupMaterialTextures(Model model, RenderResources resources)
+        private void SetupMaterialTextures(Model3D model, RenderResources resources)
         {
             var material = model.Material;
 
@@ -302,7 +303,7 @@ namespace Avalonia3D.Rendering
             }
         }
 
-        private unsafe void SetupIndexBuffer(Model model, RenderResources resources)
+        private unsafe void SetupIndexBuffer(Model3D model, RenderResources resources)
         {
             resources.IndexCount = 0;
             resources.Ebo = 0;

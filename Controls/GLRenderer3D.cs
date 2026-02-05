@@ -17,131 +17,127 @@ using Vector = Avalonia.Vector;
 
 namespace Avalonia3D.Controls
 {
-    namespace Avalonia3D.Rendering
+    public class GLRenderer3D : IRenderContext
     {
-        public class GLRenderer3D : IRenderContext
+        private GL? _gl;
+        private byte[]? _pixelBuffer;
+        private WriteableBitmap? _bitmap;
+        private readonly RenderPipeline _renderPipeline = new();
+
+        public Scene3D Scene { get; } = new();
+        private readonly WheelSceneModule _wheelModule = new();
+
+        public GL? GL => _gl;
+        public RenderFrameState FrameState { get; } = new();
+
+        public event Action<WriteableBitmap>? FrameReady;
+
+        public void Init(GL gl)
         {
-            private GL? _gl;
-            private byte[]? _pixelBuffer;
-            private WriteableBitmap? _bitmap;            
-            private readonly RenderPipeline _renderPipeline = new();
+            _gl = gl;
+            Scene.Init(gl);
+            Scene.Shaders.Add(GLShader.Create(gl));
+            Scene.RegisterModule(_wheelModule);
+            _wheelModule.Load(Path.Combine(AppContext.BaseDirectory, "Assets", "gltf"), Scene.Importer);
+            ConfigureOpenGLState();
+            InitializeCamera();
+        }
 
-            public Scene3D Scene { get; } = new();
-            private readonly WheelSceneModule _wheelModule = new();
+        public void Resize(uint width, uint height)
+        {
+            if (_gl == null) return;
+            _gl.Viewport(0, 0, width, height);
+            Scene.Camera.Width = (int)width;
+            Scene.Camera.Height = (int)height;
+        }
 
-            public GL? GL => _gl;
-            public RenderFrameState FrameState { get; } = new();
+        public unsafe void RenderFrame(int w, int h)
+        {
+            if (_gl == null) return;
 
-            public event Action<WriteableBitmap>? FrameReady;
-
-            public void Init(GL gl)
+            if (_bitmap == null || _bitmap.PixelSize.Width != w || _bitmap.PixelSize.Height != h)
             {
-                _gl = gl;
-                Scene.Init(gl);                
-                Scene.Shaders.Add(GLShader.Create(gl));                
-                Scene.RegisterModule(_wheelModule);
-                _wheelModule.Load(Path.Combine(AppContext.BaseDirectory, "Assets", "gltf"), Scene.Importer);
-                ConfigureOpenGLState();
-                InitializeCamera();
+                _pixelBuffer = new byte[w * h * 4];
+                _bitmap = new WriteableBitmap(
+                    new PixelSize(w, h),
+                    new Vector(96, 96),
+                    Avalonia.Platform.PixelFormat.Bgra8888,
+                    AlphaFormat.Unpremul);
             }
 
-            public void Resize(uint width, uint height)
+            // Рисуем сцену
+            _renderPipeline.Execute(this, w, h);
+
+            // Чтение пикселей
+            fixed (byte* ptr = _pixelBuffer)
+                _gl.ReadPixels(0, 0, (uint)w, (uint)h, GLEnum.Bgra, GLEnum.UnsignedByte, ptr);
+
+            // Копируем в WriteableBitmap
+            using (var fbmp = _bitmap.Lock())
             {
-                if (_gl == null) return;
-                _gl.Viewport(0, 0, width, height);
-                Scene.Camera.Width = (int)width;
-                Scene.Camera.Height = (int)height;
-            }
+                int stride = w * 4;
+                byte* dstBase = (byte*)fbmp.Address;
 
-            public unsafe void RenderFrame(int w, int h)
-            {
-                if (_gl == null) return;
-
-                if (_bitmap == null || _bitmap.PixelSize.Width != w || _bitmap.PixelSize.Height != h)
+                fixed (byte* srcBase = _pixelBuffer)
                 {
-                    _pixelBuffer = new byte[w * h * 4];
-                    _bitmap = new WriteableBitmap(
-                        new PixelSize(w, h),
-                        new Vector(96, 96),
-                        Avalonia.Platform.PixelFormat.Bgra8888,
-                        AlphaFormat.Unpremul);
-                }
-
-                // Рисуем сцену
-                _renderPipeline.Execute(this, w, h);
-
-                // Чтение пикселей
-                fixed (byte* ptr = _pixelBuffer)
-                    _gl.ReadPixels(0, 0, (uint)w, (uint)h, GLEnum.Bgra, GLEnum.UnsignedByte, ptr);
-
-                // Копируем в WriteableBitmap
-                using (var fbmp = _bitmap.Lock())
-                {
-                    int stride = w * 4;
-                    byte* dstBase = (byte*)fbmp.Address;
-
-                    fixed (byte* srcBase = _pixelBuffer)
+                    for (int y = 0; y < h; y++)
                     {
-                        for (int y = 0; y < h; y++)
-                        {
-                            byte* src = srcBase + (h - 1 - y) * stride; // flip по Y
-                            byte* dst = dstBase + y * fbmp.RowBytes;
-                            System.Buffer.MemoryCopy(src, dst, stride, stride);
-                        }
+                        byte* src = srcBase + (h - 1 - y) * stride; // flip по Y
+                        byte* dst = dstBase + y * fbmp.RowBytes;
+                        System.Buffer.MemoryCopy(src, dst, stride, stride);
                     }
                 }
-
-                Dispatcher.UIThread.Post(() =>
-                {
-                    FrameReady?.Invoke(_bitmap);
-                }, DispatcherPriority.Render);                      
-            }          
-
-            public void Clear()
-            {
-                Scene.Clear();
             }
 
-            private void ConfigureOpenGLState()
+            Dispatcher.UIThread.Post(() =>
             {
-                if (_gl == null) return;
-                _gl.Enable(EnableCap.DepthTest);
-                _gl.DepthFunc(DepthFunction.Lequal);
+                FrameReady?.Invoke(_bitmap);
+            }, DispatcherPriority.Render);
+        }
 
-                _gl.Disable(EnableCap.CullFace);
-                _gl.CullFace(GLEnum.Back);
-                _gl.FrontFace(FrontFaceDirection.Ccw);
+        public void Clear()
+        {
+            Scene.Clear();
+        }
 
-                _gl.Disable(EnableCap.Blend);
+        private void ConfigureOpenGLState()
+        {
+            if (_gl == null) return;
+            _gl.Enable(EnableCap.DepthTest);
+            _gl.DepthFunc(DepthFunction.Lequal);
 
-                _gl.DepthMask(true);
-                _gl.ColorMask(true, true, true, true);
-            }
+            _gl.Disable(EnableCap.CullFace);
+            _gl.CullFace(GLEnum.Back);
+            _gl.FrontFace(FrontFaceDirection.Ccw);
 
-            private void InitializeCamera()
+            _gl.Disable(EnableCap.Blend);
+
+            _gl.DepthMask(true);
+            _gl.ColorMask(true, true, true, true);
+        }
+
+        private void InitializeCamera()
+        {
+            Scene.Lights.Add(new Light()
             {
-                Scene.Lights.Add(new Light()
-                {
-                    Position = new Vector3(0f, 600.0f, 600.0f),
-                    Color = new Vector3(1f, 1f, 1f),
-                    Intensity = 0.5f
-                });
+                Position = new Vector3(0f, 600.0f, 600.0f),
+                Color = new Vector3(1f, 1f, 1f),
+                Intensity = 0.5f
+            });
 
-                Scene.Lights.Add(new Light()
-                {
-                    Position = new Vector3(100f, 300, 300.0f),
-                    Color = new Vector3(1f, 1f, 1f),
-                    Intensity = 0.5f
-                });
+            Scene.Lights.Add(new Light()
+            {
+                Position = new Vector3(100f, 300, 300.0f),
+                Color = new Vector3(1f, 1f, 1f),
+                Intensity = 0.5f
+            });
 
-                Scene.Camera.Distance = Scene3DDefault.DistantionBase;
-                Scene.Camera.Pitch = Scene3DDefault.PitchBase;
-                Scene.Camera.Yaw = Scene3DDefault.YawBase;
-                Scene.Camera.Fov = MathF.PI / 4;
-                Scene.Camera.Near = 0.1f;
-                Scene.Camera.Far = 1400f;
-            }          
+            Scene.Camera.Distance = Scene3DDefault.DistantionBase;
+            Scene.Camera.Pitch = Scene3DDefault.PitchBase;
+            Scene.Camera.Yaw = Scene3DDefault.YawBase;
+            Scene.Camera.Fov = MathF.PI / 4;
+            Scene.Camera.Near = 0.1f;
+            Scene.Camera.Far = 1400f;
         }
     }
-
 }
