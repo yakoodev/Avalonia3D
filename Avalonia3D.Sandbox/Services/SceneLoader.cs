@@ -1,5 +1,6 @@
 using Avalonia3D.Model;
 using Avalonia3D.Sandbox.Scenes;
+using Serilog;
 using System;
 using System.Numerics;
 
@@ -37,6 +38,8 @@ public sealed class SceneLoader
             throw new ArgumentNullException(nameof(scene));
         }
 
+        Log.Information("Scene load requested: {SceneId} - {SceneTitle}", scene.Id, scene.Title);
+
         if (!_isRendererReady)
         {
             _pendingScene = scene;
@@ -50,6 +53,7 @@ public sealed class SceneLoader
     {
         ApplyDefaults();
         scene.Load(_scene, _assetsRoot);
+        Log.Information("Scene loaded: {SceneId} - {SceneTitle}", scene.Id, scene.Title);
         SceneChanged?.Invoke(scene);
     }
 

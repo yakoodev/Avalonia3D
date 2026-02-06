@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.LinuxFramebuffer;
 using Avalonia.LinuxFramebuffer.Input.LibInput;
+using Serilog;
 using System;
 using System.Linq;
 
@@ -11,6 +12,13 @@ internal static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Debug()
+            .WriteTo.Console()
+            .CreateLogger();
+
+        Log.Information("Starting Avalonia3D.Sandbox with args: {Args}", string.Join(" ", args));
+
         if (OperatingSystem.IsLinux())
         {
             return StartDrm(args);

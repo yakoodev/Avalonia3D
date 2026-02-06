@@ -4,7 +4,9 @@ using Avalonia3D.Model;
 using Avalonia3D.Rendering;
 using Avalonia3D.Shaders;
 using Silk.NET.OpenGL;
+using Serilog;
 using System;
+using System.Runtime.InteropServices;
 
 namespace Avalonia3D.Sandbox.Rendering;
 
@@ -29,6 +31,7 @@ public sealed class SandboxRenderer3D : IRenderContext
         ConfigureOpenGLState();
         InitializeCameraDefaults();
         InitializeFramePresenter();
+        LogOpenGlInfo();
         RendererInitialized?.Invoke();
     }
 
@@ -85,5 +88,18 @@ public sealed class SandboxRenderer3D : IRenderContext
         Scene.Camera.Fov = MathF.PI / 4;
         Scene.Camera.Near = 0.1f;
         Scene.Camera.Far = 200f;
+    }
+
+    private void LogOpenGlInfo()
+    {
+        if (_gl == null)
+        {
+            return;
+        }
+
+        var version = Marshal.PtrToStringAnsi((nint)_gl.GetString(GLEnum.Version)) ?? "<unknown>";
+        var renderer = Marshal.PtrToStringAnsi((nint)_gl.GetString(GLEnum.Renderer)) ?? "<unknown>";
+        var vendor = Marshal.PtrToStringAnsi((nint)_gl.GetString(GLEnum.Vendor)) ?? "<unknown>";
+        Log.Information("OpenGL init. Vendor: {Vendor}, Renderer: {Renderer}, Version: {Version}", vendor, renderer, version);
     }
 }
