@@ -1,3 +1,4 @@
+using Avalonia.Threading;
 using Avalonia3D.Animation;
 using Avalonia3D.Interaction.CameraController;
 using Avalonia3D.Model;
@@ -18,6 +19,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly SceneLoader _sceneLoader;
     private readonly Scene3D _scene;
     private readonly CameraController _cameraController;
+    private readonly IRenderThreadScheduler _renderThreadScheduler;
     private string _currentSceneTitle = "Сцена не выбрана";
     private ShaderRenderMode _selectedRenderMode;
     private string? _selectedClipName;
@@ -29,12 +31,16 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         _scene = scene;
         _cameraController = cameraController;
+        _renderThreadScheduler = renderThreadScheduler;
         _sceneLoader = new SceneLoader(scene, assetsRoot, renderThreadScheduler);
         _sceneLoader.SceneChanged += sceneInfo =>
         {
-            CurrentSceneTitle = sceneInfo.Title;
-            RefreshClips();
-            _cameraController.CaptureHomeView();
+            Dispatcher.UIThread.Post(() =>
+            {
+                CurrentSceneTitle = sceneInfo.Title;
+                RefreshClips();
+                ExecuteOnRenderThread(() => _cameraController.CaptureHomeView());
+            });
         };
 
         var scenes = SceneCatalog.CreateDefault(assetsRoot);
@@ -67,12 +73,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         StopClipCommand = new RelayCommand(_ => Stop());
         TogglePlayPauseCommand = new RelayCommand(_ => TogglePlayPause());
 
-        FrameAllCommand = new RelayCommand(_ => _cameraController.FrameAll());
-        ResetViewCommand = new RelayCommand(_ => _cameraController.ResetView());
+        FrameAllCommand = new RelayCommand(_ => ExecuteOnRenderThread(() => _cameraController.FrameAll()));
+        ResetViewCommand = new RelayCommand(_ => ExecuteOnRenderThread(() => _cameraController.ResetView()));
         ToggleCameraModeCommand = new RelayCommand(_ =>
         {
-            _cameraController.ToggleControlMode();
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CurrentCameraMode)));
+            ExecuteOnRenderThread(() => _cameraController.ToggleControlMode());
+            Dispatcher.UIThread.Post(() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CurrentCameraMode))));
         });
 
         _scene.BindRenderMode(ShaderRenderMode.Pbr, ShaderIds.Pbr);
@@ -209,8 +215,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public void MarkRendererReady() => _sceneLoader.MarkRendererReady();
 
-    public void HandleShortcutFrame() => _cameraController.FrameAll();
-    public void HandleShortcutReset() => _cameraController.ResetView();
+    public void HandleShortcutFrame() => ExecuteOnRenderThread(() => _cameraController.FrameAll());
+    public void HandleShortcutReset() => ExecuteOnRenderThread(() => _cameraController.ResetView());
     public void HandleShortcutPlayPause() => TogglePlayPause();
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -252,6 +258,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             : _scene.AnimatorComponent.GetClipState(SelectedClipName);
     }
 
+
+    private void ExecuteOnRenderThread(Action action)
+    {
+        _renderThreadScheduler.Enqueue(action);
+    }
+
     private void Play()
     {
         if (string.IsNullOrWhiteSpace(SelectedClipName))
@@ -259,8 +271,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             return;
         }
 
-        _scene.AnimatorComponent.PlayClip(SelectedClipName, IsLoopEnabled, (float)PlaybackSpeed);
-        UpdateSelectedClipState();
+        ExecuteOnRenderThread(() =>
+        {
+            _scene.AnimatorComponent.PlayClip(SelectedClipName, IsLoopEnabled, (float)PlaybackSpeed);
+            var state = _scene.AnimatorComponent.GetClipState(SelectedClipName);
+            Dispatcher.UIThread.Post(() => SelectedClipState = state);
+        });
     }
 
     private void Pause()
@@ -270,8 +286,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             return;
         }
 
-        _scene.AnimatorComponent.PauseClip(SelectedClipName);
-        UpdateSelectedClipState();
+        ExecuteOnRenderThread(() =>
+        {
+            _scene.AnimatorComponent.PauseClip(SelectedClipName);
+            var state = _scene.AnimatorComponent.GetClipState(SelectedClipName);
+            Dispatcher.UIThread.Post(() => SelectedClipState = state);
+        });
     }
 
     private void Stop()
@@ -281,8 +301,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             return;
         }
 
-        _scene.AnimatorComponent.StopClip(SelectedClipName);
-        UpdateSelectedClipState();
+        ExecuteOnRenderThread(() =>
+        {
+            _scene.AnimatorComponent.StopClip(SelectedClipName);
+            var state = _scene.AnimatorComponent.GetClipState(SelectedClipName);
+            Dispatcher.UIThread.Post(() => SelectedClipState = state);
+        });
     }
 
     private void TogglePlayPause()
