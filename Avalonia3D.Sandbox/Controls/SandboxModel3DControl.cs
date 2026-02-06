@@ -45,11 +45,12 @@ public class SandboxModel3DControl : OpenGlControlBase
     public IRenderThreadScheduler RenderThreadScheduler => _renderThreadScheduler;
 
 
-    public void ApplyRenderQuality(RenderQualitySettings settings)
+    public void ApplyGraphicsProfile(GraphicsProfile profile)
     {
-        _renderThreadScheduler.Enqueue(() => _renderer.SetRenderQuality(settings));
+        _renderThreadScheduler.Enqueue(() => _renderer.SetGraphicsProfile(profile));
     }
 
+    public GraphicsProfile GetGraphicsProfile() => _renderer.GraphicsProfile;
     public RenderQualitySettings GetRenderQuality() => _renderer.RenderQualitySettings;
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)

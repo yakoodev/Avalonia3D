@@ -14,7 +14,7 @@ public sealed class SandboxRenderer3D : IRenderContext
 {
     private GL? _gl;
     private IFramePresenter? _framePresenter;
-    private readonly RenderPipeline _renderPipeline = new(RenderQualitySettings.Medium);
+    private readonly RenderPipeline _renderPipeline = new(GraphicsProfile.Medium);
 
     public GL? GL => _gl;
     public Scene3D Scene { get; } = new();
@@ -23,11 +23,12 @@ public sealed class SandboxRenderer3D : IRenderContext
     public event Action<WriteableBitmap>? FrameReady;
     public event Action? RendererInitialized;
 
+    public GraphicsProfile GraphicsProfile => _renderPipeline.Profile;
     public RenderQualitySettings RenderQualitySettings => _renderPipeline.Settings;
 
-    public void SetRenderQuality(RenderQualitySettings settings)
+    public void SetGraphicsProfile(GraphicsProfile profile)
     {
-        _renderPipeline.ApplySettings(settings);
+        _renderPipeline.ApplyProfile(profile);
     }
 
     public void Init(GL gl)

@@ -6,7 +6,7 @@ namespace Avalonia3D.Rendering
 {
     public sealed class PostEffectsPass : IRenderPass
     {
-        private readonly RenderQualitySettings _settings;
+        private readonly GraphicsProfile _settings;
         private uint _copyTexture;
         private uint _program;
         private uint _vao;
@@ -15,7 +15,7 @@ namespace Avalonia3D.Rendering
         private int _textureHeight;
         private bool _failed;
 
-        public PostEffectsPass(RenderQualitySettings settings)
+        public PostEffectsPass(GraphicsProfile settings)
         {
             _settings = settings.Validate();
         }
@@ -24,7 +24,7 @@ namespace Avalonia3D.Rendering
 
         public unsafe void Execute(RenderPipelineContext context)
         {
-            if (_failed || _settings.PostEffects == PostEffectsFlags.None)
+            if (_failed || _settings.PostFx.Effects == PostEffectsFlags.None)
             {
                 return;
             }
@@ -49,10 +49,10 @@ namespace Avalonia3D.Rendering
             gl.BindTexture(TextureTarget.Texture2D, _copyTexture);
 
             gl.Uniform1(gl.GetUniformLocation(_program, "uSceneTexture"), 0);
-            gl.Uniform1(gl.GetUniformLocation(_program, "uApplyToneMapping"), _settings.PostEffects.HasFlag(PostEffectsFlags.ToneMapping) ? 1 : 0);
-            gl.Uniform1(gl.GetUniformLocation(_program, "uToneMappingOperator"), (int)_settings.ToneMapping);
-            gl.Uniform1(gl.GetUniformLocation(_program, "uApplyGamma"), _settings.PostEffects.HasFlag(PostEffectsFlags.GammaCorrection) ? 1 : 0);
-            gl.Uniform1(gl.GetUniformLocation(_program, "uGamma"), _settings.Gamma);
+            gl.Uniform1(gl.GetUniformLocation(_program, "uApplyToneMapping"), _settings.PostFx.Effects.HasFlag(PostEffectsFlags.ToneMapping) ? 1 : 0);
+            gl.Uniform1(gl.GetUniformLocation(_program, "uToneMappingOperator"), (int)_settings.PostFx.ToneMapping);
+            gl.Uniform1(gl.GetUniformLocation(_program, "uApplyGamma"), _settings.PostFx.Effects.HasFlag(PostEffectsFlags.GammaCorrection) ? 1 : 0);
+            gl.Uniform1(gl.GetUniformLocation(_program, "uGamma"), _settings.PostFx.Gamma);
 
             gl.BindVertexArray(_vao);
             gl.DrawArrays(PrimitiveType.Triangles, 0, 6);

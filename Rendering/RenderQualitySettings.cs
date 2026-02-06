@@ -40,6 +40,7 @@ namespace Avalonia3D.Rendering
         Custom
     }
 
+    // Legacy/compatibility adapter. New orchestration should use GraphicsProfile directly.
     public sealed record RenderQualitySettings
     {
         public const int MinShadowMapSize = 256;
@@ -56,84 +57,57 @@ namespace Avalonia3D.Rendering
         public float ReflectionIntensity { get; init; } = 0.35f;
         public string? EnvironmentMapPath { get; init; }
 
-        public static RenderQualitySettings Low => new()
-        {
-            ShadowsEnabled = false,
-            ShadowMapSize = 1024,
-            PostEffects = PostEffectsFlags.GammaCorrection,
-            ToneMapping = ToneMappingOperator.None,
-            Gamma = 2.0f,
-            MsaaPolicy = MsaaPolicy.Disabled,
-            ReflectionsEnabled = false,
-            ReflectionMode = ReflectionMode.Off,
-            ReflectionIntensity = 0f,
-            EnvironmentMapPath = null
-        };
+        public static RenderQualitySettings Low => FromProfile(GraphicsProfile.Low);
+        public static RenderQualitySettings Medium => FromProfile(GraphicsProfile.Medium);
+        public static RenderQualitySettings High => FromProfile(GraphicsProfile.High);
 
-        public static RenderQualitySettings Medium => new()
+        public GraphicsProfile ToProfile(string profileName = "LegacySettings")
         {
-            ShadowsEnabled = true,
-            ShadowMapSize = 1536,
-            PostEffects = PostEffectsFlags.ToneMapping | PostEffectsFlags.GammaCorrection,
-            ToneMapping = ToneMappingOperator.Reinhard,
-            Gamma = 2.2f,
-            MsaaPolicy = MsaaPolicy.X2,
-            ReflectionsEnabled = true,
-            ReflectionMode = ReflectionMode.IBL,
-            ReflectionIntensity = 0.3f
-        };
-
-        public static RenderQualitySettings High => new()
-        {
-            ShadowsEnabled = true,
-            ShadowMapSize = 4096,
-            PostEffects = PostEffectsFlags.ToneMapping | PostEffectsFlags.GammaCorrection,
-            ToneMapping = ToneMappingOperator.Reinhard,
-            Gamma = 2.2f,
-            MsaaPolicy = MsaaPolicy.X4,
-            ReflectionsEnabled = true,
-            ReflectionMode = ReflectionMode.IBL,
-            ReflectionIntensity = 0.45f
-        };
-
-        public RenderQualitySettings Validate()
-        {
-            var clampedShadowMapSize = Math.Clamp(ShadowMapSize, MinShadowMapSize, MaxShadowMapSize);
-            var gamma = Math.Clamp(Gamma, 1.0f, 3.0f);
-
-            var toneMapping = ToneMapping;
-            if (!PostEffects.HasFlag(PostEffectsFlags.ToneMapping))
+            return new GraphicsProfile
             {
-                toneMapping = ToneMappingOperator.None;
-            }
+                Name = profileName,
+                MsaaPolicy = MsaaPolicy,
+                Shadows = new ShadowProfile { Enabled = ShadowsEnabled, MapSize = ShadowMapSize },
+                PostFx = new PostFxProfile
+                {
+                    Effects = PostEffects,
+                    ToneMapping = ToneMapping,
+                    Gamma = Gamma
+                },
+                Reflections = new ReflectionProfile
+                {
+                    Enabled = ReflectionsEnabled,
+                    Mode = ReflectionMode,
+                    Intensity = ReflectionIntensity,
+                    EnvironmentMapPath = EnvironmentMapPath
+                }
+            }.Validate();
+        }
 
-            var reflectionIntensity = Math.Clamp(ReflectionIntensity, 0f, 2f);
-            var reflectionMode = ReflectionsEnabled ? ReflectionMode : ReflectionMode.Off;
-            var environmentMapPath = string.IsNullOrWhiteSpace(EnvironmentMapPath)
-                ? null
-                : EnvironmentMapPath.Trim();
-
-            return this with
+        public static RenderQualitySettings FromProfile(GraphicsProfile profile)
+        {
+            var validated = (profile ?? GraphicsProfile.Medium).Validate();
+            return new RenderQualitySettings
             {
-                ShadowMapSize = clampedShadowMapSize,
-                Gamma = gamma,
-                ToneMapping = toneMapping,
-                ReflectionIntensity = reflectionIntensity,
-                ReflectionMode = reflectionMode,
-                EnvironmentMapPath = environmentMapPath
+                ShadowsEnabled = validated.Shadows.Enabled,
+                ShadowMapSize = validated.Shadows.MapSize,
+                PostEffects = validated.PostFx.Effects,
+                ToneMapping = validated.PostFx.ToneMapping,
+                Gamma = validated.PostFx.Gamma,
+                MsaaPolicy = validated.MsaaPolicy,
+                ReflectionsEnabled = validated.Reflections.Enabled,
+                ReflectionMode = validated.Reflections.Mode,
+                ReflectionIntensity = validated.Reflections.Intensity,
+                EnvironmentMapPath = validated.Reflections.EnvironmentMapPath
             };
         }
 
+        public RenderQualitySettings Validate() => FromProfile(ToProfile());
+
         public static RenderQualitySettings FromPreset(RenderQualityPreset preset, RenderQualitySettings? current = null)
         {
-            return preset switch
-            {
-                RenderQualityPreset.Low => Low,
-                RenderQualityPreset.Medium => Medium,
-                RenderQualityPreset.High => High,
-                RenderQualityPreset.Custom => current ?? Medium,
-                _ => Medium
-            };
+            var currentProfile = current?.ToProfile("Custom");
+            return FromProfile(GraphicsProfile.FromPreset(preset, currentProfile));
         }
     }
 }

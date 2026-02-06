@@ -47,20 +47,21 @@ namespace Avalonia3D.Rendering
         private readonly RenderPipelineFactory _factory;
         private List<IRenderPass> _passes;
 
-        public RenderPipeline(RenderQualitySettings? settings = null, RenderPipelineFactory? factory = null)
+        public RenderPipeline(GraphicsProfile? profile = null, RenderPipelineFactory? factory = null)
         {
             _factory = factory ?? new RenderPipelineFactory();
-            Settings = (settings ?? RenderQualitySettings.Medium).Validate();
-            _passes = new List<IRenderPass>(_factory.CreatePasses(Settings));
+            Profile = (profile ?? GraphicsProfile.Medium).Validate();
+            _passes = new List<IRenderPass>(_factory.CreatePasses(Profile));
         }
 
-        public RenderQualitySettings Settings { get; private set; }
+        public GraphicsProfile Profile { get; private set; }
+        public RenderQualitySettings Settings => RenderQualitySettings.FromProfile(Profile);
         public IReadOnlyList<IRenderPass> Passes => _passes;
 
-        public void ApplySettings(RenderQualitySettings settings)
+        public void ApplyProfile(GraphicsProfile profile)
         {
-            Settings = settings.Validate();
-            _passes = new List<IRenderPass>(_factory.CreatePasses(Settings));
+            Profile = profile.Validate();
+            _passes = new List<IRenderPass>(_factory.CreatePasses(Profile));
         }
 
         public void Execute(IRenderContext renderContext, int width, int height)
