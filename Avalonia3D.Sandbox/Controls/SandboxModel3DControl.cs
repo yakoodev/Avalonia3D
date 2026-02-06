@@ -34,6 +34,8 @@ public class SandboxModel3DControl : OpenGlControlBase
 
     public event EventHandler? RendererInitialized;
 
+    public bool IsRendererInitialized { get; private set; }
+
     public IRenderThreadScheduler RenderThreadScheduler => _renderThreadScheduler;
 
     protected override void OnOpenGlInit(GlInterface gl)
@@ -41,6 +43,7 @@ public class SandboxModel3DControl : OpenGlControlBase
         base.OnOpenGlInit(gl);
         _gl = GL.GetApi(gl.GetProcAddress);
         _renderer.Init(_gl);
+        IsRendererInitialized = true;
         ApplySensitivity();
     }
 
@@ -68,6 +71,7 @@ public class SandboxModel3DControl : OpenGlControlBase
     protected override void OnOpenGlDeinit(GlInterface gl)
     {
         _renderer.Clear();
+        IsRendererInitialized = false;
         _gl = null;
         base.OnOpenGlDeinit(gl);
     }

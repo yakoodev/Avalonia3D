@@ -23,6 +23,11 @@ public partial class MainWindow : Window
             };
             DataContext = viewModel;
             viewport.RendererInitialized += (_, _) => viewModel.MarkRendererReady();
+
+            if (viewport.IsRendererInitialized)
+            {
+                viewModel.MarkRendererReady();
+            }
         }
     }
 
