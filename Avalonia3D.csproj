@@ -9,6 +9,10 @@
 	</PropertyGroup>
 	<ItemGroup>
 		<Compile Remove="Avalonia3D.Sandbox\**" />
+		<Compile Remove="Avalonia3D.Tests\**" />
+		<EmbeddedResource Remove="Avalonia3D.Tests\**" />
+		<None Remove="Avalonia3D.Tests\**" />
+		<AvaloniaXaml Remove="Avalonia3D.Tests\**" />
 		<EmbeddedResource Remove="Avalonia3D.Sandbox\**" />
 		<None Remove="Avalonia3D.Sandbox\**" />
 		<AvaloniaXaml Remove="Avalonia3D.Sandbox\**" />

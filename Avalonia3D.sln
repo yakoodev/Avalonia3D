@@ -5,7 +5,9 @@ VisualStudioVersion = 17.14.36202.13
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Avalonia3D", "Avalonia3D.csproj", "{B825279A-FCF1-42ED-9CBC-73B4B8F8C13C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Avalonia3D.Sandbox", "Avalonia3D.Sandbox\\Avalonia3D.Sandbox.csproj", "{58557138-BEE8-4A1F-9141-3E2EA338D16A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Avalonia3D.Sandbox", "Avalonia3D.Sandbox\Avalonia3D.Sandbox.csproj", "{58557138-BEE8-4A1F-9141-3E2EA338D16A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Avalonia3D.Tests", "Avalonia3D.Tests\Avalonia3D.Tests.csproj", "{216239DA-1181-4812-BF0A-F062AE59B952}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +23,10 @@ Global
 		{58557138-BEE8-4A1F-9141-3E2EA338D16A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{58557138-BEE8-4A1F-9141-3E2EA338D16A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{58557138-BEE8-4A1F-9141-3E2EA338D16A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{216239DA-1181-4812-BF0A-F062AE59B952}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{216239DA-1181-4812-BF0A-F062AE59B952}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{216239DA-1181-4812-BF0A-F062AE59B952}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{216239DA-1181-4812-BF0A-F062AE59B952}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
