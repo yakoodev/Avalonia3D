@@ -4,6 +4,7 @@ using Avalonia.OpenGL;
 using Avalonia.OpenGL.Controls;
 using Avalonia3D.Model;
 using Avalonia3D.Sandbox.Rendering;
+using Avalonia3D.Sandbox.Services;
 using Silk.NET.OpenGL;
 using System;
 using System.ComponentModel;
@@ -14,6 +15,7 @@ public class SandboxModel3DControl : OpenGlControlBase
 {
     private GL? _gl;
     private readonly SandboxRenderer3D _renderer = new();
+    private readonly RenderThreadScheduler _renderThreadScheduler = new();
 
     public SandboxModel3DControl()
     {
@@ -23,6 +25,8 @@ public class SandboxModel3DControl : OpenGlControlBase
     public Scene3D Scene => _renderer.Scene;
 
     public event EventHandler? RendererInitialized;
+
+    public IRenderThreadScheduler RenderThreadScheduler => _renderThreadScheduler;
 
     protected override void OnOpenGlInit(GlInterface gl)
     {
@@ -41,6 +45,7 @@ public class SandboxModel3DControl : OpenGlControlBase
         int height = (int)Bounds.Height;
         if (width <= 0 || height <= 0) return;
 
+        _renderThreadScheduler.ExecutePending();
         _renderer.Resize((uint)width, (uint)height);
         _renderer.RenderFrame(width, height);
         RequestNextFrameRendering();

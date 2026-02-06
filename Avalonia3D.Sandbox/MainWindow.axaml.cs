@@ -15,7 +15,7 @@ public partial class MainWindow : Window
         if (viewport != null)
         {
             var assetsRoot = Path.Combine(AppContext.BaseDirectory, "Assets", "TestScenes");
-            var viewModel = new MainWindowViewModel(viewport.Scene, assetsRoot);
+            var viewModel = new MainWindowViewModel(viewport.Scene, assetsRoot, viewport.RenderThreadScheduler);
             DataContext = viewModel;
             viewport.RendererInitialized += (_, _) => viewModel.MarkRendererReady();
         }

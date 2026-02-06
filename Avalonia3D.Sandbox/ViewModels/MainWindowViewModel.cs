@@ -13,9 +13,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly SceneLoader _sceneLoader;
     private string _currentSceneTitle = "Сцена не выбрана";
 
-    public MainWindowViewModel(Scene3D scene, string assetsRoot)
+    public MainWindowViewModel(Scene3D scene, string assetsRoot, IRenderThreadScheduler renderThreadScheduler)
     {
-        _sceneLoader = new SceneLoader(scene, assetsRoot);
+        _sceneLoader = new SceneLoader(scene, assetsRoot, renderThreadScheduler);
         _sceneLoader.SceneChanged += sceneInfo => CurrentSceneTitle = sceneInfo.Title;
 
         var scenes = SceneCatalog.CreateDefault();

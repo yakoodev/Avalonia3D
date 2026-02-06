@@ -376,6 +376,12 @@ namespace Avalonia3D.Rendering
             }
 
             uint textureId = Gl.GenTexture();
+            if (textureId == 0)
+            {
+                Log.Warning("Texture allocation failed before upload: {Width}x{Height}", textureData.Width, textureData.Height);
+                return 0;
+            }
+
             Gl.BindTexture(TextureTarget.Texture2D, textureId);
 
             fixed (byte* dataPtr = textureData.Data)
@@ -386,8 +392,16 @@ namespace Avalonia3D.Rendering
             }
 
             SetTextureParameters();
+            var glError = Gl.GetError();
 
-            Log.Information("Texture loaded: {Width}x{Height}, ID: {TextureId}", textureData.Width, textureData.Height, textureId);
+            if (glError != GLEnum.NoError)
+            {
+                Log.Warning("Texture upload GL error {GlError} for {Width}x{Height}, texture {TextureId}", glError, textureData.Width, textureData.Height, textureId);
+            }
+            else
+            {
+                Log.Information("Texture loaded: {Width}x{Height}, ID: {TextureId}", textureData.Width, textureData.Height, textureId);
+            }
 
             return textureId;
         }
