@@ -24,6 +24,14 @@ namespace Avalonia3D.Rendering
         X8 = 8
     }
 
+    public enum ReflectionMode
+    {
+        IBL,
+        ScreenSpace,
+        Planar,
+        Off
+    }
+
     public enum RenderQualityPreset
     {
         Low,
@@ -43,6 +51,10 @@ namespace Avalonia3D.Rendering
         public ToneMappingOperator ToneMapping { get; init; } = ToneMappingOperator.Reinhard;
         public float Gamma { get; init; } = 2.2f;
         public MsaaPolicy MsaaPolicy { get; init; } = MsaaPolicy.X4;
+        public bool ReflectionsEnabled { get; init; } = true;
+        public ReflectionMode ReflectionMode { get; init; } = ReflectionMode.IBL;
+        public float ReflectionIntensity { get; init; } = 0.35f;
+        public string? EnvironmentMapPath { get; init; }
 
         public static RenderQualitySettings Low => new()
         {
@@ -51,7 +63,11 @@ namespace Avalonia3D.Rendering
             PostEffects = PostEffectsFlags.GammaCorrection,
             ToneMapping = ToneMappingOperator.None,
             Gamma = 2.0f,
-            MsaaPolicy = MsaaPolicy.Disabled
+            MsaaPolicy = MsaaPolicy.Disabled,
+            ReflectionsEnabled = false,
+            ReflectionMode = ReflectionMode.Off,
+            ReflectionIntensity = 0f,
+            EnvironmentMapPath = null
         };
 
         public static RenderQualitySettings Medium => new()
@@ -61,7 +77,10 @@ namespace Avalonia3D.Rendering
             PostEffects = PostEffectsFlags.ToneMapping | PostEffectsFlags.GammaCorrection,
             ToneMapping = ToneMappingOperator.Reinhard,
             Gamma = 2.2f,
-            MsaaPolicy = MsaaPolicy.X2
+            MsaaPolicy = MsaaPolicy.X2,
+            ReflectionsEnabled = true,
+            ReflectionMode = ReflectionMode.IBL,
+            ReflectionIntensity = 0.3f
         };
 
         public static RenderQualitySettings High => new()
@@ -71,7 +90,10 @@ namespace Avalonia3D.Rendering
             PostEffects = PostEffectsFlags.ToneMapping | PostEffectsFlags.GammaCorrection,
             ToneMapping = ToneMappingOperator.Reinhard,
             Gamma = 2.2f,
-            MsaaPolicy = MsaaPolicy.X4
+            MsaaPolicy = MsaaPolicy.X4,
+            ReflectionsEnabled = true,
+            ReflectionMode = ReflectionMode.IBL,
+            ReflectionIntensity = 0.45f
         };
 
         public RenderQualitySettings Validate()
@@ -85,11 +107,20 @@ namespace Avalonia3D.Rendering
                 toneMapping = ToneMappingOperator.None;
             }
 
+            var reflectionIntensity = Math.Clamp(ReflectionIntensity, 0f, 2f);
+            var reflectionMode = ReflectionsEnabled ? ReflectionMode : ReflectionMode.Off;
+            var environmentMapPath = string.IsNullOrWhiteSpace(EnvironmentMapPath)
+                ? null
+                : EnvironmentMapPath.Trim();
+
             return this with
             {
                 ShadowMapSize = clampedShadowMapSize,
                 Gamma = gamma,
-                ToneMapping = toneMapping
+                ToneMapping = toneMapping,
+                ReflectionIntensity = reflectionIntensity,
+                ReflectionMode = reflectionMode,
+                EnvironmentMapPath = environmentMapPath
             };
         }
 
