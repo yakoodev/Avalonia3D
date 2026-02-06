@@ -14,6 +14,10 @@ namespace Avalonia3D.Model.StandObjects
         private GL? _gl;
         private Model? _model;
 
+        public Vector3 LocalBoundsMin { get; private set; } = Vector3.Zero;
+        public Vector3 LocalBoundsMax { get; private set; } = Vector3.Zero;
+        public bool HasGeometryBounds { get; private set; }
+
         public void AssignModel(Model model)
         {
             _model = model;
@@ -21,10 +25,15 @@ namespace Avalonia3D.Model.StandObjects
             if (model?.Vertices == null || model.Vertices.Length == 0)
             {
                 Gravity = Vector3.Zero;
+                HasGeometryBounds = false;
+                LocalBoundsMin = Vector3.Zero;
+                LocalBoundsMax = Vector3.Zero;
                 return;
             }
 
             Gravity = GetCenterOfGravity(model.Vertices);
+            (LocalBoundsMin, LocalBoundsMax) = GetLocalBounds(model.Vertices);
+            HasGeometryBounds = true;
 
             if (model.Material != null)
             {
@@ -73,6 +82,20 @@ namespace Avalonia3D.Model.StandObjects
             }
 
             return sum / vertices.Length;
+        }
+
+        private static (Vector3 Min, Vector3 Max) GetLocalBounds(Vertex[] vertices)
+        {
+            var min = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
+            var max = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
+
+            foreach (var vertex in vertices)
+            {
+                min = Vector3.Min(min, vertex.Position);
+                max = Vector3.Max(max, vertex.Position);
+            }
+
+            return (min, max);
         }
 
         public override unsafe void Render(IRenderContext renderContext)

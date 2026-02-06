@@ -10,7 +10,7 @@ namespace Avalonia3D.Rendering
         {
             var gl = context.Gl;
             gl.Viewport(0, 0, (uint)context.Width, (uint)context.Height);
-            gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, context.RenderContext.FrameState.OutputFramebufferId);
             gl.Enable(EnableCap.DepthTest);
             gl.Disable(EnableCap.Blend);
             gl.DepthMask(true);
