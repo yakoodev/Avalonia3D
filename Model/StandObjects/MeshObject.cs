@@ -2,7 +2,6 @@ using Avalonia3D.Interfaces;
 using Avalonia3D.Model;
 using Avalonia3D.Rendering;
 using Silk.NET.OpenGL;
-using System.Linq;
 using System.Numerics;
 
 namespace Avalonia3D.Model.StandObjects
@@ -105,7 +104,7 @@ namespace Avalonia3D.Model.StandObjects
                 return;
             }
 
-            var shader = Material?.Shader as IShader3D ?? renderContext.Scene.Shaders.FirstOrDefault();
+            var shader = renderContext.Scene.ShaderSelectionPolicy.Select(Material, renderContext.Scene, _gl);
             if (shader == null)
             {
                 return;

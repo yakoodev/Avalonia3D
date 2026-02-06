@@ -31,7 +31,14 @@ namespace Avalonia3D.Controls
         {
             _gl = gl;
             Scene.Init(gl);
-            Scene.Shaders.Add(GLShader.Create(gl));
+            Scene.ShaderRegistry.Register(ShaderIds.Pbr, GLShader.Create);
+            Scene.ShaderRegistry.Register(ShaderIds.Unlit, UnlitShader.Create);
+            Scene.ShaderRegistry.Register(ShaderIds.NormalsDebug, NormalsDebugShader.Create);
+            Scene.ShaderRegistry.SetDefault(ShaderIds.Pbr);
+            Scene.ActiveShaderId = ShaderIds.Pbr;
+            Scene.BindRenderMode(ShaderRenderMode.Pbr, ShaderIds.Pbr);
+            Scene.BindRenderMode(ShaderRenderMode.Unlit, ShaderIds.Unlit);
+            Scene.BindRenderMode(ShaderRenderMode.NormalsDebug, ShaderIds.NormalsDebug);
             Scene.RegisterModule(_wheelModule);
             _wheelModule.Load(Path.Combine(AppContext.BaseDirectory, "Assets", "gltf"), Scene.Importer);
             ConfigureOpenGLState();

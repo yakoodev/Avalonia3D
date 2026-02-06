@@ -35,6 +35,7 @@ namespace Avalonia3D.Model
         private double _lastTime = 0;
 
         private RenderResourceManager? _resourceManager;
+        private readonly Dictionary<ShaderRenderMode, string> _renderModeBindings = new();
 
         public SceneGraph SceneGraph { get; private set; } = new();
         public GltfSceneImporter Importer { get; } = new();
@@ -43,13 +44,33 @@ namespace Avalonia3D.Model
         public List<Light> Lights { get; set; } = [];
         public Camera Camera { get; set; } = new();
         public Unit Unit { get; set; }
+        [Obsolete("Use ShaderRegistry instead of direct shader list.")]
         public List<IShader3D> Shaders { get; } = [];
+        public ShaderRegistry ShaderRegistry { get; } = new();
+        public ShaderSelectionPolicy ShaderSelectionPolicy { get; } = new();
+        public string? ActiveShaderId { get; set; }
+        public ShaderRenderMode RenderMode { get; set; } = ShaderRenderMode.Default;
         internal Animator Animator { get; private set; } = new();
         public AnimatorComponent AnimatorComponent { get; private set; }
 
         public Scene3D()
         {
             AnimatorComponent = new AnimatorComponent(SceneGraph, Animator);
+        }
+
+        public void BindRenderMode(ShaderRenderMode mode, string shaderId)
+        {
+            if (string.IsNullOrWhiteSpace(shaderId))
+            {
+                return;
+            }
+
+            _renderModeBindings[mode] = shaderId;
+        }
+
+        public string? GetShaderIdForMode(ShaderRenderMode mode)
+        {
+            return _renderModeBindings.TryGetValue(mode, out var shaderId) ? shaderId : null;
         }
 
         public void Init(GL gl)
