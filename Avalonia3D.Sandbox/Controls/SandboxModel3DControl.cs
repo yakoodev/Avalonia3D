@@ -26,6 +26,9 @@ public class SandboxModel3DControl : OpenGlControlBase
 
     public SandboxModel3DControl()
     {
+        Focusable = true;
+        IsHitTestVisible = true;
+
         CameraController = new CameraController(_renderer.Scene.Camera, () => _renderer.Scene.SceneGraph);
         _inputHandler = new MouseKeyboardInputHandler(CameraController);
         _renderer.RendererInitialized += () => RendererInitialized?.Invoke(this, EventArgs.Empty);
@@ -40,6 +43,19 @@ public class SandboxModel3DControl : OpenGlControlBase
 
     public IRenderThreadScheduler RenderThreadScheduler => _renderThreadScheduler;
 
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        Log.Information("SandboxModel3DControl attached. Focusable={Focusable}, HitTest={HitTest}, Bounds={Bounds}", Focusable, IsHitTestVisible, Bounds);
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        Log.Information("SandboxModel3DControl detached");
+        base.OnDetachedFromVisualTree(e);
+    }
+
     protected override void OnOpenGlInit(GlInterface gl)
     {
         base.OnOpenGlInit(gl);
@@ -47,7 +63,7 @@ public class SandboxModel3DControl : OpenGlControlBase
         _renderer.Init(_gl);
         IsRendererInitialized = true;
         ApplySensitivity();
-        Log.Debug("SandboxModel3DControl initialized. Bounds={Bounds}", Bounds);
+        Log.Information("SandboxModel3DControl initialized. Bounds={Bounds}", Bounds);
     }
 
     protected override void OnOpenGlRender(GlInterface gl, int fb)
@@ -100,7 +116,7 @@ public class SandboxModel3DControl : OpenGlControlBase
         var point = e.GetPosition(this);
         _activeMouseButton = ResolveMouseButton(e);
 
-        Log.Debug("PointerPressed at {Point}. Button={Button}, Kind={Kind}", point, _activeMouseButton, e.GetCurrentPoint(this).Properties.PointerUpdateKind);
+        Log.Information("PointerPressed at {Point}. Button={Button}, Kind={Kind}", point, _activeMouseButton, e.GetCurrentPoint(this).Properties.PointerUpdateKind);
 
         if (_activeMouseButton == MouseButton.None)
         {
@@ -120,7 +136,7 @@ public class SandboxModel3DControl : OpenGlControlBase
         var point = e.GetPosition(this);
         var releasedButton = e.InitialPressMouseButton == MouseButton.None ? _activeMouseButton : e.InitialPressMouseButton;
 
-        Log.Debug("PointerReleased at {Point}. Button={Button}", point, releasedButton);
+        Log.Information("PointerReleased at {Point}. Button={Button}", point, releasedButton);
 
         _inputHandler.OnMouseUp(new Vector2((float)point.X, (float)point.Y), releasedButton);
         _isPointerDragActive = false;
@@ -139,7 +155,13 @@ public class SandboxModel3DControl : OpenGlControlBase
         base.OnPointerCaptureLost(e);
         _isPointerDragActive = false;
         _activeMouseButton = MouseButton.None;
-        Log.Debug("PointerCaptureLost");
+        Log.Information("PointerCaptureLost");
+    }
+
+    protected override void OnPointerEntered(PointerEventArgs e)
+    {
+        base.OnPointerEntered(e);
+        Log.Information("PointerEntered SandboxModel3DControl");
     }
 
     protected override void OnPointerMoved(PointerEventArgs e)
@@ -158,7 +180,7 @@ public class SandboxModel3DControl : OpenGlControlBase
     {
         base.OnPointerWheelChanged(e);
         _inputHandler.OnMouseWheel((float)e.Delta.Y);
-        Log.Debug("PointerWheel delta={Delta}", e.Delta.Y);
+        Log.Information("PointerWheel delta={Delta}", e.Delta.Y);
         e.Handled = true;
     }
 
