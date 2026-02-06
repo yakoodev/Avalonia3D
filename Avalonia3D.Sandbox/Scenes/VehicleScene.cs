@@ -1,5 +1,6 @@
 using Avalonia3D.Lights;
 using Avalonia3D.Model;
+using Avalonia3D.Sandbox.Services;
 using Serilog;
 using System.IO;
 using System.Numerics;
@@ -16,6 +17,7 @@ public sealed class VehicleScene : ISandboxScene
     {
         var path = Path.Combine(assetsRoot, "scene.gltf");
         Log.Information("Loading custom scene from: {Path}", path);
+        GltfAssetDiagnostics.LogAssetStatus(path);
         scene.LoadScene(path);
 
         scene.Lights.Add(new Light

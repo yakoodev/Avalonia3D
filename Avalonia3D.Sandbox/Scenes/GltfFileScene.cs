@@ -1,5 +1,6 @@
 using Avalonia3D.Lights;
 using Avalonia3D.Model;
+using Avalonia3D.Sandbox.Services;
 using Serilog;
 using System;
 using System.IO;
@@ -31,6 +32,7 @@ public sealed class GltfFileScene : ISandboxScene
     {
         var path = Path.Combine(assetsRoot, _fileName);
         Log.Information("Loading auto-discovered GLTF scene from: {Path}", path);
+        GltfAssetDiagnostics.LogAssetStatus(path);
         scene.LoadScene(path);
 
         if (scene.Lights.Count == 0)
