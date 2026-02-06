@@ -159,6 +159,7 @@
       <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16" Background="#88000000" Padding="10" CornerRadius="6">
         <StackPanel>
           <TextBlock Text="{Binding CurrentSceneTitle}" Foreground="White" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding ImportStatusText}" Foreground="#FFD36B" FontSize="11" MaxWidth="600" TextWrapping="Wrap" />
           <TextBlock Text="{Binding ActiveQualitySummary}" Foreground="#D0D0D0" FontSize="11" MaxWidth="600" TextWrapping="Wrap" />
         </StackPanel>
       </Border>

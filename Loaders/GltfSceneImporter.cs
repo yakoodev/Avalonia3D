@@ -16,19 +16,31 @@ namespace Avalonia3D.Loaders
 {
     public sealed class SceneImportResult
     {
-        public SceneImportResult(SceneGraph graph, IReadOnlyList<AnimationClip> clips)
+        public SceneImportResult(SceneGraph graph, IReadOnlyList<AnimationClip> clips, SceneImportStatus status, IReadOnlyList<string>? issues = null)
         {
             Graph = graph;
             Clips = clips;
+            Status = status;
+            Issues = issues ?? [];
         }
 
         public SceneGraph Graph { get; }
         public IReadOnlyList<AnimationClip> Clips { get; }
+        public SceneImportStatus Status { get; }
+        public IReadOnlyList<string> Issues { get; }
+        public bool IsDegraded => Status == SceneImportStatus.Degraded;
+    }
+
+    public enum SceneImportStatus
+    {
+        Success,
+        Degraded
     }
 
     public class GltfSceneImporter
     {
         private readonly Dictionary<string, List<Model.Model>> _modelCache = new(StringComparer.OrdinalIgnoreCase);
+        public ImportValidationPolicy ValidationPolicy { get; set; } = ImportValidationPolicy.RelaxedWithWarnings;
 
         public SceneGraph Import(string gltfPath)
         {
@@ -58,8 +70,12 @@ namespace Avalonia3D.Loaders
 
             try
             {
-                var gltf = LoadModelRootWithFallback(gltfPath);
-                return ImportWithAnimations(gltf);
+                var loaded = LoadModelRoot(gltfPath, ValidationPolicy);
+                var importResult = loaded.Model != null
+                    ? ImportWithAnimations(loaded.Model)
+                    : new SceneImportResult(new SceneGraph(), [], SceneImportStatus.Success);
+
+                return new SceneImportResult(importResult.Graph, importResult.Clips, loaded.Status, loaded.Issues);
             }
             finally
             {
@@ -70,28 +86,65 @@ namespace Avalonia3D.Loaders
             }
         }
 
-        private static ModelRoot LoadModelRootWithFallback(string gltfPath)
+        private static ModelLoadOutcome LoadModelRoot(string gltfPath, ImportValidationPolicy validationPolicy)
         {
+            var missingDependencies = GltfDependencyInspector.GetMissingDependencies(gltfPath);
+
             try
             {
-                return ModelRoot.Load(gltfPath);
+                var model = ModelRoot.Load(gltfPath);
+                return new ModelLoadOutcome(model, SceneImportStatus.Success, []);
             }
-            catch (SchemaException schemaException)
+            catch (Exception strictException)
             {
-                Log.Warning(
-                    "Strict glTF validation failed for {Path}: {ValidationError}. Retrying with ValidationMode.Skip for QA/testing assets.",
-                    gltfPath,
-                    schemaException.Message);
+                var issues = BuildIssues(strictException, missingDependencies);
+
+                if (validationPolicy == ImportValidationPolicy.Strict)
+                {
+                    throw CreateStrictImportException(gltfPath, issues, strictException);
+                }
+
+                Log.Warning("Strict glTF validation failed for {Path}. Running in relaxed mode. Issues: {Issues}", gltfPath, string.Join(" | ", issues));
 
                 var relaxedSettings = new ReadSettings
                 {
                     Validation = ValidationMode.Skip
                 };
 
-                var model = ModelRoot.Load(gltfPath, relaxedSettings);
-                Log.Information("GLTF loaded with relaxed validation for {Path}.", gltfPath);
-                return model;
+                try
+                {
+                    var model = ModelRoot.Load(gltfPath, relaxedSettings);
+                    Log.Warning("GLTF loaded with degraded quality for {Path}.", gltfPath);
+                    return new ModelLoadOutcome(model, SceneImportStatus.Degraded, issues);
+                }
+                catch (Exception relaxedException)
+                {
+                    issues.Add($"Relaxed import also failed: {relaxedException.Message}");
+                    Log.Error(relaxedException, "Relaxed import failed for {Path}. Returning degraded empty scene.", gltfPath);
+                    return new ModelLoadOutcome(null, SceneImportStatus.Degraded, issues);
+                }
             }
+        }
+
+        private static InvalidDataException CreateStrictImportException(string gltfPath, IReadOnlyList<string> issues, Exception innerException)
+        {
+            var message = $"GLTF import failed in strict mode for '{gltfPath}'. Problematic assets/issues:{Environment.NewLine}- {string.Join(Environment.NewLine + "- ", issues)}";
+            return new InvalidDataException(message, innerException);
+        }
+
+        private static List<string> BuildIssues(Exception exception, IReadOnlyList<string> missingDependencies)
+        {
+            var issues = new List<string>
+            {
+                $"Validation/load: {exception.Message}"
+            };
+
+            foreach (var dependency in missingDependencies)
+            {
+                issues.Add($"Missing dependency: {dependency}");
+            }
+
+            return issues;
         }
 
         public SceneGraph Import(ModelRoot gltf)
@@ -104,7 +157,7 @@ namespace Avalonia3D.Loaders
             var graph = new SceneGraph();
             if (gltf == null)
             {
-                return new SceneImportResult(graph, []);
+                return new SceneImportResult(graph, [], SceneImportStatus.Success);
             }
 
             var nodeKeys = new Dictionary<Node, string>();
@@ -132,8 +185,10 @@ namespace Avalonia3D.Loaders
             ModelLoader.ClearAllCaches();
             MemoryManager.PerformAggressiveCleanup();
             MemoryManager.LogMemoryState("After GLTF load");
-            return new SceneImportResult(graph, clips);
+            return new SceneImportResult(graph, clips, SceneImportStatus.Success);
         }
+
+        private sealed record ModelLoadOutcome(ModelRoot? Model, SceneImportStatus Status, IReadOnlyList<string> Issues);
 
         public void ImportInto(string gltfPath, MeshGroup target)
         {

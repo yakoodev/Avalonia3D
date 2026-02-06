@@ -1,6 +1,7 @@
 ﻿using Avalonia;
 using Avalonia.LinuxFramebuffer;
 using Avalonia.LinuxFramebuffer.Input.LibInput;
+using Avalonia3D.Loaders;
 using System;
 using System.Linq;
 
@@ -14,6 +15,8 @@ namespace Avalonia3D
         [STAThread]
         public static int Main(string[] args)
         {
+            ImportValidationConfiguration.Configure(ImportValidationConfiguration.ResolveFrom(args));
+
             if (OperatingSystem.IsLinux())
                 return StartDRM(args);
             else

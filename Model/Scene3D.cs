@@ -53,9 +53,11 @@ namespace Avalonia3D.Model
         public EnvironmentLightingSettings EnvironmentLighting { get; set; } = new();
         internal Animator Animator { get; private set; } = new();
         public AnimatorComponent AnimatorComponent { get; private set; }
+        public SceneImportReport LastImportReport { get; private set; } = SceneImportReport.Success;
 
         public Scene3D()
         {
+            Importer.ValidationPolicy = ImportValidationConfiguration.CurrentPolicy;
             AnimatorComponent = new AnimatorComponent(SceneGraph, Animator);
         }
 
@@ -171,6 +173,7 @@ namespace Avalonia3D.Model
         {
             ResetSceneGraph();
             var importResult = Importer.ImportWithAnimations(gltfPath);
+            LastImportReport = new SceneImportReport(importResult.Status, importResult.Issues);
             SceneGraph = importResult.Graph;
             AnimatorComponent.SetSceneGraph(SceneGraph);
             foreach (var clip in importResult.Clips)
@@ -215,5 +218,11 @@ namespace Avalonia3D.Model
         {
             LookChanged?.Invoke(this, _lookState);
         }
+    }
+
+    public readonly record struct SceneImportReport(SceneImportStatus Status, IReadOnlyList<string> Issues)
+    {
+        public static SceneImportReport Success => new(SceneImportStatus.Success, []);
+        public bool IsDegraded => Status == SceneImportStatus.Degraded;
     }
 }

@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.LinuxFramebuffer;
 using Avalonia.LinuxFramebuffer.Input.LibInput;
+using Avalonia3D.Loaders;
 using Serilog;
 using System;
 using System.Linq;
@@ -12,11 +13,14 @@ internal static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        ImportValidationConfiguration.Configure(ImportValidationConfiguration.ResolveFrom(args));
+
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
             .WriteTo.Console()
             .CreateLogger();
 
+        Log.Information("Import validation policy: {Policy}", ImportValidationConfiguration.CurrentPolicy);
         Log.Information("Starting Avalonia3D.Sandbox with args: {Args}", string.Join(" ", args));
 
         if (OperatingSystem.IsLinux())
