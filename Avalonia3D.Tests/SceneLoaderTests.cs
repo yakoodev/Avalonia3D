@@ -58,25 +58,22 @@ public sealed class SceneLoaderTests
     }
 
     [Fact]
-    public void CreateDefault_AddsBuiltInsAndDiscoversExternalGltfScenes()
+    public void CreateDefault_DiscoversExternalGltfScenesRecursively()
     {
         var assetsRoot = Path.Combine(Path.GetTempPath(), $"SceneCatalogTests-{Guid.NewGuid():N}");
         Directory.CreateDirectory(assetsRoot);
         File.WriteAllText(Path.Combine(assetsRoot, "A.gltf"), "{}");
         File.WriteAllText(Path.Combine(assetsRoot, "b.gltf"), "{}");
-        File.WriteAllText(Path.Combine(assetsRoot, "SimpleScene.gltf"), "{}");
+        var nested = Path.Combine(assetsRoot, "droid");
+        Directory.CreateDirectory(nested);
+        File.WriteAllText(Path.Combine(nested, "Unit.gltf"), "{}");
 
         try
         {
             var scenes = SceneCatalog.CreateDefault(assetsRoot);
 
-            Assert.Contains(scenes, s => s.Id == "simple");
-            Assert.Contains(scenes, s => s.Id == "hierarchy");
-            Assert.Contains(scenes, s => s.Id == "pbr");
-            Assert.Contains(scenes, s => s.Id == "vehicle");
-
             var discovered = scenes.Where(s => s is GltfFileScene).Select(s => s.Title).ToArray();
-            Assert.Equal(new[] { "Модель: A", "Модель: b" }, discovered);
+            Assert.Equal(new[] { "Модель: A", "Модель: b", "Модель: Unit" }, discovered);
         }
         finally
         {
@@ -85,14 +82,13 @@ public sealed class SceneLoaderTests
     }
 
     [Fact]
-    public void CreateDefault_WhenDirectoryMissing_ReturnsOnlyBuiltInScenes()
+    public void CreateDefault_WhenDirectoryMissing_ReturnsNoScenes()
     {
         var assetsRoot = Path.Combine(Path.GetTempPath(), $"missing-{Guid.NewGuid():N}");
 
         var scenes = SceneCatalog.CreateDefault(assetsRoot);
 
-        Assert.Equal(4, scenes.Count);
-        Assert.DoesNotContain(scenes, s => s is GltfFileScene);
+        Assert.Empty(scenes);
     }
 
     private sealed class ImmediateScheduler : IRenderThreadScheduler

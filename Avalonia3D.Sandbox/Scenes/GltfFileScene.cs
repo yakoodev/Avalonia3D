@@ -10,18 +10,21 @@ namespace Avalonia3D.Sandbox.Scenes;
 
 public sealed class GltfFileScene : ISandboxScene
 {
-    private readonly string _fileName;
+    private readonly string _relativePath;
 
-    public GltfFileScene(string fileName)
+    public GltfFileScene(string relativePath)
     {
-        if (string.IsNullOrWhiteSpace(fileName))
-            throw new ArgumentException("GLTF file name is required.", nameof(fileName));
+        if (string.IsNullOrWhiteSpace(relativePath))
+            throw new ArgumentException("GLTF relative path is required.", nameof(relativePath));
 
-        _fileName = fileName;
-        var shortName = Path.GetFileNameWithoutExtension(fileName);
-        Id = $"gltf:{shortName.ToLowerInvariant()}";
+        _relativePath = relativePath;
+        var shortName = Path.GetFileNameWithoutExtension(relativePath);
+        var normalizedPath = relativePath.Replace(Path.DirectorySeparatorChar, '/').Replace(Path.AltDirectorySeparatorChar, '/');
+        var normalizedId = normalizedPath.Replace(".gltf", string.Empty, StringComparison.OrdinalIgnoreCase).ToLowerInvariant();
+
+        Id = $"gltf:{normalizedId}";
         Title = $"Модель: {shortName}";
-        Description = $"Авто-сцена для файла {fileName} из Assets/TestScenes.";
+        Description = $"Авто-сцена для файла {normalizedPath} из Assets/TestScenes.";
     }
 
     public string Id { get; }
@@ -30,7 +33,7 @@ public sealed class GltfFileScene : ISandboxScene
 
     public void Load(Scene3D scene, string assetsRoot)
     {
-        var path = Path.Combine(assetsRoot, _fileName);
+        var path = Path.Combine(assetsRoot, _relativePath);
         Log.Information("Loading auto-discovered GLTF scene from: {Path}", path);
         GltfAssetDiagnostics.LogAssetStatus(path);
         scene.LoadScene(path);
