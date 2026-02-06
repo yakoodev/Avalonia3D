@@ -5,6 +5,7 @@ using Avalonia3D.Model;
 using Avalonia3D.Model.StandObjects;
 using Serilog;
 using SharpGLTF.Schema2;
+using SharpGLTF.Validation;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -56,7 +57,7 @@ namespace Avalonia3D.Loaders
 
             try
             {
-                var gltf = ModelRoot.Load(gltfPath);
+                var gltf = LoadModelRootWithFallback(gltfPath);
                 return ImportWithAnimations(gltf);
             }
             finally
@@ -65,6 +66,27 @@ namespace Avalonia3D.Loaders
                 {
                     MemoryManager.RestoreNormalSettings();
                 }
+            }
+        }
+
+        private static ModelRoot LoadModelRootWithFallback(string gltfPath)
+        {
+            try
+            {
+                return ModelRoot.Load(gltfPath);
+            }
+            catch (SchemaException schemaException)
+            {
+                Log.Warning(schemaException,
+                    "Strict glTF validation failed for {Path}. Retrying with ValidationMode.Skip for QA/testing assets.",
+                    gltfPath);
+
+                var relaxedSettings = new ReadSettings
+                {
+                    Validation = ValidationMode.Skip
+                };
+
+                return ModelRoot.Load(gltfPath, relaxedSettings);
             }
         }
 

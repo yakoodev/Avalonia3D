@@ -127,6 +127,31 @@ public class AnimationTests
         Assert.Null(exception);
     }
 
+
+    [Fact]
+    public void AnimatorComponent_RegisterAndPlayClip_UpdatesPlaybackStateInvariant()
+    {
+        var (graph, _, clip) = CreateSingleNodeClip(duration: 1f);
+        var animator = new Animator();
+        var component = new AnimatorComponent(graph, animator);
+
+        component.RegisterClip(clip);
+        var beforePlayState = component.GetClipState(clip.Name);
+
+        Assert.True(beforePlayState.IsRegistered);
+        Assert.False(beforePlayState.IsPlaying);
+        Assert.Equal(clip.Duration, beforePlayState.Duration);
+
+        var started = component.PlayClip(clip.Name, loop: true, speed: 1.5f);
+        var playingState = component.GetClipState(clip.Name);
+
+        Assert.True(started);
+        Assert.True(playingState.IsRegistered);
+        Assert.True(playingState.IsPlaying);
+        Assert.True(playingState.Loop);
+        Assert.Equal(1.5f, playingState.Speed);
+    }
+
     private static (SceneGraph Graph, SceneNode Node, AnimationClip Clip) CreateSingleNodeClip(float duration)
     {
         var graph = new SceneGraph();
