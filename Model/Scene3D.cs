@@ -50,6 +50,7 @@ namespace Avalonia3D.Model
         public ShaderSelectionPolicy ShaderSelectionPolicy { get; } = new();
         public string? ActiveShaderId { get; set; }
         public ShaderRenderMode RenderMode { get; set; } = ShaderRenderMode.Default;
+        public EnvironmentLightingSettings EnvironmentLighting { get; set; } = new();
         internal Animator Animator { get; private set; } = new();
         public AnimatorComponent AnimatorComponent { get; private set; }
 

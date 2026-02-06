@@ -15,17 +15,36 @@ public class RenderPipelineFactoryTests
         var names = passes.Select(p => p.Name).ToArray();
 
         Assert.DoesNotContain("ShadowPass", names);
+        Assert.DoesNotContain("EnvironmentLightingPass", names);
         Assert.Contains("ForwardPass", names);
         Assert.Contains("PostEffectsPass", names);
     }
 
     [Fact]
-    public void CreatePasses_HighPreset_IncludesShadowForwardAndPostEffects()
+    public void CreatePasses_HighPreset_IncludesShadowEnvironmentForwardAndPostEffects()
     {
         var passes = _factory.CreatePasses(RenderQualitySettings.High);
         var names = passes.Select(p => p.Name).ToArray();
 
-        Assert.Equal(new[] { "ShadowPass", "ForwardPass", "PostEffectsPass" }, names);
+        Assert.Equal(new[] { "ShadowPass", "EnvironmentLightingPass", "ForwardPass", "PostEffectsPass" }, names);
+    }
+
+    [Theory]
+    [InlineData(ReflectionMode.Off, false)]
+    [InlineData(ReflectionMode.Off, true)]
+    [InlineData(ReflectionMode.IBL, false)]
+    public void CreatePasses_ReflectionDisabledOrOff_DropsEnvironmentPass(ReflectionMode mode, bool enabled)
+    {
+        var settings = RenderQualitySettings.Medium with
+        {
+            ReflectionMode = mode,
+            ReflectionsEnabled = enabled
+        };
+
+        var passes = _factory.CreatePasses(settings);
+        var names = passes.Select(p => p.Name).ToArray();
+
+        Assert.DoesNotContain("EnvironmentLightingPass", names);
     }
 
     [Fact]
@@ -37,6 +56,6 @@ public class RenderPipelineFactoryTests
         var names = passes.Select(p => p.Name).ToArray();
 
         Assert.DoesNotContain("PostEffectsPass", names);
-        Assert.Equal(new[] { "ShadowPass", "ForwardPass" }, names);
+        Assert.Equal(new[] { "ShadowPass", "EnvironmentLightingPass", "ForwardPass" }, names);
     }
 }

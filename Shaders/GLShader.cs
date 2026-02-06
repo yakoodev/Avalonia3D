@@ -44,6 +44,9 @@ namespace Avalonia3D.Shaders
         private int _roughnessFactorLocation = -1;
         private int _occlusionStrengthLocation = -1;
         private int _emissiveFactorLocation = -1;
+        private int _environmentMapLocation = -1;
+        private int _reflectionIntensityLocation = -1;
+        private int _hasEnvironmentMapLocation = -1;
 
         public uint Handle => _shaderProgram;
         private GL _gl;
@@ -138,6 +141,10 @@ uniform float uRoughnessFactor;
 uniform float uOcclusionStrength;
 uniform vec3 uEmissiveFactor;
 
+uniform sampler2D uEnvironmentMap;
+uniform float uReflectionIntensity;
+uniform int uHasEnvironmentMap;
+
 uniform float uAlpha;
 
 float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
@@ -188,6 +195,20 @@ vec3 GetNormal()
     mat3 TBN = mat3(T, B, norm);
 
     return normalize(TBN * tangentNormal);
+}
+
+vec3 ComputeEnvironmentReflection(vec3 normal, vec3 viewDir, float roughness)
+{
+    if (uHasEnvironmentMap == 0)
+    {
+        return vec3(0.0);
+    }
+
+    vec3 reflectionDir = reflect(-viewDir, normal);
+    vec2 envUv = vec2(atan(reflectionDir.z, reflectionDir.x) / (2.0 * 3.14159265) + 0.5, acos(clamp(reflectionDir.y, -1.0, 1.0)) / 3.14159265);
+    vec3 reflectedColor = texture(uEnvironmentMap, envUv).rgb;
+    float roughnessFade = 1.0 - clamp(roughness, 0.0, 1.0);
+    return reflectedColor * roughnessFade * uReflectionIntensity;
 }
 
 void main()
@@ -256,7 +277,8 @@ void main()
         resultLight = albedo * 0.65;
     }
 
-    vec3 result = resultLight * ao + emissive + uEmissionColor;
+    vec3 reflection = ComputeEnvironmentReflection(norm, viewDir, roughness);
+    vec3 result = resultLight * ao + emissive + uEmissionColor + reflection;
     float alpha = baseColor.a * uAlpha;
     FragColor = vec4(result, alpha);
 }";
@@ -353,6 +375,9 @@ void main()
             _intensityLocation = _gl.GetUniformLocation(_shaderProgram, "uIntensity[0]");
             _shininessLocation = _gl.GetUniformLocation(_shaderProgram, "uShininess");
             _alphaLocation = _gl.GetUniformLocation(_shaderProgram, "uAlpha");
+            _environmentMapLocation = _gl.GetUniformLocation(_shaderProgram, "uEnvironmentMap");
+            _reflectionIntensityLocation = _gl.GetUniformLocation(_shaderProgram, "uReflectionIntensity");
+            _hasEnvironmentMapLocation = _gl.GetUniformLocation(_shaderProgram, "uHasEnvironmentMap");
         }
 
         public unsafe void SetUniforms(IRenderContext renderContext, SceneObject sceneObject, Matrix4x4 lightSpaceMatrix = default)
@@ -457,6 +482,16 @@ void main()
 
             if (_shininessLocation != -1)
                 _gl.Uniform1(_shininessLocation, primaryLight?.Shininess ?? 16);
+
+            var frameState = renderContext.FrameState;
+            if (_environmentMapLocation != -1)
+                _gl.Uniform1(_environmentMapLocation, 6);
+
+            if (_reflectionIntensityLocation != -1)
+                _gl.Uniform1(_reflectionIntensityLocation, frameState.ReflectionsEnabled ? frameState.ReflectionIntensity : 0f);
+
+            if (_hasEnvironmentMapLocation != -1)
+                _gl.Uniform1(_hasEnvironmentMapLocation, frameState.ReflectionsEnabled && frameState.EnvironmentReflectionTextureId.HasValue ? 1 : 0);
         }
 
         public void BindMaterial(RenderResources resources, Material? material, uint? shadowMapId)
