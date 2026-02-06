@@ -62,7 +62,7 @@ namespace Avalonia3D.Rendering
             _bitmap = new WriteableBitmap(
                 new PixelSize(width, height),
                 new Vector(96, 96),
-                PixelFormat.Bgra8888,
+                Avalonia.Platform.PixelFormat.Bgra8888,
                 AlphaFormat.Unpremul);
 
             _hasData = false;
@@ -84,7 +84,7 @@ namespace Avalonia3D.Rendering
             int mapIndex = (_pboIndex + 1) % BufferCount;
 
             gl.BindBuffer(GLEnum.PixelPackBuffer, _pbos[readIndex]);
-            gl.ReadPixels(0, 0, (uint)width, (uint)height, GLEnum.Bgra, GLEnum.UnsignedByte, 0);
+            gl.ReadPixels(0, 0, (uint)width, (uint)height, GLEnum.Bgra, GLEnum.UnsignedByte, (int*)0);
 
             if (_hasData && _bitmap != null)
             {
@@ -129,7 +129,7 @@ namespace Avalonia3D.Rendering
             _bitmap = null;
         }
 
-        private void EnsurePbos(GL gl)
+        private unsafe void EnsurePbos(GL gl)
         {
             if (_pboInitialized)
             {
