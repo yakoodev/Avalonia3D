@@ -40,6 +40,7 @@ namespace Avalonia3D.Controls
             int h = (int)Bounds.Height;
             if (w <= 0 || h <= 0) return;
 
+            _renderer.FrameState.OutputFramebufferId = (uint)Math.Max(0, fb);
             _renderer.Resize((uint)w, (uint)h);
             _renderer.RenderFrame(w, h);
 

@@ -5,6 +5,7 @@ using Avalonia.OpenGL.Controls;
 using Avalonia3D.Model;
 using Avalonia3D.Sandbox.Rendering;
 using Avalonia3D.Sandbox.Services;
+using Serilog;
 using Silk.NET.OpenGL;
 using System;
 using System.ComponentModel;
@@ -45,6 +46,13 @@ public class SandboxModel3DControl : OpenGlControlBase
         int height = (int)Bounds.Height;
         if (width <= 0 || height <= 0) return;
 
+        if (_lastFramebuffer != fb)
+        {
+            _lastFramebuffer = fb;
+            Log.Information("Sandbox OpenGL target framebuffer: {FramebufferId}", fb);
+        }
+
+        _renderer.FrameState.OutputFramebufferId = (uint)Math.Max(0, fb);
         _renderThreadScheduler.ExecutePending();
         _renderer.Resize((uint)width, (uint)height);
         _renderer.RenderFrame(width, height);
@@ -70,6 +78,7 @@ public class SandboxModel3DControl : OpenGlControlBase
     private Point? _lastMousePosition;
     private bool _isRotating;
     private bool _isDragging;
+    private int _lastFramebuffer = -1;
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {

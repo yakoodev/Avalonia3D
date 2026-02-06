@@ -4,6 +4,7 @@ namespace Avalonia3D.Rendering
 {
     public sealed class RenderFrameState
     {
+        public uint OutputFramebufferId { get; set; }
         public uint? ShadowMapId { get; set; }
         public Matrix4x4 LightSpaceMatrix { get; set; } = Matrix4x4.Identity;
     }
