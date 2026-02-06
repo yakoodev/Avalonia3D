@@ -4,6 +4,21 @@ using System.Numerics;
 
 namespace Avalonia3D.Model
 {
+    public enum MaterialAlphaMode
+    {
+        Opaque = 0,
+        Mask = 1,
+        Blend = 2
+    }
+
+    public sealed class MaterialSurfaceSettings
+    {
+        public MaterialAlphaMode AlphaMode { get; set; } = MaterialAlphaMode.Opaque;
+        public float AlphaCutoff { get; set; } = 0.5f;
+        public bool DoubleSided { get; set; }
+        public float EmissiveIntensity { get; set; } = 1f;
+    }
+
     public class Material
     {
         public Vector4 BaseColorFactor { get; set; } = new(1f, 1f, 1f, 1f);
@@ -13,6 +28,31 @@ namespace Avalonia3D.Model
         public Vector3 EmissiveFactor { get; set; } = Vector3.Zero;
         public float Opacity { get; set; } = 1.0f;
         public bool IsTransparent { get; set; }
+        public MaterialSurfaceSettings Surface { get; set; } = new();
+
+        public MaterialAlphaMode AlphaMode
+        {
+            get => Surface.AlphaMode;
+            set => Surface.AlphaMode = value;
+        }
+
+        public float AlphaCutoff
+        {
+            get => Surface.AlphaCutoff;
+            set => Surface.AlphaCutoff = value;
+        }
+
+        public bool DoubleSided
+        {
+            get => Surface.DoubleSided;
+            set => Surface.DoubleSided = value;
+        }
+
+        public float EmissiveIntensity
+        {
+            get => Surface.EmissiveIntensity;
+            set => Surface.EmissiveIntensity = value;
+        }
 
         public TextureData? BaseColorTexture { get; set; }
         public TextureData? NormalTexture { get; set; }

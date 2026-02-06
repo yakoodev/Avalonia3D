@@ -13,6 +13,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Runtime;
+using System.Text.Json;
 
 namespace Avalonia3D.Loaders
 {
@@ -204,6 +205,7 @@ namespace Avalonia3D.Loaders
 
             var result = new Avalonia3D.Model.Material();
             ApplyPbrFactors(material, result);
+            ApplySurfaceSettings(material, result);
             result.Opacity = result.BaseColorFactor.W;
 
             var baseColorChannel = material.FindChannel("BaseColor");
@@ -236,13 +238,175 @@ namespace Avalonia3D.Loaders
                 result.EmissiveFactor = new Vector3(emissiveColor.X, emissiveColor.Y, emissiveColor.Z);
             }
 
-            if (result.Opacity < 0.999f)
+            if (result.AlphaMode == MaterialAlphaMode.Blend || result.Opacity < 0.999f)
             {
                 result.IsTransparent = true;
             }
 
             model.Material = result;
             model.TextureData = result.BaseColorTexture;
+        }
+
+
+        private static void ApplySurfaceSettings(SharpGLTF.Schema2.Material material, Avalonia3D.Model.Material target)
+        {
+            if (material == null || target == null)
+            {
+                return;
+            }
+
+            target.AlphaMode = ParseAlphaMode(material.Alpha);
+            target.AlphaCutoff = material.AlphaCutoff;
+            target.DoubleSided = material.DoubleSided;
+            target.EmissiveIntensity = ReadEmissiveStrength(material);
+        }
+
+        private static MaterialAlphaMode ParseAlphaMode(AlphaMode alphaMode)
+        {
+            return alphaMode switch
+            {
+                AlphaMode.MASK => MaterialAlphaMode.Mask,
+                AlphaMode.BLEND => MaterialAlphaMode.Blend,
+                _ => MaterialAlphaMode.Opaque
+            };
+        }
+
+        private static float ReadEmissiveStrength(SharpGLTF.Schema2.Material material)
+        {
+            const float fallback = 1f;
+
+            if (material == null)
+            {
+                return fallback;
+            }
+
+            if (TryReadEmissiveStrengthFromObject(material, out var directStrength))
+            {
+                return directStrength;
+            }
+
+            try
+            {
+                var extrasJson = material.Extras?.ToString();
+                if (!string.IsNullOrWhiteSpace(extrasJson))
+                {
+                    using var doc = JsonDocument.Parse(extrasJson);
+                    if (TryReadEmissiveStrengthFromJson(doc.RootElement, out var extrasStrength))
+                    {
+                        return extrasStrength;
+                    }
+                }
+            }
+            catch
+            {
+                // ignored, fallback below
+            }
+
+            return fallback;
+        }
+
+        private static bool TryReadEmissiveStrengthFromObject(object source, out float strength)
+        {
+            strength = 1f;
+            if (source == null)
+            {
+                return false;
+            }
+
+            var type = source.GetType();
+            foreach (var prop in type.GetProperties())
+            {
+                var name = prop.Name;
+                object value;
+
+                try
+                {
+                    value = prop.GetValue(source);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (value == null)
+                {
+                    continue;
+                }
+
+                if (name.Contains("EmissiveStrength", StringComparison.OrdinalIgnoreCase) ||
+                    (name.Contains("Strength", StringComparison.OrdinalIgnoreCase) && name.Contains("Emissive", StringComparison.OrdinalIgnoreCase)))
+                {
+                    if (value is float f)
+                    {
+                        strength = Math.Max(0f, f);
+                        return true;
+                    }
+
+                    if (value is double d)
+                    {
+                        strength = Math.Max(0f, (float)d);
+                        return true;
+                    }
+                }
+
+                if (value is string)
+                {
+                    continue;
+                }
+
+                if (value is System.Collections.IEnumerable sequence)
+                {
+                    foreach (var item in sequence)
+                    {
+                        if (item != null && TryReadEmissiveStrengthFromObject(item, out strength))
+                        {
+                            return true;
+                        }
+                    }
+
+                    continue;
+                }
+
+                if (name.Contains("Extension", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("Emissive", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (TryReadEmissiveStrengthFromObject(value, out strength))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryReadEmissiveStrengthFromJson(JsonElement element, out float strength)
+        {
+            strength = 1f;
+            if (element.ValueKind != JsonValueKind.Object)
+            {
+                return false;
+            }
+
+            if (element.TryGetProperty("KHR_materials_emissive_strength", out var ext) &&
+                ext.TryGetProperty("emissiveStrength", out var emissiveStrength) &&
+                emissiveStrength.ValueKind == JsonValueKind.Number &&
+                emissiveStrength.TryGetSingle(out var extValue))
+            {
+                strength = Math.Max(0f, extValue);
+                return true;
+            }
+
+            foreach (var property in element.EnumerateObject())
+            {
+                if (property.Value.ValueKind == JsonValueKind.Object &&
+                    TryReadEmissiveStrengthFromJson(property.Value, out strength))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static TextureData? LoadTextureFromChannel(MaterialChannel? channel)

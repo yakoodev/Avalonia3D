@@ -49,7 +49,8 @@ void main()
         sb.AppendLine("in vec3 FragPos;");
         sb.AppendLine("in vec4 FragPosLightSpace;");
         sb.AppendLine();
-        sb.AppendLine("out vec4 FragColor;");
+        sb.AppendLine("layout(location = 0) out vec4 FragColor;");
+        sb.AppendLine("layout(location = 1) out vec4 EmissiveColor;");
         sb.AppendLine();
         AppendUniforms(sb, maxLights);
         AppendShadowFunction(sb);
@@ -120,6 +121,9 @@ void main()
         sb.AppendLine("uniform int uHasEnvironmentMap;");
         sb.AppendLine();
         sb.AppendLine("uniform float uAlpha;");
+        sb.AppendLine("uniform float uAlphaCutoff;");
+        sb.AppendLine("uniform int uAlphaMode;");
+        sb.AppendLine("uniform float uEmissiveIntensity;");
         sb.AppendLine();
     }
 
@@ -232,7 +236,7 @@ void main()
         {
             sb.AppendLine("    if (uHasOcclusionMap == 1) { float aoSample = texture(uOcclusionMap, TexCoord).r; ao = mix(1.0, aoSample, uOcclusionStrength); }");
         }
-        sb.AppendLine("    vec3 emissive = uEmissiveFactor;");
+        sb.AppendLine("    vec3 emissive = uEmissiveFactor * max(uEmissiveIntensity, 0.0);");
         if (features.HasFlag(PbrFeatures.EmissiveMap))
         {
             sb.AppendLine("    if (uHasEmissiveMap == 1) { emissive *= texture(uEmissiveMap, TexCoord).rgb; }");
@@ -273,9 +277,17 @@ void main()
     }}
 
     vec3 reflection = ComputeEnvironmentReflection(norm, viewDir, roughness);
-    vec3 result = resultLight * ao + emissive + uEmissionColor + reflection;
+    vec3 totalEmissive = emissive + uEmissionColor;
+    vec3 result = resultLight * ao + totalEmissive + reflection;
     float alpha = baseColor.a * uAlpha;
+
+    if (uAlphaMode == 1 && alpha < uAlphaCutoff)
+    {{
+        discard;
+    }}
+
     FragColor = vec4(result, alpha);
+    EmissiveColor = vec4(max(totalEmissive, vec3(0.0)), alpha);
 }}");
     }
 }
