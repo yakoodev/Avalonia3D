@@ -78,9 +78,12 @@
       </ScrollViewer>
     </Border>
     <Grid Grid.Column="1">
-      <Border Background="Black">
-        <local:SandboxModel3DControl x:Name="Viewport" />
-      </Border>
+      <Grid>
+        <Border Background="Black">
+          <local:SandboxModel3DControl x:Name="Viewport" />
+        </Border>
+        <Border x:Name="InputOverlay" Background="Transparent" IsHitTestVisible="True" />
+      </Grid>
       <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16" Background="#66000000" Padding="8" CornerRadius="4">
         <TextBlock Text="{Binding CurrentSceneTitle}" Foreground="White" />
       </Border>

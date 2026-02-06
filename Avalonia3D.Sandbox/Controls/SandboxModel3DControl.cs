@@ -113,6 +113,11 @@ public class SandboxModel3DControl : OpenGlControlBase
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
+        HandlePointerPressed(e);
+    }
+
+    public void HandlePointerPressed(PointerPressedEventArgs e)
+    {
         var point = e.GetPosition(this);
         _activeMouseButton = ResolveMouseButton(e);
 
@@ -133,6 +138,11 @@ public class SandboxModel3DControl : OpenGlControlBase
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
+        HandlePointerReleased(e);
+    }
+
+    public void HandlePointerReleased(PointerReleasedEventArgs e)
+    {
         var point = e.GetPosition(this);
         var releasedButton = e.InitialPressMouseButton == MouseButton.None ? _activeMouseButton : e.InitialPressMouseButton;
 
@@ -167,6 +177,11 @@ public class SandboxModel3DControl : OpenGlControlBase
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
+        HandlePointerMoved(e);
+    }
+
+    public void HandlePointerMoved(PointerEventArgs e)
+    {
         var point = e.GetPosition(this);
 
         if (_isPointerDragActive)
@@ -179,6 +194,11 @@ public class SandboxModel3DControl : OpenGlControlBase
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
+        HandlePointerWheelChanged(e);
+    }
+
+    public void HandlePointerWheelChanged(PointerWheelEventArgs e)
+    {
         _inputHandler.OnMouseWheel((float)e.Delta.Y);
         Log.Information("PointerWheel delta={Delta}", e.Delta.Y);
         e.Handled = true;
