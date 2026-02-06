@@ -13,11 +13,11 @@ namespace Avalonia3D.Rendering
         private uint _depthMap;
         private uint _framebuffer;
         private ShadowShader? _shadowShader;
-        private readonly RenderQualitySettings _settings;
+        private readonly GraphicsProfile _settings;
         private bool _shadowSupportChecked;
         private bool _supportsShadowPass = true;
 
-        public ShadowPass(RenderQualitySettings settings)
+        public ShadowPass(GraphicsProfile settings)
         {
             _settings = settings.Validate();
         }
@@ -26,7 +26,7 @@ namespace Avalonia3D.Rendering
 
         public void Execute(RenderPipelineContext context)
         {
-            if (!_settings.ShadowsEnabled || context.Scene.Lights.Count == 0)
+            if (!_settings.Shadows.Enabled || context.Scene.Lights.Count == 0)
             {
                 DisableShadows(context);
                 return;
@@ -43,7 +43,7 @@ namespace Avalonia3D.Rendering
             context.RenderContext.FrameState.ShadowMapId = _depthMap;
             context.RenderContext.FrameState.LightSpaceMatrix = lightSpaceMatrix;
 
-            gl.Viewport(0, 0, (uint)_settings.ShadowMapSize, (uint)_settings.ShadowMapSize);
+            gl.Viewport(0, 0, (uint)_settings.Shadows.MapSize, (uint)_settings.Shadows.MapSize);
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, _framebuffer);
             gl.Clear(ClearBufferMask.DepthBufferBit);
             gl.ColorMask(false, false, false, false);
@@ -90,7 +90,7 @@ namespace Avalonia3D.Rendering
             _depthMap = gl.GenTexture();
             gl.BindTexture(TextureTarget.Texture2D, _depthMap);
             gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.DepthComponent24,
-                (uint)_settings.ShadowMapSize, (uint)_settings.ShadowMapSize, 0, PixelFormat.DepthComponent, PixelType.Float, null);
+                (uint)_settings.Shadows.MapSize, (uint)_settings.Shadows.MapSize, 0, PixelFormat.DepthComponent, PixelType.Float, null);
             gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
             gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
             gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);

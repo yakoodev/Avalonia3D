@@ -4,9 +4,9 @@ namespace Avalonia3D.Rendering
 {
     public sealed class ForwardPass : IRenderPass
     {
-        private readonly RenderQualitySettings _settings;
+        private readonly GraphicsProfile _settings;
 
-        public ForwardPass(RenderQualitySettings settings)
+        public ForwardPass(GraphicsProfile settings)
         {
             _settings = settings.Validate();
         }

@@ -20,7 +20,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly Scene3D _scene;
     private readonly CameraController _cameraController;
     private readonly IRenderThreadScheduler _renderThreadScheduler;
-    private readonly Action<RenderQualitySettings> _applyRenderQuality;
+    private readonly Action<GraphicsProfile> _applyGraphicsProfile;
     private string _currentSceneTitle = "Сцена не выбрана";
     private ShaderRenderMode _selectedRenderMode;
     private string? _selectedClipName;
@@ -28,14 +28,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private double _playbackSpeed = 1.0;
     private ClipPlaybackState _selectedClipState;
     private RenderQualityPreset _selectedQualityPreset = RenderQualityPreset.Medium;
-    private RenderQualitySettings _renderQualitySettings = RenderQualitySettings.Medium;
+    private GraphicsProfile _graphicsProfile = GraphicsProfile.Medium;
 
-    public MainWindowViewModel(Scene3D scene, CameraController cameraController, string assetsRoot, IRenderThreadScheduler renderThreadScheduler, Action<RenderQualitySettings> applyRenderQuality)
+    public MainWindowViewModel(Scene3D scene, CameraController cameraController, string assetsRoot, IRenderThreadScheduler renderThreadScheduler, Action<GraphicsProfile> applyGraphicsProfile)
     {
         _scene = scene;
         _cameraController = cameraController;
         _renderThreadScheduler = renderThreadScheduler;
-        _applyRenderQuality = applyRenderQuality;
+        _applyGraphicsProfile = applyGraphicsProfile;
         _sceneLoader = new SceneLoader(scene, assetsRoot, renderThreadScheduler);
         _sceneLoader.SceneChanged += sceneInfo =>
         {
@@ -134,7 +134,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    public string ActiveQualitySummary => $"Preset: {SelectedQualityPreset}, shadows={_renderQualitySettings.ShadowsEnabled}, shadowMap={_renderQualitySettings.ShadowMapSize}, postfx={_renderQualitySettings.PostEffects}, gamma={_renderQualitySettings.Gamma:0.00}, msaa={_renderQualitySettings.MsaaPolicy}";
+    public string ActiveQualitySummary => _graphicsProfile.ToSummary();
+
+    public string ActiveProfileJson => _graphicsProfile.ToJson();
 
     public double OrbitSensitivity
     {
@@ -274,10 +276,27 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private void ApplyRenderQualityPreset(RenderQualityPreset preset)
     {
         _selectedQualityPreset = preset;
-        _renderQualitySettings = RenderQualitySettings.FromPreset(preset, _renderQualitySettings).Validate();
-        _applyRenderQuality(_renderQualitySettings);
+        _graphicsProfile = GraphicsProfile.FromPreset(preset, _graphicsProfile) with
+        {
+            Name = preset == RenderQualityPreset.Custom ? _graphicsProfile.Name : preset.ToString()
+        };
+
+        _graphicsProfile = _graphicsProfile.Validate();
+        _applyGraphicsProfile(_graphicsProfile);
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedQualityPreset)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ActiveQualitySummary)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ActiveProfileJson)));
+    }
+
+
+    public void ImportProfileFromJson(string json)
+    {
+        _graphicsProfile = GraphicsProfile.FromJson(json);
+        _selectedQualityPreset = _graphicsProfile.QualityPreset;
+        _applyGraphicsProfile(_graphicsProfile);
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedQualityPreset)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ActiveQualitySummary)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ActiveProfileJson)));
     }
 
     private void RefreshClips()

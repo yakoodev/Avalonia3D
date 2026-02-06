@@ -11,7 +11,7 @@ public class RenderPipelineFactoryTests
     [Fact]
     public void CreatePasses_LowPreset_IncludesForwardAndPostEffectsOnly()
     {
-        var passes = _factory.CreatePasses(RenderQualitySettings.Low);
+        var passes = _factory.CreatePasses(GraphicsProfile.Low);
         var names = passes.Select(p => p.Name).ToArray();
 
         Assert.DoesNotContain("ShadowPass", names);
@@ -23,7 +23,7 @@ public class RenderPipelineFactoryTests
     [Fact]
     public void CreatePasses_HighPreset_IncludesShadowEnvironmentForwardAndPostEffects()
     {
-        var passes = _factory.CreatePasses(RenderQualitySettings.High);
+        var passes = _factory.CreatePasses(GraphicsProfile.High);
         var names = passes.Select(p => p.Name).ToArray();
 
         Assert.Equal(new[] { "ShadowPass", "EnvironmentLightingPass", "ForwardPass", "PostEffectsPass" }, names);
@@ -35,10 +35,13 @@ public class RenderPipelineFactoryTests
     [InlineData(ReflectionMode.IBL, false)]
     public void CreatePasses_ReflectionDisabledOrOff_DropsEnvironmentPass(ReflectionMode mode, bool enabled)
     {
-        var settings = RenderQualitySettings.Medium with
+        var settings = GraphicsProfile.Medium with
         {
-            ReflectionMode = mode,
-            ReflectionsEnabled = enabled
+            Reflections = GraphicsProfile.Medium.Reflections with
+            {
+                Mode = mode,
+                Enabled = enabled
+            }
         };
 
         var passes = _factory.CreatePasses(settings);
@@ -50,7 +53,10 @@ public class RenderPipelineFactoryTests
     [Fact]
     public void CreatePasses_NoPostEffects_DropsPostEffectsPass()
     {
-        var settings = RenderQualitySettings.Medium with { PostEffects = PostEffectsFlags.None };
+        var settings = GraphicsProfile.Medium with
+        {
+            PostFx = GraphicsProfile.Medium.PostFx with { Effects = PostEffectsFlags.None }
+        };
 
         var passes = _factory.CreatePasses(settings);
         var names = passes.Select(p => p.Name).ToArray();

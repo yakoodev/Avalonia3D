@@ -11,12 +11,12 @@ namespace Avalonia3D.Rendering
     {
         private const TextureUnit ReflectionTextureUnit = TextureUnit.Texture6;
 
-        private readonly RenderQualitySettings _settings;
+        private readonly GraphicsProfile _settings;
         private uint _environmentMapTexture;
         private string? _loadedPath;
         private bool _missingEnvironmentMapWarningLogged;
 
-        public EnvironmentLightingPass(RenderQualitySettings settings)
+        public EnvironmentLightingPass(GraphicsProfile settings)
         {
             _settings = settings.Validate();
         }
@@ -25,20 +25,20 @@ namespace Avalonia3D.Rendering
 
         public void Execute(RenderPipelineContext context)
         {
-            if (!_settings.ReflectionsEnabled || _settings.ReflectionMode == ReflectionMode.Off)
+            if (!_settings.Reflections.Enabled || _settings.Reflections.Mode == ReflectionMode.Off)
             {
                 DisableReflections(context);
                 return;
             }
 
-            if (_settings.ReflectionMode is ReflectionMode.ScreenSpace or ReflectionMode.Planar)
+            if (_settings.Reflections.Mode is ReflectionMode.ScreenSpace or ReflectionMode.Planar)
             {
-                Log.Debug("Reflection mode {ReflectionMode} is not implemented yet. Keeping extension point active.", _settings.ReflectionMode);
+                Log.Debug("Reflection mode {ReflectionMode} is not implemented yet. Keeping extension point active.", _settings.Reflections.Mode);
                 DisableReflections(context);
                 return;
             }
 
-            if (!EnsureEnvironmentMap(context.Gl, _settings.EnvironmentMapPath))
+            if (!EnsureEnvironmentMap(context.Gl, _settings.Reflections.EnvironmentMapPath))
             {
                 DisableReflections(context);
                 return;
@@ -48,9 +48,9 @@ namespace Avalonia3D.Rendering
             context.Gl.BindTexture(TextureTarget.Texture2D, _environmentMapTexture);
 
             context.RenderContext.FrameState.EnvironmentReflectionTextureId = _environmentMapTexture;
-            context.RenderContext.FrameState.ReflectionIntensity = _settings.ReflectionIntensity;
+            context.RenderContext.FrameState.ReflectionIntensity = _settings.Reflections.Intensity;
             context.RenderContext.FrameState.ReflectionsEnabled = true;
-            context.RenderContext.FrameState.ReflectionMode = _settings.ReflectionMode;
+            context.RenderContext.FrameState.ReflectionMode = _settings.Reflections.Mode;
         }
 
         private bool EnsureEnvironmentMap(GL gl, string? environmentMapPath)
