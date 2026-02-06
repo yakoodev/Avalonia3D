@@ -4,6 +4,7 @@ using Avalonia3D.Shaders;
 using Silk.NET.OpenGL;
 using System;
 using System.Numerics;
+using System.Runtime.InteropServices;
 
 namespace Avalonia3D.Rendering
 {
@@ -105,7 +106,7 @@ namespace Avalonia3D.Rendering
             }
 
             _shadowSupportChecked = true;
-            var version = gl.GetString(StringName.Version);
+            var version = Marshal.PtrToStringAnsi((nint)gl.GetString(GLEnum.Version));
             if (!string.IsNullOrWhiteSpace(version) &&
                 version.Contains("OpenGL ES", StringComparison.OrdinalIgnoreCase))
             {
