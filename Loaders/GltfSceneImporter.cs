@@ -77,16 +77,19 @@ namespace Avalonia3D.Loaders
             }
             catch (SchemaException schemaException)
             {
-                Log.Warning(schemaException,
-                    "Strict glTF validation failed for {Path}. Retrying with ValidationMode.Skip for QA/testing assets.",
-                    gltfPath);
+                Log.Warning(
+                    "Strict glTF validation failed for {Path}: {ValidationError}. Retrying with ValidationMode.Skip for QA/testing assets.",
+                    gltfPath,
+                    schemaException.Message);
 
                 var relaxedSettings = new ReadSettings
                 {
                     Validation = ValidationMode.Skip
                 };
 
-                return ModelRoot.Load(gltfPath, relaxedSettings);
+                var model = ModelRoot.Load(gltfPath, relaxedSettings);
+                Log.Information("GLTF loaded with relaxed validation for {Path}.", gltfPath);
+                return model;
             }
         }
 
