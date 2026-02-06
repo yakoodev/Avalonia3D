@@ -1,6 +1,7 @@
 ﻿using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media.Imaging;
+using Avalonia3D.Interaction.CameraController;
 using Avalonia3D.Model;
 using System;
 
@@ -12,12 +13,13 @@ namespace Avalonia3D.Controls
         float RotationSensitivity { get; set; }
         Scene3D Scene { get; }
         float ZoomSensitivity { get; set; }
+        CameraController CameraController { get; }
 
         event Action<WriteableBitmap>? FrameReady;
 
-        public void HandlePointerMoved(PointerEventArgs e);
-        public void HandlePointerPressed(PointerPressedEventArgs e);
-        public void HandlePointerReleased(PointerReleasedEventArgs e);
-        public void HandlePointerWheelChanged(PointerWheelEventArgs e);
+        void HandlePointerMoved(PointerEventArgs e);
+        void HandlePointerPressed(PointerPressedEventArgs e);
+        void HandlePointerReleased(PointerReleasedEventArgs e);
+        void HandlePointerWheelChanged(PointerWheelEventArgs e);
     }
 }

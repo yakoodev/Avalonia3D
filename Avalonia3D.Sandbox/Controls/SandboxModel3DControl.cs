@@ -2,6 +2,8 @@ using Avalonia;
 using Avalonia.Input;
 using Avalonia.OpenGL;
 using Avalonia.OpenGL.Controls;
+using Avalonia3D.Interaction.CameraController;
+using Avalonia3D.Interfaces;
 using Avalonia3D.Model;
 using Avalonia3D.Sandbox.Rendering;
 using Avalonia3D.Sandbox.Services;
@@ -9,6 +11,7 @@ using Serilog;
 using Silk.NET.OpenGL;
 using System;
 using System.ComponentModel;
+using System.Numerics;
 
 namespace Avalonia3D.Sandbox;
 
@@ -17,25 +20,50 @@ public class SandboxModel3DControl : OpenGlControlBase
     private GL? _gl;
     private readonly SandboxRenderer3D _renderer = new();
     private readonly RenderThreadScheduler _renderThreadScheduler = new();
+    private readonly IInputHandler _inputHandler;
+    private bool _isPointerDragActive;
+    private MouseButton _activeMouseButton = MouseButton.None;
 
     public SandboxModel3DControl()
     {
+        Focusable = true;
+        IsHitTestVisible = true;
+
+        CameraController = new CameraController(_renderer.Scene.Camera, () => _renderer.Scene.SceneGraph);
+        _inputHandler = new MouseKeyboardInputHandler(CameraController);
         _renderer.RendererInitialized += () => RendererInitialized?.Invoke(this, EventArgs.Empty);
     }
 
     public Scene3D Scene => _renderer.Scene;
+    public CameraController CameraController { get; }
 
     public event EventHandler? RendererInitialized;
 
+    public bool IsRendererInitialized { get; private set; }
+
     public IRenderThreadScheduler RenderThreadScheduler => _renderThreadScheduler;
+
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        Log.Information("SandboxModel3DControl attached. Focusable={Focusable}, HitTest={HitTest}, Bounds={Bounds}", Focusable, IsHitTestVisible, Bounds);
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        Log.Information("SandboxModel3DControl detached");
+        base.OnDetachedFromVisualTree(e);
+    }
 
     protected override void OnOpenGlInit(GlInterface gl)
     {
         base.OnOpenGlInit(gl);
         _gl = GL.GetApi(gl.GetProcAddress);
         _renderer.Init(_gl);
-        Scene.Camera.RotationSensitivity = RotationSensitivity;
-        Scene.Camera.PanSensitivity = PanSensitivity;
+        IsRendererInitialized = true;
+        ApplySensitivity();
+        Log.Information("SandboxModel3DControl initialized. Bounds={Bounds}", Bounds);
     }
 
     protected override void OnOpenGlRender(GlInterface gl, int fb)
@@ -62,69 +90,103 @@ public class SandboxModel3DControl : OpenGlControlBase
     protected override void OnOpenGlDeinit(GlInterface gl)
     {
         _renderer.Clear();
+        IsRendererInitialized = false;
         _gl = null;
         base.OnOpenGlDeinit(gl);
     }
 
-    [Category("Interaction")]
-    public float RotationSensitivity { get; set; } = 0.01f;
+    private float _rotationSensitivity = 0.01f;
+    private float _panSensitivity = 0.01f;
+    private float _zoomSensitivity = 2f;
 
     [Category("Interaction")]
-    public float PanSensitivity { get; set; } = 0.01f;
+    public float RotationSensitivity { get => _rotationSensitivity; set { _rotationSensitivity = value; ApplySensitivity(); } }
 
     [Category("Interaction")]
-    public float ZoomSensitivity { get; set; } = 2f;
+    public float PanSensitivity { get => _panSensitivity; set { _panSensitivity = value; ApplySensitivity(); } }
 
-    private Point? _lastMousePosition;
-    private bool _isRotating;
-    private bool _isDragging;
+    [Category("Interaction")]
+    public float ZoomSensitivity { get => _zoomSensitivity; set { _zoomSensitivity = value; ApplySensitivity(); } }
+
     private int _lastFramebuffer = -1;
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
+        HandlePointerPressed(e);
+    }
+
+    public void HandlePointerPressed(PointerPressedEventArgs e)
+    {
         var point = e.GetPosition(this);
-        _lastMousePosition = point;
+        _activeMouseButton = ResolveMouseButton(e);
 
-        var properties = e.GetCurrentPoint(this).Properties;
-        _isRotating = properties.IsLeftButtonPressed;
-        _isDragging = properties.IsRightButtonPressed;
+        Log.Information("PointerPressed at {Point}. Button={Button}, Kind={Kind}", point, _activeMouseButton, e.GetCurrentPoint(this).Properties.PointerUpdateKind);
 
-        if (_isRotating || _isDragging)
+        if (_activeMouseButton == MouseButton.None)
         {
-            e.Handled = true;
+            return;
         }
+
+        _isPointerDragActive = true;
+        _inputHandler.OnMouseDown(new Vector2((float)point.X, (float)point.Y), _activeMouseButton);
+        e.Pointer.Capture(this);
+        Focus();
+        e.Handled = true;
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
-        _isDragging = false;
-        _isRotating = false;
-        _lastMousePosition = null;
+        HandlePointerReleased(e);
+    }
+
+    public void HandlePointerReleased(PointerReleasedEventArgs e)
+    {
+        var point = e.GetPosition(this);
+        var releasedButton = e.InitialPressMouseButton == MouseButton.None ? _activeMouseButton : e.InitialPressMouseButton;
+
+        Log.Information("PointerReleased at {Point}. Button={Button}", point, releasedButton);
+
+        _inputHandler.OnMouseUp(new Vector2((float)point.X, (float)point.Y), releasedButton);
+        _isPointerDragActive = false;
+        _activeMouseButton = MouseButton.None;
+
+        if (e.Pointer.Captured == this)
+        {
+            e.Pointer.Capture(null);
+        }
+
         e.Handled = true;
+    }
+
+    protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+    {
+        base.OnPointerCaptureLost(e);
+        _isPointerDragActive = false;
+        _activeMouseButton = MouseButton.None;
+        Log.Information("PointerCaptureLost");
+    }
+
+    protected override void OnPointerEntered(PointerEventArgs e)
+    {
+        base.OnPointerEntered(e);
+        Log.Information("PointerEntered SandboxModel3DControl");
     }
 
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
-        if (_lastMousePosition is not Point lastPoint)
-        {
-            return;
-        }
+        HandlePointerMoved(e);
+    }
 
-        var currentPoint = e.GetPosition(this);
-        var delta = currentPoint - lastPoint;
-        _lastMousePosition = currentPoint;
+    public void HandlePointerMoved(PointerEventArgs e)
+    {
+        var point = e.GetPosition(this);
 
-        if (_isRotating)
+        if (_isPointerDragActive)
         {
-            Scene.Camera.Rotate(new Vector(delta.X, delta.Y));
-            e.Handled = true;
-        }
-        else if (_isDragging)
-        {
-            Scene.Camera.Pan(delta);
+            _inputHandler.OnMouseMove(new Vector2((float)point.X, (float)point.Y));
             e.Handled = true;
         }
     }
@@ -132,7 +194,39 @@ public class SandboxModel3DControl : OpenGlControlBase
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
-        Scene.Camera.Distance += (float)(e.Delta.Y * -ZoomSensitivity);
+        HandlePointerWheelChanged(e);
+    }
+
+    public void HandlePointerWheelChanged(PointerWheelEventArgs e)
+    {
+        _inputHandler.OnMouseWheel((float)e.Delta.Y);
+        Log.Information("PointerWheel delta={Delta}", e.Delta.Y);
         e.Handled = true;
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        _inputHandler.OnKeyDown(e.Key);
+    }
+
+    private MouseButton ResolveMouseButton(PointerPressedEventArgs e)
+    {
+        var props = e.GetCurrentPoint(this).Properties;
+        return props.PointerUpdateKind switch
+        {
+            PointerUpdateKind.LeftButtonPressed => MouseButton.Left,
+            PointerUpdateKind.RightButtonPressed => MouseButton.Right,
+            _ when props.IsRightButtonPressed => MouseButton.Right,
+            _ when props.IsLeftButtonPressed => MouseButton.Left,
+            _ => MouseButton.None
+        };
+    }
+
+    private void ApplySensitivity()
+    {
+        CameraController.OrbitSensitivity = RotationSensitivity;
+        CameraController.PanSensitivity = PanSensitivity;
+        CameraController.DollySensitivity = ZoomSensitivity;
     }
 }

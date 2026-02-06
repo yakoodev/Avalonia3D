@@ -3,12 +3,14 @@ using Avalonia.Input;
 using Avalonia.Media.Imaging;
 using Avalonia.OpenGL;
 using Avalonia.OpenGL.Controls;
-using Avalonia3D.Rendering;
+using Avalonia3D.Interaction.CameraController;
+using Avalonia3D.Interfaces;
 using Avalonia3D.Model;
+using Avalonia3D.Rendering;
 using Silk.NET.OpenGL;
 using System;
 using System.ComponentModel;
-
+using System.Numerics;
 
 namespace Avalonia3D.Controls
 {
@@ -16,9 +18,17 @@ namespace Avalonia3D.Controls
     {
         private GL? _gl;
         private readonly GLRenderer3D _renderer = new();
-        public Scene3D Scene { get => _renderer.Scene; }
+        private readonly IInputHandler _inputHandler;
 
-        // Событие кадра, проброшенное наружу
+        public Model3DControl()
+        {
+            CameraController = new CameraController(_renderer.Scene.Camera, () => _renderer.Scene.SceneGraph);
+            _inputHandler = new MouseKeyboardInputHandler(CameraController);
+        }
+
+        public Scene3D Scene => _renderer.Scene;
+        public CameraController CameraController { get; }
+
         public event Action<WriteableBitmap>? FrameReady
         {
             add => _renderer.FrameReady += value;
@@ -30,6 +40,7 @@ namespace Avalonia3D.Controls
             base.OnOpenGlInit(gl);
             _gl = GL.GetApi(gl.GetProcAddress);
             _renderer.Init(_gl);
+            ApplySensitivity();
         }
 
         protected override void OnOpenGlRender(GlInterface gl, int fb)
@@ -54,68 +65,76 @@ namespace Avalonia3D.Controls
             base.OnOpenGlDeinit(gl);
         }
 
-        [Category("Interaction")]
-        public float RotationSensitivity { get; set; } = 0.01f;
+        private float _rotationSensitivity = 0.01f;
+        private float _panSensitivity = 0.01f;
+        private float _zoomSensitivity = 2f;
 
         [Category("Interaction")]
-        public float PanSensitivity { get; set; } = 0.01f;
+        public float RotationSensitivity
+        {
+            get => _rotationSensitivity;
+            set
+            {
+                _rotationSensitivity = value;
+                ApplySensitivity();
+            }
+        }
 
         [Category("Interaction")]
-        public float ZoomSensitivity { get; set; } = 2f;
+        public float PanSensitivity
+        {
+            get => _panSensitivity;
+            set
+            {
+                _panSensitivity = value;
+                ApplySensitivity();
+            }
+        }
 
-        #region Input Handling
-        private Point? _lastMousePosition;
-        private bool _isRotating;
-        private bool _isDragging;
+        [Category("Interaction")]
+        public float ZoomSensitivity
+        {
+            get => _zoomSensitivity;
+            set
+            {
+                _zoomSensitivity = value;
+                ApplySensitivity();
+            }
+        }
 
         public void HandlePointerPressed(PointerPressedEventArgs e)
         {
             var point = e.GetPosition(this);
-            _lastMousePosition = point;
-
-            var properties = e.GetCurrentPoint(this).Properties;
-            _isRotating = properties.IsLeftButtonPressed;
-            _isDragging = properties.IsRightButtonPressed;
-
-            if (_isRotating || _isDragging)
-                e.Handled = true;
+            var button = e.GetCurrentPoint(this).Properties.IsRightButtonPressed ? MouseButton.Right : MouseButton.Left;
+            _inputHandler.OnMouseDown(new Vector2((float)point.X, (float)point.Y), button);
+            e.Handled = true;
         }
 
         public void HandlePointerReleased(PointerReleasedEventArgs e)
         {
-            _isDragging = false;
-            _isRotating = false;
-            _lastMousePosition = null;
+            var point = e.GetPosition(this);
+            _inputHandler.OnMouseUp(new Vector2((float)point.X, (float)point.Y), e.InitialPressMouseButton);
             e.Handled = true;
         }
 
         public void HandlePointerMoved(PointerEventArgs e)
         {
-            if (_lastMousePosition is not Point lastPoint)
-                return;
-
-            var currentPoint = e.GetPosition(this);
-            var delta = currentPoint - lastPoint;
-            _lastMousePosition = currentPoint;
-
-            if (_isRotating)
-            {
-                _renderer.Scene.Camera.Rotate(new Vector(delta.X, delta.Y));
-                e.Handled = true;
-            }
-            else if (_isDragging)
-            {
-                _renderer.Scene.Camera.Pan(delta);
-                e.Handled = true;
-            }
+            var point = e.GetPosition(this);
+            _inputHandler.OnMouseMove(new Vector2((float)point.X, (float)point.Y));
+            e.Handled = true;
         }
 
         public void HandlePointerWheelChanged(PointerWheelEventArgs e)
         {
-            _renderer.Scene.Camera.Distance += (float)(e.Delta.Y * -2.0f); // ZoomSensitivity
+            _inputHandler.OnMouseWheel((float)e.Delta.Y);
             e.Handled = true;
         }
-        #endregion
-    }
 
+        private void ApplySensitivity()
+        {
+            CameraController.OrbitSensitivity = RotationSensitivity;
+            CameraController.PanSensitivity = PanSensitivity;
+            CameraController.DollySensitivity = ZoomSensitivity;
+        }
+    }
 }

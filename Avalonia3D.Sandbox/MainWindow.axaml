@@ -10,11 +10,34 @@
         Title="Avalonia3D Sandbox"
         Width="1200"
         Height="720">
+  <Window.KeyBindings>
+    <KeyBinding Gesture="F" Command="{Binding FrameAllCommand}" />
+    <KeyBinding Gesture="R" Command="{Binding ResetViewCommand}" />
+    <KeyBinding Gesture="Space" Command="{Binding TogglePlayPauseCommand}" />
+  </Window.KeyBindings>
+
   <Grid ColumnDefinitions="280,*" Background="#1E1E1E">
     <Border Grid.Column="0" Background="#252526" Padding="16">
       <ScrollViewer>
         <StackPanel Spacing="12">
           <TextBlock Text="Тестовые сцены" FontSize="18" FontWeight="Bold" Foreground="White" />
+          <TextBlock Text="Камера" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,8,0,0" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="Frame" Command="{Binding FrameAllCommand}" />
+            <Button Content="Reset" Command="{Binding ResetViewCommand}" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="Mode:" Foreground="White" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding CurrentCameraMode}" Foreground="#CFCFCF" VerticalAlignment="Center" />
+            <Button Content="Toggle" Command="{Binding ToggleCameraModeCommand}" />
+          </StackPanel>
+          <TextBlock Text="Orbit sensitivity" Foreground="White" />
+          <Slider Minimum="0.001" Maximum="0.1" Value="{Binding OrbitSensitivity}" />
+          <TextBlock Text="Pan sensitivity" Foreground="White" />
+          <Slider Minimum="0.001" Maximum="0.1" Value="{Binding PanSensitivity}" />
+          <TextBlock Text="Dolly sensitivity" Foreground="White" />
+          <Slider Minimum="0.1" Maximum="10" Value="{Binding DollySensitivity}" />
+
           <TextBlock Text="Режим шейдера" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,8,0,0" />
           <ComboBox ItemsSource="{Binding ShaderModes}"
                     SelectedItem="{Binding SelectedRenderMode}"
@@ -55,9 +78,12 @@
       </ScrollViewer>
     </Border>
     <Grid Grid.Column="1">
-      <Border Background="Black">
-        <local:SandboxModel3DControl x:Name="Viewport" />
-      </Border>
+      <Grid>
+        <Border Background="Black">
+          <local:SandboxModel3DControl x:Name="Viewport" />
+        </Border>
+        <Border x:Name="InputOverlay" Background="Transparent" IsHitTestVisible="True" />
+      </Grid>
       <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16" Background="#66000000" Padding="8" CornerRadius="4">
         <TextBlock Text="{Binding CurrentSceneTitle}" Foreground="White" />
       </Border>
