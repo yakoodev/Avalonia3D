@@ -85,6 +85,11 @@ public sealed class SceneLoader
         }
 
         LogSceneDiagnostics(scene);
+        if (_scene.LastImportReport.IsDegraded)
+        {
+            Log.Warning("Scene {SceneId} loaded in degraded import mode. Issues: {Issues}", scene.Id, string.Join(" | ", _scene.LastImportReport.Issues));
+        }
+
         Log.Information("Scene loaded: {SceneId} - {SceneTitle}", scene.Id, scene.Title);
         SceneChanged?.Invoke(scene);
     }

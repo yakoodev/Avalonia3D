@@ -36,6 +36,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private double _backgroundBlue = 20;
     private string _profileJsonEditor = string.Empty;
     private string _profileStatusMessage = "";
+    private string _importStatusText = "Import: OK";
+    private bool _isImportDegraded;
 
     public MainWindowViewModel(Scene3D scene, CameraController cameraController, string assetsRoot, IRenderThreadScheduler renderThreadScheduler, Action<GraphicsProfile> applyGraphicsProfile)
     {
@@ -49,6 +51,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             Dispatcher.UIThread.Post(() =>
             {
                 CurrentSceneTitle = sceneInfo.Title;
+                UpdateImportStatus();
                 RefreshClips();
                 ExecuteOnRenderThread(() => _cameraController.CaptureHomeView());
             });
@@ -131,6 +134,36 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public RelayCommand ResetProfileJsonCommand { get; }
 
     public string CurrentCameraMode => _cameraController.ControlMode.ToString();
+
+    public bool IsImportDegraded
+    {
+        get => _isImportDegraded;
+        private set
+        {
+            if (_isImportDegraded == value)
+            {
+                return;
+            }
+
+            _isImportDegraded = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsImportDegraded)));
+        }
+    }
+
+    public string ImportStatusText
+    {
+        get => _importStatusText;
+        private set
+        {
+            if (_importStatusText == value)
+            {
+                return;
+            }
+
+            _importStatusText = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ImportStatusText)));
+        }
+    }
 
     public RenderQualityPreset SelectedQualityPreset
     {
@@ -490,6 +523,24 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         SelectedClipState = string.IsNullOrWhiteSpace(SelectedClipName)
             ? default
             : _scene.AnimatorComponent.GetClipState(SelectedClipName);
+    }
+
+    private void UpdateImportStatus()
+    {
+        var report = _scene.LastImportReport;
+        IsImportDegraded = report.IsDegraded;
+
+        if (!report.IsDegraded)
+        {
+            ImportStatusText = "Import: OK";
+            return;
+        }
+
+        var issuesPreview = report.Issues.Count == 0
+            ? "validation issues"
+            : string.Join("; ", report.Issues.Take(3));
+
+        ImportStatusText = $"Import: DEGRADED ({issuesPreview})";
     }
 
     private void ExecuteOnRenderThread(Action action)
