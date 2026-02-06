@@ -16,8 +16,14 @@
     <KeyBinding Gesture="Space" Command="{Binding TogglePlayPauseCommand}" />
   </Window.KeyBindings>
 
-  <Grid ColumnDefinitions="420,*" Background="#1B1B1D">
-    <Border Grid.Column="0" Background="#222226" Padding="14" BorderBrush="#3A3A40" BorderThickness="0,0,1,0">
+  <Grid ColumnDefinitions="420,6,*" Background="#1B1B1D">
+    <Border Grid.Column="0"
+            MinWidth="320"
+            MaxWidth="700"
+            Background="#222226"
+            Padding="14"
+            BorderBrush="#3A3A40"
+            BorderThickness="0,0,1,0">
       <DockPanel LastChildFill="True">
         <Border DockPanel.Dock="Top" Background="#2B2B31" CornerRadius="8" Padding="10" Margin="0,0,0,10">
           <StackPanel>
@@ -26,9 +32,9 @@
           </StackPanel>
         </Border>
 
-        <ScrollViewer>
-          <TabControl>
-            <TabItem Header="Сцены">
+        <TabControl>
+          <TabItem Header="Сцены">
+            <ScrollViewer>
               <StackPanel Spacing="10" Margin="0,8,0,0">
                 <TextBlock Text="Выберите тестовую сцену" Foreground="White" FontWeight="SemiBold" />
                 <ItemsControl ItemsSource="{Binding Scenes}">
@@ -45,9 +51,11 @@
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
               </StackPanel>
-            </TabItem>
+            </ScrollViewer>
+          </TabItem>
 
-            <TabItem Header="Камера">
+          <TabItem Header="Камера">
+            <ScrollViewer>
               <StackPanel Spacing="10" Margin="0,8,0,0">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <Button Content="Frame All" Command="{Binding FrameAllCommand}" />
@@ -64,9 +72,11 @@
                 <TextBlock Text="Dolly sensitivity" Foreground="#D6D6D6" />
                 <Slider Minimum="0.1" Maximum="10" Value="{Binding DollySensitivity}" />
               </StackPanel>
-            </TabItem>
+            </ScrollViewer>
+          </TabItem>
 
-            <TabItem Header="Графика / QA">
+          <TabItem Header="Графика / QA">
+            <ScrollViewer>
               <StackPanel Spacing="10" Margin="0,8,0,0">
                 <TextBlock Text="Профиль качества" FontWeight="SemiBold" Foreground="White" />
                 <ComboBox ItemsSource="{Binding QualityPresets}" SelectedItem="{Binding SelectedQualityPreset}" HorizontalAlignment="Stretch" />
@@ -101,10 +111,18 @@
                 </StackPanel>
                 <TextBlock Text="{Binding ProfileStatusMessage}" Foreground="#C9F7A5" TextWrapping="Wrap" />
               </StackPanel>
-            </TabItem>
+            </ScrollViewer>
+          </TabItem>
 
-            <TabItem Header="Анимация">
+          <TabItem Header="Анимация">
+            <ScrollViewer>
               <StackPanel Spacing="10" Margin="0,8,0,0">
+                <TextBlock Text="Список анимаций" Foreground="White" FontWeight="SemiBold" />
+                <Border Background="#2D2D33" CornerRadius="6" Padding="8" MaxHeight="180">
+                  <ListBox ItemsSource="{Binding AvailableClips}" SelectedItem="{Binding SelectedClipName}" />
+                </Border>
+
+                <TextBlock Text="Выбранная анимация" Foreground="#D6D6D6" />
                 <ComboBox ItemsSource="{Binding AvailableClips}" SelectedItem="{Binding SelectedClipName}" HorizontalAlignment="Stretch" />
                 <CheckBox Content="Loop" IsChecked="{Binding IsLoopEnabled}" Foreground="White" />
                 <StackPanel Orientation="Horizontal" Spacing="8">
@@ -118,13 +136,20 @@
                 </StackPanel>
                 <TextBlock Text="{Binding ClipStateText}" Foreground="#CFCFCF" TextWrapping="Wrap" />
               </StackPanel>
-            </TabItem>
-          </TabControl>
-        </ScrollViewer>
+            </ScrollViewer>
+          </TabItem>
+        </TabControl>
       </DockPanel>
     </Border>
 
-    <Grid Grid.Column="1">
+    <GridSplitter Grid.Column="1"
+                  HorizontalAlignment="Stretch"
+                  VerticalAlignment="Stretch"
+                  Background="#3E3E45"
+                  ResizeDirection="Columns"
+                  ShowsPreview="True" />
+
+    <Grid Grid.Column="2">
       <Grid>
         <Border Background="Black">
           <local:SandboxModel3DControl x:Name="Viewport" />
