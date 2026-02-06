@@ -251,6 +251,11 @@ void main()
         resultLight += (ambient + (1.0 - shadow) * (diffuse + specular)) * uIntensity[i];
     }
 
+    if (uLightCount == 0)
+    {
+        resultLight = albedo * 0.65;
+    }
+
     vec3 result = resultLight * ao + emissive + uEmissionColor;
     float alpha = baseColor.a * uAlpha;
     FragColor = vec4(result, alpha);
