@@ -11,9 +11,9 @@ namespace Avalonia3D.Shaders
 {
     public sealed class GLShader : IShader3D, IDisposable
     {
-        private const int MaxLights = 2;
         private readonly PbrFeatures _features;
         private readonly PbrShaderSourceBuilder _sourceBuilder;
+        private readonly int _maxLights;
         // Кэшированные uniform-локации
         private int _mvpLocation = -1;
         private int _modelLocation = -1;
@@ -54,13 +54,14 @@ namespace Avalonia3D.Shaders
         private GL _gl;
         private uint _shaderProgram;
 
-        public GLShader() : this(PbrFeatures.None, null)
+        public GLShader() : this(PbrFeatures.None, RenderQualitySettings.DefaultMaxLights, null)
         {
         }
 
-        public GLShader(PbrFeatures features, PbrShaderSourceBuilder? sourceBuilder = null)
+        public GLShader(PbrFeatures features, int maxLights = RenderQualitySettings.DefaultMaxLights, PbrShaderSourceBuilder? sourceBuilder = null)
         {
             _features = features;
+            _maxLights = Math.Clamp(maxLights, RenderQualitySettings.MinLights, RenderQualitySettings.MaxSupportedLights);
             _sourceBuilder = sourceBuilder ?? new PbrShaderSourceBuilder();
         }
 
@@ -82,7 +83,7 @@ namespace Avalonia3D.Shaders
 
         private uint CreateShaderProgram()
         {
-            var shaderSource = _sourceBuilder.Build(_features);
+            var shaderSource = _sourceBuilder.Build(_features, _maxLights);
             string vertSource = shaderSource.VertexSource;
             string fragSource = shaderSource.FragmentSource;
 
@@ -135,14 +136,14 @@ namespace Avalonia3D.Shaders
 
         public static IShader3D Create(GL gL)
         {
-            var sh = new GLShader(PbrFeatures.None);
+            var sh = new GLShader(PbrFeatures.None, RenderQualitySettings.DefaultMaxLights);
             sh.InitializeShaders(gL);
             return sh;
         }
 
-        public static IShader3D Create(GL gL, PbrFeatures features)
+        public static IShader3D Create(GL gL, PbrFeatures features, int maxLights = RenderQualitySettings.DefaultMaxLights)
         {
-            var sh = new GLShader(features);
+            var sh = new GLShader(features, maxLights);
             sh.InitializeShaders(gL);
             return sh;
         }
@@ -207,14 +208,14 @@ namespace Avalonia3D.Shaders
                 _gl.UniformMatrix4(_lightSpaceMatrixLocation, 1, false, (float*)&lightSpaceMatrix);
 
             var lights = renderContext.Scene.Lights;
-            var lightCount = Math.Min(lights.Count, MaxLights);
+            var lightCount = Math.Min(lights.Count, _maxLights);
 
             if (_lightCountLocation != -1)
                 _gl.Uniform1(_lightCountLocation, lightCount);
 
             if (_lightPosLocation != -1 && lightCount > 0)
             {
-                var lightPositions = new float[MaxLights * 3];
+                var lightPositions = new float[_maxLights * 3];
                 for (int i = 0; i < lightCount; i++)
                 {
                     lightPositions[i * 3 + 0] = lights[i].Position.X;
@@ -222,12 +223,12 @@ namespace Avalonia3D.Shaders
                     lightPositions[i * 3 + 2] = lights[i].Position.Z;
                 }
                 fixed (float* p = &lightPositions[0])
-                    _gl.Uniform3(_lightPosLocation, (uint)MaxLights, p);
+                    _gl.Uniform3(_lightPosLocation, (uint)_maxLights, p);
             }
 
             if (_lightColorLocation != -1 && lightCount > 0)
             {
-                var lightColors = new float[MaxLights * 3];
+                var lightColors = new float[_maxLights * 3];
                 for (int i = 0; i < lightCount; i++)
                 {
                     lightColors[i * 3 + 0] = lights[i].Color.X;
@@ -235,15 +236,15 @@ namespace Avalonia3D.Shaders
                     lightColors[i * 3 + 2] = lights[i].Color.Z;
                 }
                 fixed (float* p = &lightColors[0])
-                    _gl.Uniform3(_lightColorLocation, (uint)MaxLights, p);
+                    _gl.Uniform3(_lightColorLocation, (uint)_maxLights, p);
             }
 
             if (_intensityLocation != -1)
             {
-                var intensities = new float[MaxLights];
+                var intensities = new float[_maxLights];
                 for (int i = 0; i < lightCount; i++)
                     intensities[i] = lights[i].Intensity;
-                _gl.Uniform1(_intensityLocation, (uint)MaxLights, intensities);
+                _gl.Uniform1(_intensityLocation, (uint)_maxLights, intensities);
             }
 
             if (_viewPosLocation != -1)

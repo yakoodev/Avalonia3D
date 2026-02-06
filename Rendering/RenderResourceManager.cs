@@ -5,6 +5,7 @@ using System.Buffers;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Avalonia3D.Model;
+using Avalonia3D.Model.StandObjects;
 using Model3D = Avalonia3D.Model.Model;
 
 namespace Avalonia3D.Rendering
@@ -33,6 +34,14 @@ namespace Avalonia3D.Rendering
         internal string? CacheKey { get; set; }
     }
 
+
+    public sealed record InstanceBatchRequest(string Key, IReadOnlyList<MeshObject> Instances);
+
+    public interface IInstanceBatchPlanner
+    {
+        bool TryBuildBatch(MeshObject candidate, out InstanceBatchRequest? batchRequest);
+    }
+
     public sealed class RenderResourceManager
     {
         private readonly Dictionary<string, GeometryInfo> _geometryCache = new();
@@ -44,6 +53,18 @@ namespace Avalonia3D.Rendering
         }
 
         public GL Gl { get; }
+        public IInstanceBatchPlanner? InstanceBatchPlanner { get; set; }
+
+        public bool TryGetInstancingBatch(MeshObject candidate, out InstanceBatchRequest? batchRequest)
+        {
+            batchRequest = null;
+            if (candidate == null || InstanceBatchPlanner == null)
+            {
+                return false;
+            }
+
+            return InstanceBatchPlanner.TryBuildBatch(candidate, out batchRequest);
+        }
 
         private sealed class GeometryInfo
         {

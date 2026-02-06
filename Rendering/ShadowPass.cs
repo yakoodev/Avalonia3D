@@ -77,7 +77,7 @@ namespace Avalonia3D.Rendering
             }
 
             _shadowShader.SetUniforms(context.RenderContext, obj, lightSpaceMatrix);
-            obj.RenderModel();
+            obj.RenderModel(context.RenderContext);
         }
 
         private unsafe bool EnsureResources(GL gl)

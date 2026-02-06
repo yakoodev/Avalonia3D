@@ -21,6 +21,8 @@ namespace Avalonia3D.Model
         public float Far { get; set; }
         public float Fov { get; set; }
         public static float DefaultDistance { get; set; } = 150;
+        public float? MinDistance { get; set; }
+        public float? MaxDistance { get; set; }
         public float RotationSensitivity { get; set; } = 0.01f;
         public float PanSensitivity { get; set; } = 0.01f;
 
@@ -73,7 +75,19 @@ namespace Avalonia3D.Model
             get => _distance;
             set
             {
-                _distance = Math.Clamp(value, 1.0f, DefaultDistance);
+                var sanitized = float.IsFinite(value) ? value : _distance;
+
+                if (MinDistance.HasValue)
+                {
+                    sanitized = Math.Max(sanitized, MinDistance.Value);
+                }
+
+                if (MaxDistance.HasValue)
+                {
+                    sanitized = Math.Min(sanitized, MaxDistance.Value);
+                }
+
+                _distance = sanitized;
                 OnDistanceChanged?.Invoke();
                 UpdatePosition();
             }

@@ -45,6 +45,9 @@ namespace Avalonia3D.Rendering
     {
         public const int MinShadowMapSize = 256;
         public const int MaxShadowMapSize = 8192;
+        public const int MinLights = 1;
+        public const int MaxSupportedLights = 16;
+        public const int DefaultMaxLights = 4;
 
         public bool ShadowsEnabled { get; init; } = true;
         public int ShadowMapSize { get; init; } = 2048;
@@ -56,6 +59,7 @@ namespace Avalonia3D.Rendering
         public ReflectionMode ReflectionMode { get; init; } = ReflectionMode.IBL;
         public float ReflectionIntensity { get; init; } = 0.35f;
         public string? EnvironmentMapPath { get; init; }
+        public int MaxLights { get; init; } = DefaultMaxLights;
 
         public static RenderQualitySettings Low => FromProfile(GraphicsProfile.Low);
         public static RenderQualitySettings Medium => FromProfile(GraphicsProfile.Medium);
@@ -80,7 +84,8 @@ namespace Avalonia3D.Rendering
                     Mode = ReflectionMode,
                     Intensity = ReflectionIntensity,
                     EnvironmentMapPath = EnvironmentMapPath
-                }
+                },
+                MaxLights = MaxLights
             }.Validate();
         }
 
@@ -98,7 +103,8 @@ namespace Avalonia3D.Rendering
                 ReflectionsEnabled = validated.Reflections.Enabled,
                 ReflectionMode = validated.Reflections.Mode,
                 ReflectionIntensity = validated.Reflections.Intensity,
-                EnvironmentMapPath = validated.Reflections.EnvironmentMapPath
+                EnvironmentMapPath = validated.Reflections.EnvironmentMapPath,
+                MaxLights = validated.MaxLights
             };
         }
 

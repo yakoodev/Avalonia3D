@@ -55,6 +55,7 @@ namespace Avalonia3D.Rendering
         public ReflectionProfile Reflections { get; init; } = new();
         public PbrTuningProfile PbrTuning { get; init; } = new();
         public BackgroundProfile Background { get; init; } = new();
+        public int MaxLights { get; init; } = RenderQualitySettings.DefaultMaxLights;
 
         public static GraphicsProfile Low => new()
         {
@@ -81,7 +82,8 @@ namespace Avalonia3D.Rendering
                 IblIntensity = 0.6f,
                 AmbientOcclusionStrength = 0.8f
             },
-            Background = new BackgroundProfile { Red = 0.09f, Green = 0.09f, Blue = 0.10f }
+            Background = new BackgroundProfile { Red = 0.09f, Green = 0.09f, Blue = 0.10f },
+            MaxLights = 2
         };
 
         public static GraphicsProfile Medium => new()
@@ -108,7 +110,8 @@ namespace Avalonia3D.Rendering
                 IblIntensity = 1.0f,
                 AmbientOcclusionStrength = 1.0f
             },
-            Background = new BackgroundProfile { Red = 0.06f, Green = 0.06f, Blue = 0.08f }
+            Background = new BackgroundProfile { Red = 0.06f, Green = 0.06f, Blue = 0.08f },
+            MaxLights = 4
         };
 
         public static GraphicsProfile High => new()
@@ -135,7 +138,8 @@ namespace Avalonia3D.Rendering
                 IblIntensity = 1.2f,
                 AmbientOcclusionStrength = 1.1f
             },
-            Background = new BackgroundProfile { Red = 0.04f, Green = 0.05f, Blue = 0.07f }
+            Background = new BackgroundProfile { Red = 0.04f, Green = 0.05f, Blue = 0.07f },
+            MaxLights = 8
         };
 
         public GraphicsProfile Validate()
@@ -184,7 +188,8 @@ namespace Avalonia3D.Rendering
                 PostFx = validatedPostFx,
                 Reflections = validatedReflections,
                 PbrTuning = validatedPbr,
-                Background = validatedBackground
+                Background = validatedBackground,
+                MaxLights = Math.Clamp(MaxLights, RenderQualitySettings.MinLights, RenderQualitySettings.MaxSupportedLights)
             };
         }
 
@@ -209,6 +214,6 @@ namespace Avalonia3D.Rendering
         }
 
         public string ToSummary() =>
-            $"Profile={Name} ({QualityPreset}), shadows={Shadows.Enabled}:{Shadows.MapSize}, postfx={PostFx.Effects}, gamma={PostFx.Gamma:0.00}, refl={Reflections.Mode}:{Reflections.Intensity:0.00}, exposure={PbrTuning.Exposure:0.00}, ibl={PbrTuning.IblIntensity:0.00}, msaa={MsaaPolicy}, bg=({Background.Red:0.00},{Background.Green:0.00},{Background.Blue:0.00})";
+            $"Profile={Name} ({QualityPreset}), shadows={Shadows.Enabled}:{Shadows.MapSize}, postfx={PostFx.Effects}, gamma={PostFx.Gamma:0.00}, refl={Reflections.Mode}:{Reflections.Intensity:0.00}, exposure={PbrTuning.Exposure:0.00}, ibl={PbrTuning.IblIntensity:0.00}, lights={MaxLights}, msaa={MsaaPolicy}, bg=({Background.Red:0.00},{Background.Green:0.00},{Background.Blue:0.00})";
     }
 }
