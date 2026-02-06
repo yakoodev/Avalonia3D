@@ -15,7 +15,6 @@ public class ShaderSelectionTests
     public void Select_UsesMaterialOverride_AsHighestPriority()
     {
         var scene = CreateScene();
-        scene.ActiveShaderId = "scene-default";
         var materialShader = new StubShader();
         var material = new Material { Shader = materialShader, ShaderId = "material-shader" };
 
@@ -25,9 +24,31 @@ public class ShaderSelectionTests
     }
 
     [Fact]
-    public void Select_UsesMaterialFeatureShader_WhenTextureCombinationMatchesRegisteredVariant()
+    public void Select_UsesRenderModeShader_WhenRenderModeIsNotPbr()
     {
         var scene = CreateScene();
+        scene.BindRenderMode(ShaderRenderMode.Unlit, ShaderIds.Unlit);
+        scene.RenderMode = ShaderRenderMode.Unlit;
+
+        var material = new Material
+        {
+            BaseColorTexture = new TextureData(),
+            NormalTexture = new TextureData(),
+            MetallicRoughnessTexture = new TextureData()
+        };
+
+        var selected = scene.ShaderSelectionPolicy.Select(material, scene, gl: null);
+
+        Assert.Same(scene.ShaderRegistry.Get(ShaderIds.Unlit), selected);
+    }
+
+    [Fact]
+    public void Select_UsesMaterialFeatureShader_WhenPbrModeAndTextureCombinationMatchesVariant()
+    {
+        var scene = CreateScene();
+        scene.BindRenderMode(ShaderRenderMode.Pbr, ShaderIds.Pbr);
+        scene.RenderMode = ShaderRenderMode.Pbr;
+
         var material = new Material
         {
             BaseColorTexture = new TextureData(),
@@ -105,7 +126,9 @@ public class ShaderSelectionTests
         scene.ShaderRegistry.RegisterInstance(ShaderIds.PbrBaseColorNormalMetallicRoughness, new StubShader());
         scene.ShaderRegistry.RegisterInstance(ShaderIds.PbrBaseColorNormalMetallicRoughnessAoEmissive, new StubShader());
         scene.ShaderRegistry.RegisterInstance(ShaderIds.PbrFull, new StubShader());
+        scene.ShaderRegistry.RegisterInstance(ShaderIds.Unlit, new StubShader());
         scene.ShaderRegistry.SetDefault("fallback");
+        scene.ActiveShaderId = ShaderIds.Pbr;
         return scene;
     }
 

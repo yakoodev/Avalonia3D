@@ -2,6 +2,7 @@ using Avalonia3D.Interfaces;
 using Avalonia3D.Model;
 using Avalonia3D.Shaders;
 using Silk.NET.OpenGL;
+using System;
 
 namespace Avalonia3D.Rendering;
 
@@ -23,48 +24,41 @@ public sealed class ShaderSelectionPolicy
             }
         }
 
-        var pbrShaderId = ResolvePbrShaderId(material, scene);
-        if (pbrShaderId != null)
+        var requestedShaderId = ResolveRequestedShaderId(scene);
+        if (requestedShaderId != null)
         {
-            var byFeatures = scene.ShaderRegistry.Get(pbrShaderId, gl);
+            if (IsPbrShaderId(requestedShaderId) && material != null)
+            {
+                var featureShaderId = ResolvePbrShaderId(material, scene);
+                var byFeatures = scene.ShaderRegistry.Get(featureShaderId, gl);
+                if (byFeatures != null)
+                {
+                    return byFeatures;
+                }
+            }
+
+            var byRequestedId = scene.ShaderRegistry.Get(requestedShaderId, gl);
+            if (byRequestedId != null)
+            {
+                return byRequestedId;
+            }
+        }
+
+        if (material != null)
+        {
+            var featureShaderId = ResolvePbrShaderId(material, scene);
+            var byFeatures = scene.ShaderRegistry.Get(featureShaderId, gl);
             if (byFeatures != null)
             {
                 return byFeatures;
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(scene.ActiveShaderId))
-        {
-            var bySceneId = scene.ShaderRegistry.Get(scene.ActiveShaderId, gl);
-            if (bySceneId != null)
-            {
-                return bySceneId;
-            }
-        }
-
-        if (scene.RenderMode != ShaderRenderMode.Default)
-        {
-            var modeShaderId = scene.GetShaderIdForMode(scene.RenderMode);
-            if (modeShaderId != null)
-            {
-                var byMode = scene.ShaderRegistry.Get(modeShaderId, gl);
-                if (byMode != null)
-                {
-                    return byMode;
-                }
-            }
-        }
-
         return scene.ShaderRegistry.GetDefault(gl);
     }
 
-    public static string? ResolvePbrShaderId(Material? material, Scene3D scene)
+    public static string ResolvePbrShaderId(Material material, Scene3D scene)
     {
-        if (material == null)
-        {
-            return null;
-        }
-
         var features = BuildPbrFeatures(material, scene);
         return features switch
         {
@@ -112,5 +106,20 @@ public sealed class ShaderSelectionPolicy
         }
 
         return features;
+    }
+
+    private static string? ResolveRequestedShaderId(Scene3D scene)
+    {
+        if (scene.RenderMode != ShaderRenderMode.Default)
+        {
+            return scene.GetShaderIdForMode(scene.RenderMode);
+        }
+
+        return string.IsNullOrWhiteSpace(scene.ActiveShaderId) ? null : scene.ActiveShaderId;
+    }
+
+    private static bool IsPbrShaderId(string shaderId)
+    {
+        return shaderId.StartsWith(ShaderIds.Pbr, StringComparison.Ordinal);
     }
 }
