@@ -15,7 +15,12 @@ public partial class MainWindow : Window
         if (viewport != null)
         {
             var assetsRoot = Path.Combine(AppContext.BaseDirectory, "Assets", "TestScenes");
-            var viewModel = new MainWindowViewModel(viewport.Scene, assetsRoot, viewport.RenderThreadScheduler);
+            var viewModel = new MainWindowViewModel(viewport.Scene, viewport.CameraController, assetsRoot, viewport.RenderThreadScheduler)
+            {
+                OrbitSensitivity = viewport.RotationSensitivity,
+                PanSensitivity = viewport.PanSensitivity,
+                DollySensitivity = viewport.ZoomSensitivity
+            };
             DataContext = viewModel;
             viewport.RendererInitialized += (_, _) => viewModel.MarkRendererReady();
         }
