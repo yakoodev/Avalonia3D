@@ -21,7 +21,7 @@ public partial class MainWindow : Window
                 AttachPointerForwarding(inputOverlay, viewport);
             }
             var assetsRoot = Path.Combine(AppContext.BaseDirectory, "Assets", "TestScenes");
-            var viewModel = new MainWindowViewModel(viewport.Scene, viewport.CameraController, assetsRoot, viewport.RenderThreadScheduler)
+            var viewModel = new MainWindowViewModel(viewport.Scene, viewport.CameraController, assetsRoot, viewport.RenderThreadScheduler, viewport.ApplyRenderQuality)
             {
                 OrbitSensitivity = viewport.RotationSensitivity,
                 PanSensitivity = viewport.PanSensitivity,

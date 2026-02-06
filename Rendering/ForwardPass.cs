@@ -4,6 +4,13 @@ namespace Avalonia3D.Rendering
 {
     public sealed class ForwardPass : IRenderPass
     {
+        private readonly RenderQualitySettings _settings;
+
+        public ForwardPass(RenderQualitySettings settings)
+        {
+            _settings = settings.Validate();
+        }
+
         public string Name => "ForwardPass";
 
         public void Execute(RenderPipelineContext context)
@@ -12,6 +19,16 @@ namespace Avalonia3D.Rendering
             gl.Viewport(0, 0, (uint)context.Width, (uint)context.Height);
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, context.RenderContext.FrameState.OutputFramebufferId);
             gl.Enable(EnableCap.DepthTest);
+
+            if (_settings.MsaaPolicy == MsaaPolicy.Disabled)
+            {
+                gl.Disable(EnableCap.Multisample);
+            }
+            else
+            {
+                gl.Enable(EnableCap.Multisample);
+            }
+
             gl.Disable(EnableCap.Blend);
             gl.DepthMask(true);
             gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);

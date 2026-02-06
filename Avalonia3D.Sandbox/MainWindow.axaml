@@ -46,6 +46,11 @@
                   Command="{Binding SwitchShaderModeCommand}"
                   CommandParameter="{Binding SelectedRenderMode}"
                   HorizontalAlignment="Left" />
+          <TextBlock Text="Качество рендера" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,8,0,0" />
+          <ComboBox ItemsSource="{Binding QualityPresets}"
+                    SelectedItem="{Binding SelectedQualityPreset}"
+                    HorizontalAlignment="Stretch" />
+          <TextBlock Text="{Binding ActiveQualitySummary}" Foreground="#CFCFCF" TextWrapping="Wrap" />
           <TextBlock Text="Анимация" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,8,0,0" />
           <ComboBox ItemsSource="{Binding AvailableClips}"
                     SelectedItem="{Binding SelectedClipName}"

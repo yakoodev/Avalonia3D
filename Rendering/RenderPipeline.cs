@@ -44,14 +44,24 @@ namespace Avalonia3D.Rendering
 
     public sealed class RenderPipeline
     {
-        private readonly List<IRenderPass> _passes = new()
-        {
-            new ShadowPass(),
-            new ForwardPass(),
-            new PostEffectsPass()
-        };
+        private readonly RenderPipelineFactory _factory;
+        private List<IRenderPass> _passes;
 
+        public RenderPipeline(RenderQualitySettings? settings = null, RenderPipelineFactory? factory = null)
+        {
+            _factory = factory ?? new RenderPipelineFactory();
+            Settings = (settings ?? RenderQualitySettings.Medium).Validate();
+            _passes = new List<IRenderPass>(_factory.CreatePasses(Settings));
+        }
+
+        public RenderQualitySettings Settings { get; private set; }
         public IReadOnlyList<IRenderPass> Passes => _passes;
+
+        public void ApplySettings(RenderQualitySettings settings)
+        {
+            Settings = settings.Validate();
+            _passes = new List<IRenderPass>(_factory.CreatePasses(Settings));
+        }
 
         public void Execute(IRenderContext renderContext, int width, int height)
         {
