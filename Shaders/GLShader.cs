@@ -29,6 +29,8 @@ namespace Avalonia3D.Shaders
         private int _hasOcclusionMapLocation = -1;
         private int _hasEmissiveMapLocation = -1;
         private int _shadowMapLocation = -1;
+        private int _hasShadowMapLocation = -1;
+        private int _lightCountLocation = -1;
         private int _lightSpaceMatrixLocation = -1;
         private int _modelColorLocation = -1;
         private int _ambientLocation = -1;
@@ -115,9 +117,11 @@ uniform int uHasOcclusionMap;
 uniform int uHasEmissiveMap;
 
 uniform sampler2D uShadowMap;
+uniform int uHasShadowMap;
 uniform vec3 uLightPos[2];
 uniform vec3 uLightColor[2];
 uniform float uIntensity[2];
+uniform int uLightCount;
 
 uniform vec3 uViewPos;
 
@@ -230,6 +234,9 @@ void main()
 
     for (int i = 0; i < 2; i++)
     {
+        if (i >= uLightCount)
+            break;
+
         vec3 ambient = uAmbientStrength * uLightColor[i];
 
         vec3 lightDir = normalize(uLightPos[i] - FragPos);
@@ -240,7 +247,7 @@ void main()
         float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
         vec3 specular = uSpecularStrength * spec * specularColor * uLightColor[i];
 
-        float shadow = ShadowCalculation(FragPosLightSpace, norm, lightDir);
+        float shadow = uHasShadowMap == 1 ? ShadowCalculation(FragPosLightSpace, norm, lightDir) : 0.0;
         resultLight += (ambient + (1.0 - shadow) * (diffuse + specular)) * uIntensity[i];
     }
 
@@ -312,9 +319,9 @@ void main()
         {
             _mvpLocation = _gl.GetUniformLocation(_shaderProgram, "uMVP");
             _modelLocation = _gl.GetUniformLocation(_shaderProgram, "uModel");
-            _lightPosLocation = _gl.GetUniformLocation(_shaderProgram, "uLightPos");
+            _lightPosLocation = _gl.GetUniformLocation(_shaderProgram, "uLightPos[0]");
             _viewPosLocation = _gl.GetUniformLocation(_shaderProgram, "uViewPos");
-            _lightColorLocation = _gl.GetUniformLocation(_shaderProgram, "uLightColor");
+            _lightColorLocation = _gl.GetUniformLocation(_shaderProgram, "uLightColor[0]");
             _baseColorMapLocation = _gl.GetUniformLocation(_shaderProgram, "uBaseColorMap");
             _normalMapLocation = _gl.GetUniformLocation(_shaderProgram, "uNormalMap");
             _metallicRoughnessMapLocation = _gl.GetUniformLocation(_shaderProgram, "uMetallicRoughnessMap");
@@ -326,6 +333,8 @@ void main()
             _hasOcclusionMapLocation = _gl.GetUniformLocation(_shaderProgram, "uHasOcclusionMap");
             _hasEmissiveMapLocation = _gl.GetUniformLocation(_shaderProgram, "uHasEmissiveMap");
             _shadowMapLocation = _gl.GetUniformLocation(_shaderProgram, "uShadowMap");
+            _hasShadowMapLocation = _gl.GetUniformLocation(_shaderProgram, "uHasShadowMap");
+            _lightCountLocation = _gl.GetUniformLocation(_shaderProgram, "uLightCount");
             _lightSpaceMatrixLocation = _gl.GetUniformLocation(_shaderProgram, "uLightSpaceMatrix");
             _modelColorLocation = _gl.GetUniformLocation(_shaderProgram, "uModelColor");
             _modelEmissionColorLocation = _gl.GetUniformLocation(_shaderProgram, "uEmissionColor");
@@ -336,7 +345,7 @@ void main()
             _emissiveFactorLocation = _gl.GetUniformLocation(_shaderProgram, "uEmissiveFactor");
             _ambientLocation = _gl.GetUniformLocation(_shaderProgram, "uAmbientStrength");
             _specularLocation = _gl.GetUniformLocation(_shaderProgram, "uSpecularStrength");
-            _intensityLocation = _gl.GetUniformLocation(_shaderProgram, "uIntensity");
+            _intensityLocation = _gl.GetUniformLocation(_shaderProgram, "uIntensity[0]");
             _shininessLocation = _gl.GetUniformLocation(_shaderProgram, "uShininess");
             _alphaLocation = _gl.GetUniformLocation(_shaderProgram, "uAlpha");
         }
@@ -359,6 +368,9 @@ void main()
 
             var lights = renderContext.Scene.Lights;
             var lightCount = Math.Min(lights.Count, MaxLights);
+
+            if (_lightCountLocation != -1)
+                _gl.Uniform1(_lightCountLocation, lightCount);
 
             if (_lightPosLocation != -1 && lightCount > 0)
             {
@@ -456,6 +468,13 @@ void main()
                 _gl.BindTexture(TextureTarget.Texture2D, shadowMapId.Value);
                 if (_shadowMapLocation != -1)
                     _gl.Uniform1(_shadowMapLocation, 5);
+
+                if (_hasShadowMapLocation != -1)
+                    _gl.Uniform1(_hasShadowMapLocation, 1);
+            }
+            else if (_hasShadowMapLocation != -1)
+            {
+                _gl.Uniform1(_hasShadowMapLocation, 0);
             }
         }
 
