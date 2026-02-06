@@ -30,7 +30,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private ClipPlaybackState _selectedClipState;
     private RenderQualityPreset _selectedQualityPreset = RenderQualityPreset.Medium;
     private GraphicsProfile _graphicsProfile = GraphicsProfile.Medium;
-    private Color _selectedBackgroundColor = Color.FromRgb(15, 15, 20);
+    private bool _isSyncingBackgroundChannels;
+    private double _backgroundRed = 15;
+    private double _backgroundGreen = 15;
+    private double _backgroundBlue = 20;
     private string _profileJsonEditor = string.Empty;
     private string _profileStatusMessage = "";
 
@@ -177,21 +180,27 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    public Color SelectedBackgroundColor
+    public double BackgroundRed
     {
-        get => _selectedBackgroundColor;
-        set
-        {
-            if (_selectedBackgroundColor == value)
-            {
-                return;
-            }
-
-            _selectedBackgroundColor = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedBackgroundColor)));
-            ApplyBackgroundColor(value);
-        }
+        get => _backgroundRed;
+        set => SetBackgroundChannel(nameof(BackgroundRed), ref _backgroundRed, value);
     }
+
+    public double BackgroundGreen
+    {
+        get => _backgroundGreen;
+        set => SetBackgroundChannel(nameof(BackgroundGreen), ref _backgroundGreen, value);
+    }
+
+    public double BackgroundBlue
+    {
+        get => _backgroundBlue;
+        set => SetBackgroundChannel(nameof(BackgroundBlue), ref _backgroundBlue, value);
+    }
+
+    public SolidColorBrush BackgroundPreviewBrush => new(Color.FromRgb((byte)_backgroundRed, (byte)_backgroundGreen, (byte)_backgroundBlue));
+
+    public string BackgroundHex => $"#{(byte)_backgroundRed:X2}{(byte)_backgroundGreen:X2}{(byte)_backgroundBlue:X2}";
 
     public string GraphicsTuningHint =>
         "Подсказка: High + тени 4096 + отражения IBL дают лучшую картинку, но дороже по FPS. " +
@@ -376,17 +385,22 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         ProfileStatusMessage = "JSON редактор синхронизирован с активным профилем.";
     }
 
-    private void ApplyBackgroundColor(Color color)
+    private void ApplyBackgroundChannels()
     {
+        if (_isSyncingBackgroundChannels)
+        {
+            return;
+        }
+
         var updated = _graphicsProfile with
         {
             QualityPreset = RenderQualityPreset.Custom,
             Name = "Custom",
             Background = _graphicsProfile.Background with
             {
-                Red = color.R / 255f,
-                Green = color.G / 255f,
-                Blue = color.B / 255f
+                Red = (float)_backgroundRed / 255f,
+                Green = (float)_backgroundGreen / 255f,
+                Blue = (float)_backgroundBlue / 255f
             }
         };
 
@@ -395,16 +409,27 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedQualityPreset)));
     }
 
+    private void SetBackgroundChannel(string propertyName, ref double channel, double value)
+    {
+        var clamped = Math.Clamp(Math.Round(value), 0d, 255d);
+        if (Math.Abs(channel - clamped) < 0.1)
+        {
+            return;
+        }
+
+        channel = clamped;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(BackgroundPreviewBrush)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(BackgroundHex)));
+        ApplyBackgroundChannels();
+    }
+
     private void ApplyProfile(GraphicsProfile profile, string statusMessage)
     {
         _graphicsProfile = profile.Validate();
         _applyGraphicsProfile(_graphicsProfile);
 
-        if (_selectedBackgroundColor != ToColor(_graphicsProfile.Background))
-        {
-            _selectedBackgroundColor = ToColor(_graphicsProfile.Background);
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedBackgroundColor)));
-        }
+        SyncBackgroundChannelsFromProfile(_graphicsProfile.Background);
 
         ProfileJsonEditor = ActiveProfileJson;
         ProfileStatusMessage = statusMessage;
@@ -412,12 +437,41 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ActiveProfileJson)));
     }
 
-    private static Color ToColor(BackgroundProfile background)
+    private void SyncBackgroundChannelsFromProfile(BackgroundProfile background)
     {
-        return Color.FromRgb(
-            (byte)Math.Clamp((int)(background.Red * 255f), 0, 255),
-            (byte)Math.Clamp((int)(background.Green * 255f), 0, 255),
-            (byte)Math.Clamp((int)(background.Blue * 255f), 0, 255));
+        _isSyncingBackgroundChannels = true;
+
+        try
+        {
+            var red = Math.Clamp((int)(background.Red * 255f), 0, 255);
+            var green = Math.Clamp((int)(background.Green * 255f), 0, 255);
+            var blue = Math.Clamp((int)(background.Blue * 255f), 0, 255);
+
+            if (Math.Abs(_backgroundRed - red) > 0.1)
+            {
+                _backgroundRed = red;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(BackgroundRed)));
+            }
+
+            if (Math.Abs(_backgroundGreen - green) > 0.1)
+            {
+                _backgroundGreen = green;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(BackgroundGreen)));
+            }
+
+            if (Math.Abs(_backgroundBlue - blue) > 0.1)
+            {
+                _backgroundBlue = blue;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(BackgroundBlue)));
+            }
+
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(BackgroundPreviewBrush)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(BackgroundHex)));
+        }
+        finally
+        {
+            _isSyncingBackgroundChannels = false;
+        }
     }
 
     private void RefreshClips()

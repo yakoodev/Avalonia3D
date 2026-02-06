@@ -78,7 +78,20 @@
                 <Button Content="Применить режим" Command="{Binding SwitchShaderModeCommand}" CommandParameter="{Binding SelectedRenderMode}" HorizontalAlignment="Left" />
 
                 <TextBlock Text="Цвет фона сцены" FontWeight="SemiBold" Foreground="White" Margin="0,6,0,0" />
-                <ColorPicker Color="{Binding SelectedBackgroundColor}" />
+                <Border Background="#2D2D33" CornerRadius="6" Padding="10">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="R" Foreground="#D6D6D6" />
+                    <Slider Minimum="0" Maximum="255" Value="{Binding BackgroundRed}" />
+                    <TextBlock Text="G" Foreground="#D6D6D6" />
+                    <Slider Minimum="0" Maximum="255" Value="{Binding BackgroundGreen}" />
+                    <TextBlock Text="B" Foreground="#D6D6D6" />
+                    <Slider Minimum="0" Maximum="255" Value="{Binding BackgroundBlue}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                      <Border Width="28" Height="28" CornerRadius="4" BorderBrush="#808080" BorderThickness="1" Background="{Binding BackgroundPreviewBrush}" />
+                      <TextBlock Text="{Binding BackgroundHex}" Foreground="White" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
 
                 <TextBlock Text="JSON профиля (импорт/экспорт)" FontWeight="SemiBold" Foreground="White" Margin="0,8,0,0" />
                 <TextBox Text="{Binding ProfileJsonEditor}" AcceptsReturn="True" TextWrapping="Wrap" Height="180" FontFamily="Consolas" />
