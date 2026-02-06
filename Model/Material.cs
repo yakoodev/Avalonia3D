@@ -20,5 +20,6 @@ namespace Avalonia3D.Model
         public TextureData? EmissiveTexture { get; set; }
 
         public IShader? Shader { get; set; }
+        public string? ShaderId { get; set; }
     }
 }
