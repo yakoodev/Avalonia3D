@@ -1,5 +1,6 @@
 ﻿using Avalonia3D.Animation;
 using Avalonia3D.Interfaces;
+using Avalonia3D.Interaction.Behaviors;
 using Avalonia3D.Lights;
 using Avalonia3D.Loaders;
 using Avalonia3D.Memory;
@@ -32,6 +33,8 @@ namespace Avalonia3D.Model
     {
         private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
         private readonly List<ISceneModule> _modules = [];
+        private readonly List<ISceneBehavior> _behaviors = [];
+        private readonly List<IUpdatableBehavior> _updatableBehaviors = [];
         private double _lastTime = 0;
 
         private RenderResourceManager? _resourceManager;
@@ -40,6 +43,7 @@ namespace Avalonia3D.Model
         public SceneGraph SceneGraph { get; private set; } = new();
         public GltfSceneImporter Importer { get; } = new();
         public IReadOnlyList<ISceneModule> Modules => _modules;
+        public IReadOnlyList<ISceneBehavior> Behaviors => _behaviors;
 
         public List<Light> Lights { get; set; } = [];
         public Camera Camera { get; set; } = new();
@@ -54,6 +58,7 @@ namespace Avalonia3D.Model
         internal Animator Animator { get; private set; } = new();
         public AnimatorComponent AnimatorComponent { get; private set; }
         public SceneImportReport LastImportReport { get; private set; } = SceneImportReport.Success;
+        public SceneCommandBus CommandBus { get; } = new();
 
         public Scene3D()
         {
@@ -125,6 +130,57 @@ namespace Avalonia3D.Model
             return _modules.OfType<T>().FirstOrDefault();
         }
 
+        public void RegisterBehavior(ISceneBehavior behavior)
+        {
+            if (behavior == null || _behaviors.Contains(behavior))
+            {
+                return;
+            }
+
+            _behaviors.Add(behavior);
+            if (behavior is IUpdatableBehavior updatable)
+            {
+                _updatableBehaviors.Add(updatable);
+            }
+
+            if (behavior is ISceneCommandHandler commandHandler)
+            {
+                CommandBus.RegisterHandler(commandHandler);
+            }
+
+            behavior.Attach(this);
+        }
+
+        public void UnregisterBehavior(ISceneBehavior behavior)
+        {
+            if (behavior == null)
+            {
+                return;
+            }
+
+            if (!_behaviors.Remove(behavior))
+            {
+                return;
+            }
+
+            if (behavior is IUpdatableBehavior updatable)
+            {
+                _updatableBehaviors.Remove(updatable);
+            }
+
+            if (behavior is ISceneCommandHandler commandHandler)
+            {
+                CommandBus.UnregisterHandler(commandHandler);
+            }
+
+            behavior.Detach(this);
+        }
+
+        public bool DispatchCommand(SceneCommand command)
+        {
+            return CommandBus.Publish(command);
+        }
+
         private float GetDeltaTime()
         {
             double now = _stopwatch.Elapsed.TotalSeconds;
@@ -137,6 +193,10 @@ namespace Avalonia3D.Model
         {
             float deltaTime = GetDeltaTime();
             Animator.Update(deltaTime);
+            foreach (var behavior in _updatableBehaviors)
+            {
+                behavior.Update(deltaTime);
+            }
         }
 
         public void Render(IRenderContext context)
@@ -180,6 +240,8 @@ namespace Avalonia3D.Model
             {
                 AnimatorComponent.RegisterClip(clip);
             }
+
+            ReattachBehaviors();
             BuildRenderResources();
             LookChanged?.Invoke(this, _lookState);
             return SceneGraph;
@@ -211,6 +273,15 @@ namespace Avalonia3D.Model
                 {
                     BuildRenderResourcesRecursive(child);
                 }
+            }
+        }
+
+        private void ReattachBehaviors()
+        {
+            foreach (var behavior in _behaviors)
+            {
+                behavior.Detach(this);
+                behavior.Attach(this);
             }
         }
 

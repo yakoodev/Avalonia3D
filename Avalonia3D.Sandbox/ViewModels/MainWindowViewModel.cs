@@ -2,6 +2,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia3D.Animation;
 using Avalonia3D.Interaction.CameraController;
+using Avalonia3D.Interaction.Behaviors;
 using Avalonia3D.Model;
 using Avalonia3D.Rendering;
 using Avalonia3D.Sandbox.Scenes;
@@ -38,6 +39,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private string _profileStatusMessage = "";
     private string _importStatusText = "Import: OK";
     private bool _isImportDegraded;
+    private string _behaviorTargetSemanticId = "door.main";
 
     public MainWindowViewModel(Scene3D scene, CameraController cameraController, string assetsRoot, IRenderThreadScheduler renderThreadScheduler, Action<GraphicsProfile> applyGraphicsProfile)
     {
@@ -94,6 +96,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         StopClipCommand = new RelayCommand(_ => Stop());
         TogglePlayPauseCommand = new RelayCommand(_ => TogglePlayPause());
 
+        OpenSemanticTargetCommand = new RelayCommand(_ => DispatchBehaviorCommand(SceneCommandAction.Open));
+        CloseSemanticTargetCommand = new RelayCommand(_ => DispatchBehaviorCommand(SceneCommandAction.Close));
+        ToggleSemanticTargetCommand = new RelayCommand(_ => DispatchBehaviorCommand(SceneCommandAction.Toggle));
+
         FrameAllCommand = new RelayCommand(_ => ExecuteOnRenderThread(() => _cameraController.FrameAll()));
         ResetViewCommand = new RelayCommand(_ => ExecuteOnRenderThread(() => _cameraController.ResetView()));
         ToggleCameraModeCommand = new RelayCommand(_ =>
@@ -127,6 +133,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public RelayCommand PauseClipCommand { get; }
     public RelayCommand StopClipCommand { get; }
     public RelayCommand TogglePlayPauseCommand { get; }
+    public RelayCommand OpenSemanticTargetCommand { get; }
+    public RelayCommand CloseSemanticTargetCommand { get; }
+    public RelayCommand ToggleSemanticTargetCommand { get; }
     public RelayCommand FrameAllCommand { get; }
     public RelayCommand ResetViewCommand { get; }
     public RelayCommand ToggleCameraModeCommand { get; }
@@ -134,6 +143,22 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public RelayCommand ResetProfileJsonCommand { get; }
 
     public string CurrentCameraMode => _cameraController.ControlMode.ToString();
+
+
+    public string BehaviorTargetSemanticId
+    {
+        get => _behaviorTargetSemanticId;
+        set
+        {
+            if (_behaviorTargetSemanticId == value)
+            {
+                return;
+            }
+
+            _behaviorTargetSemanticId = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(BehaviorTargetSemanticId)));
+        }
+    }
 
     public bool IsImportDegraded
     {
@@ -546,6 +571,20 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private void ExecuteOnRenderThread(Action action)
     {
         _renderThreadScheduler.Enqueue(action);
+    }
+
+
+    private void DispatchBehaviorCommand(SceneCommandAction action)
+    {
+        if (string.IsNullOrWhiteSpace(BehaviorTargetSemanticId))
+        {
+            return;
+        }
+
+        ExecuteOnRenderThread(() =>
+        {
+            _scene.DispatchCommand(new SceneCommand(BehaviorTargetSemanticId, action));
+        });
     }
 
     private void Play()

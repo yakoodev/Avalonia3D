@@ -8,12 +8,24 @@ namespace Avalonia3D.Animation
 {
     public readonly record struct ClipPlaybackState(string ClipName, bool IsRegistered, bool IsPlaying, bool IsPaused, bool Loop, float Speed, float Time, float Duration);
 
+    public sealed class ClipPlaybackCompletedEventArgs : EventArgs
+    {
+        public ClipPlaybackCompletedEventArgs(string clipName)
+        {
+            ClipName = clipName;
+        }
+
+        public string ClipName { get; }
+    }
+
     public class AnimatorComponent
     {
         private readonly Animator _animator;
         private SceneGraph _sceneGraph;
         private readonly Dictionary<string, AnimationClip> _clips = new(StringComparer.Ordinal);
         private readonly Dictionary<string, AnimationClipPlayer> _activePlayers = new(StringComparer.Ordinal);
+
+        public event EventHandler<ClipPlaybackCompletedEventArgs>? ClipCompleted;
 
         public AnimatorComponent(SceneGraph sceneGraph, Animator animator)
         {
@@ -180,6 +192,7 @@ namespace Avalonia3D.Animation
             }
 
             _activePlayers.Remove(player.Clip.Name);
+            ClipCompleted?.Invoke(this, new ClipPlaybackCompletedEventArgs(player.Clip.Name));
         }
     }
 }
