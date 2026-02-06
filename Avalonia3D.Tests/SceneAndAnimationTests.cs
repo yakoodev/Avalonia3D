@@ -1,6 +1,9 @@
 using System;
+using System.IO;
+using System.Linq;
 using System.Numerics;
 using Avalonia3D.Animation;
+using Avalonia3D.Loaders;
 using Avalonia3D.Model;
 using Xunit;
 
@@ -42,28 +45,43 @@ public class SceneAndAnimationTests
     public void FindByName_FindsNestedNodeByName()
     {
         var graph = new SceneGraph();
-        var level1 = new SceneNode { Name = "Level1" };
-        var level2 = new SceneNode { Name = "Level2" };
-        var target = new SceneNode { Name = "TargetNode" };
+        var level1 = new SceneNode { Name = "Level1", StableId = "node:1" };
+        var level2 = new SceneNode { Name = "Level2", StableId = "node:2" };
+        var target = new SceneNode { Name = "TargetNode", StableId = "node:3" };
 
         graph.Root.AddChild(level1);
         level1.AddChild(level2);
         level2.AddChild(target);
 
-        var found = graph.FindNode("TargetNode");
+        var foundByName = graph.FindNode("TargetNode");
+        var foundById = graph.FindNodeByKey("node:3");
 
-        Assert.Same(target, found);
+        Assert.Same(target, foundByName);
+        Assert.Same(target, foundById);
+    }
+
+    [Fact]
+    public void GltfImporter_ExtractsAnimationClip_FromTestAsset()
+    {
+        var importer = new GltfSceneImporter();
+        var path = GetTestAssetPath("Fox.gltf");
+
+        var result = importer.ImportWithAnimations(path);
+
+        Assert.NotNull(result.Graph);
+        Assert.NotEmpty(result.Clips);
+        Assert.All(result.Clips, clip => Assert.NotEmpty(clip.Channels));
     }
 
     [Fact]
     public void AnimationClipPlayer_Update_AppliesChannelValueToNode()
     {
         var graph = new SceneGraph();
-        var animatedNode = new SceneNode { Name = "Arm" };
+        var animatedNode = new SceneNode { Name = "Arm", StableId = "node:arm" };
         graph.Root.AddChild(animatedNode);
 
         var clip = new AnimationClip("MoveArm");
-        var channel = new AnimationChannel("Arm", AnimationTargetProperty.Position);
+        var channel = new AnimationChannel("node:arm", AnimationTargetProperty.Position);
         channel.AddKeyframe(0f, new Vector3(0f, 0f, 0f));
         channel.AddKeyframe(1f, new Vector3(10f, 0f, 0f));
         clip.Channels.Add(channel);
@@ -75,6 +93,69 @@ public class SceneAndAnimationTests
 
         Assert.True(isRunning);
         AssertVectorEqual(new Vector3(5f, 0f, 0f), animatedNode.Position);
+    }
+
+    [Fact]
+    public void AnimationClipPlayer_RespectsLoopAndNonLoopCompletion()
+    {
+        var graph = new SceneGraph();
+        var node = new SceneNode { Name = "Node", StableId = "node:test" };
+        graph.Root.AddChild(node);
+
+        var clip = new AnimationClip("Move");
+        var channel = new AnimationChannel("node:test", AnimationTargetProperty.Position);
+        channel.AddKeyframe(0f, Vector3.Zero);
+        channel.AddKeyframe(1f, new Vector3(1f, 0f, 0f));
+        clip.Channels.Add(channel);
+
+        var nonLoop = new AnimationClipPlayer(clip, graph);
+        nonLoop.Play(loop: false, speed: 1f);
+        var activeAfterEnd = nonLoop.Update(1.1f);
+
+        Assert.False(activeAfterEnd);
+        AssertVectorEqual(new Vector3(1f, 0f, 0f), node.Position);
+
+        var loop = new AnimationClipPlayer(clip, graph);
+        loop.Play(loop: true, speed: 1f);
+        var loopStillActive = loop.Update(1.1f);
+
+        Assert.True(loopStillActive);
+        Assert.InRange(node.Position.X, 0.09f, 0.11f);
+    }
+
+    [Fact]
+    public void AnimationClipPlayer_MissingNode_DoesNotThrow()
+    {
+        var graph = new SceneGraph();
+        var clip = new AnimationClip("NoNodeClip");
+        var channel = new AnimationChannel("node:missing", AnimationTargetProperty.Scale);
+        channel.AddKeyframe(0f, Vector3.One);
+        channel.AddKeyframe(1f, new Vector3(2f, 2f, 2f));
+        clip.Channels.Add(channel);
+
+        var player = new AnimationClipPlayer(clip, graph);
+        player.Play(loop: false, speed: 1f);
+
+        var exception = Record.Exception(() => player.Update(0.5f));
+
+        Assert.Null(exception);
+    }
+
+    private static string GetTestAssetPath(string fileName)
+    {
+        var current = AppContext.BaseDirectory;
+        for (var i = 0; i < 6; i++)
+        {
+            var candidate = Path.Combine(current, "Avalonia3D.Sandbox", "Assets", "TestScenes", fileName);
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+
+            current = Path.GetFullPath(Path.Combine(current, ".."));
+        }
+
+        throw new FileNotFoundException($"Test asset {fileName} not found.");
     }
 
     private static void AssertVectorEqual(Vector3 expected, Vector3 actual, float epsilon = 0.0001f)

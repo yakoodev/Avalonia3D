@@ -9,6 +9,7 @@ namespace Avalonia3D.Model
         private readonly List<SceneNode> _children = [];
 
         public string? Name { get; set; }
+        public string? StableId { get; set; }
         public Vector3 Position { get; set; } = Vector3.Zero;
         public Quaternion Rotation { get; set; } = Quaternion.Identity;
         public Vector3 Scale { get; set; } = Vector3.One;
@@ -89,6 +90,20 @@ namespace Avalonia3D.Model
                 * Matrix4x4.CreateFromQuaternion(Rotation)
                 * Matrix4x4.CreateTranslation(Position)
                 * parentMatrix;
+        }
+
+        public string GetPath()
+        {
+            var segments = new Stack<string>();
+            var current = this;
+
+            while (current != null)
+            {
+                segments.Push(string.IsNullOrWhiteSpace(current.Name) ? "$node" : current.Name!);
+                current = current.Parent;
+            }
+
+            return string.Join('/', segments);
         }
     }
 }

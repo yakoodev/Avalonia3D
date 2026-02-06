@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using Avalonia3D.Model;
 
 namespace Avalonia3D.Animation
 {
+    public readonly record struct ClipPlaybackState(string ClipName, bool IsRegistered, bool IsPlaying, bool IsPaused, bool Loop, float Speed, float Time, float Duration);
+
     public class AnimatorComponent
     {
         private readonly Animator _animator;
@@ -29,12 +32,45 @@ namespace Avalonia3D.Animation
 
         public void RegisterClip(AnimationClip clip)
         {
-            if (clip == null)
+            if (clip == null || string.IsNullOrWhiteSpace(clip.Name))
             {
                 return;
             }
 
             _clips[clip.Name] = clip;
+        }
+
+        public IReadOnlyList<string> GetClipNames()
+        {
+            return _clips.Keys.OrderBy(static x => x, StringComparer.Ordinal).ToArray();
+        }
+
+        public ClipPlaybackState GetClipState(string clipName)
+        {
+            if (string.IsNullOrWhiteSpace(clipName))
+            {
+                return default;
+            }
+
+            if (!_clips.TryGetValue(clipName, out var clip))
+            {
+                return new ClipPlaybackState(clipName, false, false, false, false, 1f, 0f, 0f);
+            }
+
+            if (_activePlayers.TryGetValue(clipName, out var player))
+            {
+                return new ClipPlaybackState(
+                    clipName,
+                    true,
+                    true,
+                    player.IsPaused,
+                    player.Loop,
+                    player.Speed,
+                    player.Time,
+                    clip.Duration);
+            }
+
+            return new ClipPlaybackState(clipName, true, false, false, false, 1f, 0f, clip.Duration);
         }
 
         public bool PlayClip(string clipName, bool loop = false, float speed = 1f)
@@ -102,7 +138,7 @@ namespace Avalonia3D.Animation
 
         public bool SetNodePosition(string nodeName, Vector3 position)
         {
-            var node = _sceneGraph.FindNode(nodeName);
+            var node = _sceneGraph.FindNodeByKey(nodeName);
             if (node == null)
             {
                 return false;
@@ -114,7 +150,7 @@ namespace Avalonia3D.Animation
 
         public bool SetNodeRotation(string nodeName, Quaternion rotation)
         {
-            var node = _sceneGraph.FindNode(nodeName);
+            var node = _sceneGraph.FindNodeByKey(nodeName);
             if (node == null)
             {
                 return false;
@@ -126,7 +162,7 @@ namespace Avalonia3D.Animation
 
         public bool SetNodeScale(string nodeName, Vector3 scale)
         {
-            var node = _sceneGraph.FindNode(nodeName);
+            var node = _sceneGraph.FindNodeByKey(nodeName);
             if (node == null)
             {
                 return false;

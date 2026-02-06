@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Avalonia3D.Model.StandObjects;
 
@@ -9,7 +10,7 @@ namespace Avalonia3D.Model
 
         public SceneGraph()
         {
-            Root = new SceneNode { Name = "Root" };
+            Root = new SceneNode { Name = "Root", StableId = "Root" };
         }
 
         public SceneNode Root { get; }
@@ -60,6 +61,52 @@ namespace Avalonia3D.Model
         public SceneNode? FindNode(string name)
         {
             return Root.FindByName(name);
+        }
+
+        public SceneNode? FindNodeByStableId(string stableId)
+        {
+            return FindNodeByPredicate(node => string.Equals(node.StableId, stableId, StringComparison.Ordinal));
+        }
+
+        public SceneNode? FindNodeByPath(string path)
+        {
+            return FindNodeByPredicate(node => string.Equals(node.GetPath(), path, StringComparison.Ordinal));
+        }
+
+        public SceneNode? FindNodeByKey(string key)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                return null;
+            }
+
+            return FindNodeByStableId(key)
+                ?? FindNodeByPath(key)
+                ?? FindNode(key);
+        }
+
+        private SceneNode? FindNodeByPredicate(Func<SceneNode, bool> predicate)
+        {
+            return FindNodeByPredicate(Root, predicate);
+        }
+
+        private static SceneNode? FindNodeByPredicate(SceneNode node, Func<SceneNode, bool> predicate)
+        {
+            if (predicate(node))
+            {
+                return node;
+            }
+
+            foreach (var child in node.Children)
+            {
+                var match = FindNodeByPredicate(child, predicate);
+                if (match != null)
+                {
+                    return match;
+                }
+            }
+
+            return null;
         }
     }
 }
