@@ -31,6 +31,7 @@ namespace Avalonia3D.Rendering
 
             gl.Disable(EnableCap.Blend);
             gl.DepthMask(true);
+            gl.ClearColor(_settings.Background.Red, _settings.Background.Green, _settings.Background.Blue, 1f);
             gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
             foreach (var obj in context.OpaqueObjects)

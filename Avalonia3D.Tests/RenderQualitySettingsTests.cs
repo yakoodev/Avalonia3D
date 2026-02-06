@@ -64,7 +64,8 @@ public class RenderQualitySettingsTests
         var profile = GraphicsProfile.High with
         {
             Name = "QA-High",
-            PbrTuning = GraphicsProfile.High.PbrTuning with { Exposure = 1.35f, IblIntensity = 1.7f }
+            PbrTuning = GraphicsProfile.High.PbrTuning with { Exposure = 1.35f, IblIntensity = 1.7f },
+            Background = new BackgroundProfile { Red = 0.2f, Green = 0.25f, Blue = 0.3f }
         };
 
         var json = profile.ToJson();
@@ -74,5 +75,8 @@ public class RenderQualitySettingsTests
         Assert.Equal(RenderQualityPreset.High, restored.QualityPreset);
         Assert.Equal(1.35f, restored.PbrTuning.Exposure);
         Assert.Equal(1.7f, restored.PbrTuning.IblIntensity);
+        Assert.Equal(0.2f, restored.Background.Red);
+        Assert.Equal(0.25f, restored.Background.Green);
+        Assert.Equal(0.3f, restored.Background.Blue);
     }
 }

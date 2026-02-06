@@ -8,80 +8,109 @@
         x:Class="Avalonia3D.Sandbox.MainWindow"
         x:DataType="viewModels:MainWindowViewModel"
         Title="Avalonia3D Sandbox"
-        Width="1200"
-        Height="720">
+        Width="1400"
+        Height="820">
   <Window.KeyBindings>
     <KeyBinding Gesture="F" Command="{Binding FrameAllCommand}" />
     <KeyBinding Gesture="R" Command="{Binding ResetViewCommand}" />
     <KeyBinding Gesture="Space" Command="{Binding TogglePlayPauseCommand}" />
   </Window.KeyBindings>
 
-  <Grid ColumnDefinitions="280,*" Background="#1E1E1E">
-    <Border Grid.Column="0" Background="#252526" Padding="16">
-      <ScrollViewer>
-        <StackPanel Spacing="12">
-          <TextBlock Text="Тестовые сцены" FontSize="18" FontWeight="Bold" Foreground="White" />
-          <TextBlock Text="Камера" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,8,0,0" />
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Content="Frame" Command="{Binding FrameAllCommand}" />
-            <Button Content="Reset" Command="{Binding ResetViewCommand}" />
+  <Grid ColumnDefinitions="420,*" Background="#1B1B1D">
+    <Border Grid.Column="0" Background="#222226" Padding="14" BorderBrush="#3A3A40" BorderThickness="0,0,1,0">
+      <DockPanel LastChildFill="True">
+        <Border DockPanel.Dock="Top" Background="#2B2B31" CornerRadius="8" Padding="10" Margin="0,0,0,10">
+          <StackPanel>
+            <TextBlock Text="Avalonia3D Sandbox" FontSize="18" FontWeight="Bold" Foreground="White" />
+            <TextBlock Text="Быстрые клавиши: F = Frame All, R = Reset, Space = Play/Pause" Foreground="#BDBDC7" FontSize="12" Margin="0,4,0,0" />
           </StackPanel>
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBlock Text="Mode:" Foreground="White" VerticalAlignment="Center" />
-            <TextBlock Text="{Binding CurrentCameraMode}" Foreground="#CFCFCF" VerticalAlignment="Center" />
-            <Button Content="Toggle" Command="{Binding ToggleCameraModeCommand}" />
-          </StackPanel>
-          <TextBlock Text="Orbit sensitivity" Foreground="White" />
-          <Slider Minimum="0.001" Maximum="0.1" Value="{Binding OrbitSensitivity}" />
-          <TextBlock Text="Pan sensitivity" Foreground="White" />
-          <Slider Minimum="0.001" Maximum="0.1" Value="{Binding PanSensitivity}" />
-          <TextBlock Text="Dolly sensitivity" Foreground="White" />
-          <Slider Minimum="0.1" Maximum="10" Value="{Binding DollySensitivity}" />
+        </Border>
 
-          <TextBlock Text="Режим шейдера" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,8,0,0" />
-          <ComboBox ItemsSource="{Binding ShaderModes}"
-                    SelectedItem="{Binding SelectedRenderMode}"
-                    HorizontalAlignment="Stretch" />
-          <Button Content="Применить режим"
-                  Command="{Binding SwitchShaderModeCommand}"
-                  CommandParameter="{Binding SelectedRenderMode}"
-                  HorizontalAlignment="Left" />
-          <TextBlock Text="Качество рендера" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,8,0,0" />
-          <ComboBox ItemsSource="{Binding QualityPresets}"
-                    SelectedItem="{Binding SelectedQualityPreset}"
-                    HorizontalAlignment="Stretch" />
-          <TextBlock Text="{Binding ActiveQualitySummary}" Foreground="#CFCFCF" TextWrapping="Wrap" />
-          <TextBlock Text="Анимация" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,8,0,0" />
-          <ComboBox ItemsSource="{Binding AvailableClips}"
-                    SelectedItem="{Binding SelectedClipName}"
-                    HorizontalAlignment="Stretch" />
-          <CheckBox Content="Loop" IsChecked="{Binding IsLoopEnabled}" Foreground="White" />
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBlock Text="Speed" Foreground="White" VerticalAlignment="Center"/>
-            <NumericUpDown Minimum="0.1" Maximum="4" Increment="0.1" Value="{Binding PlaybackSpeed}" Width="120"/>
-          </StackPanel>
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Content="Play" Command="{Binding PlayClipCommand}" />
-            <Button Content="Pause" Command="{Binding PauseClipCommand}" />
-            <Button Content="Stop" Command="{Binding StopClipCommand}" />
-          </StackPanel>
-          <TextBlock Text="{Binding ClipStateText}" Foreground="#CFCFCF" TextWrapping="Wrap" />
-          <ItemsControl ItemsSource="{Binding Scenes}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="viewModels:SceneItemViewModel">
-                <Border Background="#2D2D30" Padding="12" CornerRadius="6">
-                  <StackPanel Spacing="6">
-                    <TextBlock Text="{Binding Title}" FontWeight="Bold" Foreground="White" />
-                    <TextBlock Text="{Binding Description}" Foreground="#CFCFCF" TextWrapping="Wrap" />
-                    <Button Content="Открыть" Command="{Binding LoadCommand}" HorizontalAlignment="Left" />
-                  </StackPanel>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </StackPanel>
-      </ScrollViewer>
+        <ScrollViewer>
+          <TabControl>
+            <TabItem Header="Сцены">
+              <StackPanel Spacing="10" Margin="0,8,0,0">
+                <TextBlock Text="Выберите тестовую сцену" Foreground="White" FontWeight="SemiBold" />
+                <ItemsControl ItemsSource="{Binding Scenes}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="viewModels:SceneItemViewModel">
+                      <Border Background="#2D2D33" Padding="10" CornerRadius="8" Margin="0,0,0,8">
+                        <StackPanel Spacing="6">
+                          <TextBlock Text="{Binding Title}" FontWeight="Bold" Foreground="White" />
+                          <TextBlock Text="{Binding Description}" Foreground="#CFCFCF" TextWrapping="Wrap" />
+                          <Button Content="Открыть сцену" Command="{Binding LoadCommand}" HorizontalAlignment="Left" />
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </TabItem>
+
+            <TabItem Header="Камера">
+              <StackPanel Spacing="10" Margin="0,8,0,0">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Content="Frame All" Command="{Binding FrameAllCommand}" />
+                  <Button Content="Reset" Command="{Binding ResetViewCommand}" />
+                  <Button Content="Toggle Mode" Command="{Binding ToggleCameraModeCommand}" />
+                </StackPanel>
+                <TextBlock Text="Текущий режим камеры:" Foreground="#D6D6D6" />
+                <TextBlock Text="{Binding CurrentCameraMode}" Foreground="White" FontWeight="SemiBold" />
+
+                <TextBlock Text="Orbit sensitivity" Foreground="#D6D6D6" />
+                <Slider Minimum="0.001" Maximum="0.1" Value="{Binding OrbitSensitivity}" />
+                <TextBlock Text="Pan sensitivity" Foreground="#D6D6D6" />
+                <Slider Minimum="0.001" Maximum="0.1" Value="{Binding PanSensitivity}" />
+                <TextBlock Text="Dolly sensitivity" Foreground="#D6D6D6" />
+                <Slider Minimum="0.1" Maximum="10" Value="{Binding DollySensitivity}" />
+              </StackPanel>
+            </TabItem>
+
+            <TabItem Header="Графика / QA">
+              <StackPanel Spacing="10" Margin="0,8,0,0">
+                <TextBlock Text="Профиль качества" FontWeight="SemiBold" Foreground="White" />
+                <ComboBox ItemsSource="{Binding QualityPresets}" SelectedItem="{Binding SelectedQualityPreset}" HorizontalAlignment="Stretch" />
+                <TextBlock Text="{Binding ActiveQualitySummary}" Foreground="#D6D6D6" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding GraphicsTuningHint}" Foreground="#9FD0FF" TextWrapping="Wrap" />
+
+                <TextBlock Text="Режим шейдера" FontWeight="SemiBold" Foreground="White" Margin="0,6,0,0" />
+                <ComboBox ItemsSource="{Binding ShaderModes}" SelectedItem="{Binding SelectedRenderMode}" HorizontalAlignment="Stretch" />
+                <Button Content="Применить режим" Command="{Binding SwitchShaderModeCommand}" CommandParameter="{Binding SelectedRenderMode}" HorizontalAlignment="Left" />
+
+                <TextBlock Text="Цвет фона сцены" FontWeight="SemiBold" Foreground="White" Margin="0,6,0,0" />
+                <ColorPicker Color="{Binding SelectedBackgroundColor}" />
+
+                <TextBlock Text="JSON профиля (импорт/экспорт)" FontWeight="SemiBold" Foreground="White" Margin="0,8,0,0" />
+                <TextBox Text="{Binding ProfileJsonEditor}" AcceptsReturn="True" TextWrapping="Wrap" Height="180" FontFamily="Consolas" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Content="Применить JSON" Command="{Binding ApplyProfileJsonCommand}" />
+                  <Button Content="Сбросить к активному" Command="{Binding ResetProfileJsonCommand}" />
+                </StackPanel>
+                <TextBlock Text="{Binding ProfileStatusMessage}" Foreground="#C9F7A5" TextWrapping="Wrap" />
+              </StackPanel>
+            </TabItem>
+
+            <TabItem Header="Анимация">
+              <StackPanel Spacing="10" Margin="0,8,0,0">
+                <ComboBox ItemsSource="{Binding AvailableClips}" SelectedItem="{Binding SelectedClipName}" HorizontalAlignment="Stretch" />
+                <CheckBox Content="Loop" IsChecked="{Binding IsLoopEnabled}" Foreground="White" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock Text="Speed" Foreground="White" VerticalAlignment="Center"/>
+                  <NumericUpDown Minimum="0.1" Maximum="4" Increment="0.1" Value="{Binding PlaybackSpeed}" Width="120"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Content="Play" Command="{Binding PlayClipCommand}" />
+                  <Button Content="Pause" Command="{Binding PauseClipCommand}" />
+                  <Button Content="Stop" Command="{Binding StopClipCommand}" />
+                </StackPanel>
+                <TextBlock Text="{Binding ClipStateText}" Foreground="#CFCFCF" TextWrapping="Wrap" />
+              </StackPanel>
+            </TabItem>
+          </TabControl>
+        </ScrollViewer>
+      </DockPanel>
     </Border>
+
     <Grid Grid.Column="1">
       <Grid>
         <Border Background="Black">
@@ -89,8 +118,11 @@
         </Border>
         <Border x:Name="InputOverlay" Background="Transparent" IsHitTestVisible="True" />
       </Grid>
-      <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16" Background="#66000000" Padding="8" CornerRadius="4">
-        <TextBlock Text="{Binding CurrentSceneTitle}" Foreground="White" />
+      <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16" Background="#88000000" Padding="10" CornerRadius="6">
+        <StackPanel>
+          <TextBlock Text="{Binding CurrentSceneTitle}" Foreground="White" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding ActiveQualitySummary}" Foreground="#D0D0D0" FontSize="11" MaxWidth="600" TextWrapping="Wrap" />
+        </StackPanel>
       </Border>
     </Grid>
   </Grid>

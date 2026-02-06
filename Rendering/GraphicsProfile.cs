@@ -32,6 +32,13 @@ namespace Avalonia3D.Rendering
         public float AmbientOcclusionStrength { get; init; } = 1.0f;
     }
 
+    public sealed record BackgroundProfile
+    {
+        public float Red { get; init; } = 0.06f;
+        public float Green { get; init; } = 0.06f;
+        public float Blue { get; init; } = 0.08f;
+    }
+
     public sealed record GraphicsProfile
     {
         private static readonly JsonSerializerOptions JsonOptions = new()
@@ -47,6 +54,7 @@ namespace Avalonia3D.Rendering
         public PostFxProfile PostFx { get; init; } = new();
         public ReflectionProfile Reflections { get; init; } = new();
         public PbrTuningProfile PbrTuning { get; init; } = new();
+        public BackgroundProfile Background { get; init; } = new();
 
         public static GraphicsProfile Low => new()
         {
@@ -72,7 +80,8 @@ namespace Avalonia3D.Rendering
                 Exposure = 0.95f,
                 IblIntensity = 0.6f,
                 AmbientOcclusionStrength = 0.8f
-            }
+            },
+            Background = new BackgroundProfile { Red = 0.09f, Green = 0.09f, Blue = 0.10f }
         };
 
         public static GraphicsProfile Medium => new()
@@ -98,7 +107,8 @@ namespace Avalonia3D.Rendering
                 Exposure = 1.0f,
                 IblIntensity = 1.0f,
                 AmbientOcclusionStrength = 1.0f
-            }
+            },
+            Background = new BackgroundProfile { Red = 0.06f, Green = 0.06f, Blue = 0.08f }
         };
 
         public static GraphicsProfile High => new()
@@ -124,7 +134,8 @@ namespace Avalonia3D.Rendering
                 Exposure = 1.1f,
                 IblIntensity = 1.2f,
                 AmbientOcclusionStrength = 1.1f
-            }
+            },
+            Background = new BackgroundProfile { Red = 0.04f, Green = 0.05f, Blue = 0.07f }
         };
 
         public GraphicsProfile Validate()
@@ -159,13 +170,21 @@ namespace Avalonia3D.Rendering
                 AmbientOcclusionStrength = Math.Clamp(PbrTuning?.AmbientOcclusionStrength ?? 1.0f, 0f, 4.0f)
             };
 
+            var validatedBackground = (Background ?? new BackgroundProfile()) with
+            {
+                Red = Math.Clamp(Background?.Red ?? 0.06f, 0f, 1f),
+                Green = Math.Clamp(Background?.Green ?? 0.06f, 0f, 1f),
+                Blue = Math.Clamp(Background?.Blue ?? 0.08f, 0f, 1f)
+            };
+
             return this with
             {
                 Name = string.IsNullOrWhiteSpace(Name) ? "Custom" : Name.Trim(),
                 Shadows = validatedShadows,
                 PostFx = validatedPostFx,
                 Reflections = validatedReflections,
-                PbrTuning = validatedPbr
+                PbrTuning = validatedPbr,
+                Background = validatedBackground
             };
         }
 
@@ -190,6 +209,6 @@ namespace Avalonia3D.Rendering
         }
 
         public string ToSummary() =>
-            $"Profile={Name} ({QualityPreset}), shadows={Shadows.Enabled}:{Shadows.MapSize}, postfx={PostFx.Effects}, gamma={PostFx.Gamma:0.00}, refl={Reflections.Mode}:{Reflections.Intensity:0.00}, exposure={PbrTuning.Exposure:0.00}, ibl={PbrTuning.IblIntensity:0.00}, msaa={MsaaPolicy}";
+            $"Profile={Name} ({QualityPreset}), shadows={Shadows.Enabled}:{Shadows.MapSize}, postfx={PostFx.Effects}, gamma={PostFx.Gamma:0.00}, refl={Reflections.Mode}:{Reflections.Intensity:0.00}, exposure={PbrTuning.Exposure:0.00}, ibl={PbrTuning.IblIntensity:0.00}, msaa={MsaaPolicy}, bg=({Background.Red:0.00},{Background.Green:0.00},{Background.Blue:0.00})";
     }
 }
