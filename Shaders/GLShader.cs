@@ -11,6 +11,7 @@ namespace Avalonia3D.Shaders
 {
     public sealed class GLShader : IShader3D, IDisposable
     {
+        private const int MaxLights = 2;
         // Кэшированные uniform-локации
         private int _mvpLocation = -1;
         private int _modelLocation = -1;
@@ -344,51 +345,57 @@ void main()
         {
             var camera = renderContext.Scene.Camera;
             var modelMatrix = sceneObject.CreateModelMatrix();
-            var mvpMatrix = modelMatrix * camera.View * camera.Projection;
+            var viewProjection = camera.View * camera.Projection;
+            var mvpMatrix = modelMatrix * viewProjection;
+
+            var glMvpMatrix = Matrix4x4.Transpose(mvpMatrix);
+            var glModelMatrix = Matrix4x4.Transpose(modelMatrix);
+            var glLightSpaceMatrix = Matrix4x4.Transpose(lightSpaceMatrix);
 
             if (_mvpLocation != -1)
-                _gl.UniformMatrix4(_mvpLocation, 1, false, (float*)&mvpMatrix);
+                _gl.UniformMatrix4(_mvpLocation, 1, false, (float*)&glMvpMatrix);
 
             if (_modelLocation != -1)
-                _gl.UniformMatrix4(_modelLocation, 1, false, (float*)&modelMatrix);
+                _gl.UniformMatrix4(_modelLocation, 1, false, (float*)&glModelMatrix);
 
             if (_lightSpaceMatrixLocation != -1)
-                _gl.UniformMatrix4(_lightSpaceMatrixLocation, 1, false, (float*)&lightSpaceMatrix);
+                _gl.UniformMatrix4(_lightSpaceMatrixLocation, 1, false, (float*)&glLightSpaceMatrix);
 
             var lights = renderContext.Scene.Lights;
+            var lightCount = Math.Min(lights.Count, MaxLights);
 
-            if (_lightPosLocation != -1)
+            if (_lightPosLocation != -1 && lightCount > 0)
             {
-                var lightPositions = new float[lights.Count * 3];
-                for (int i = 0; i < lights.Count; i++)
+                var lightPositions = new float[MaxLights * 3];
+                for (int i = 0; i < lightCount; i++)
                 {
                     lightPositions[i * 3 + 0] = lights[i].Position.X;
                     lightPositions[i * 3 + 1] = lights[i].Position.Y;
                     lightPositions[i * 3 + 2] = lights[i].Position.Z;
                 }
                 fixed (float* p = &lightPositions[0])
-                    _gl.Uniform3(_lightPosLocation, (uint)lights.Count, p);
+                    _gl.Uniform3(_lightPosLocation, (uint)MaxLights, p);
             }
 
-            if (_lightColorLocation != -1)
+            if (_lightColorLocation != -1 && lightCount > 0)
             {
-                var lightColors = new float[lights.Count * 3];
-                for (int i = 0; i < lights.Count; i++)
+                var lightColors = new float[MaxLights * 3];
+                for (int i = 0; i < lightCount; i++)
                 {
                     lightColors[i * 3 + 0] = lights[i].Color.X;
                     lightColors[i * 3 + 1] = lights[i].Color.Y;
                     lightColors[i * 3 + 2] = lights[i].Color.Z;
                 }
                 fixed (float* p = &lightColors[0])
-                    _gl.Uniform3(_lightColorLocation, (uint)lights.Count, p);
+                    _gl.Uniform3(_lightColorLocation, (uint)MaxLights, p);
             }
 
             if (_intensityLocation != -1)
             {
-                var intensities = new float[lights.Count];
-                for (int i = 0; i < lights.Count; i++)
+                var intensities = new float[MaxLights];
+                for (int i = 0; i < lightCount; i++)
                     intensities[i] = lights[i].Intensity;
-                _gl.Uniform1(_intensityLocation, (uint)lights.Count, intensities);
+                _gl.Uniform1(_intensityLocation, (uint)MaxLights, intensities);
             }
 
             if (_viewPosLocation != -1)
@@ -427,14 +434,16 @@ void main()
             if (_alphaLocation != -1)
                 _gl.Uniform1(_alphaLocation, alpha);
 
+            var primaryLight = lightCount > 0 ? lights[0] : null;
+
             if (_ambientLocation != -1)
-                _gl.Uniform1(_ambientLocation, lights[0].AmbientStrength);
+                _gl.Uniform1(_ambientLocation, primaryLight?.AmbientStrength ?? 0.25f);
 
             if (_specularLocation != -1)
-                _gl.Uniform1(_specularLocation, lights[0].SpecularStrength);
+                _gl.Uniform1(_specularLocation, primaryLight?.SpecularStrength ?? 0.35f);
 
             if (_shininessLocation != -1)
-                _gl.Uniform1(_shininessLocation, lights[0].Shininess);
+                _gl.Uniform1(_shininessLocation, primaryLight?.Shininess ?? 16);
         }
 
         public void BindMaterial(RenderResources resources, Material? material, uint? shadowMapId)
