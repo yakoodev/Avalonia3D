@@ -21,6 +21,8 @@ public class SandboxModel3DControl : OpenGlControlBase
     private readonly SandboxRenderer3D _renderer = new();
     private readonly RenderThreadScheduler _renderThreadScheduler = new();
     private readonly IInputHandler _inputHandler;
+    private bool _isPointerDragActive;
+    private MouseButton _activeMouseButton = MouseButton.None;
 
     public SandboxModel3DControl()
     {
@@ -45,6 +47,7 @@ public class SandboxModel3DControl : OpenGlControlBase
         _renderer.Init(_gl);
         IsRendererInitialized = true;
         ApplySensitivity();
+        Log.Debug("SandboxModel3DControl initialized. Bounds={Bounds}", Bounds);
     }
 
     protected override void OnOpenGlRender(GlInterface gl, int fb)
@@ -95,27 +98,34 @@ public class SandboxModel3DControl : OpenGlControlBase
     {
         base.OnPointerPressed(e);
         var point = e.GetPosition(this);
-        var properties = e.GetCurrentPoint(this).Properties;
-        var button = properties.IsRightButtonPressed
-            ? MouseButton.Right
-            : properties.IsLeftButtonPressed
-                ? MouseButton.Left
-                : MouseButton.None;
+        _activeMouseButton = ResolveMouseButton(e);
 
-        if (button != MouseButton.None)
+        Log.Debug("PointerPressed at {Point}. Button={Button}, Kind={Kind}", point, _activeMouseButton, e.GetCurrentPoint(this).Properties.PointerUpdateKind);
+
+        if (_activeMouseButton == MouseButton.None)
         {
-            _inputHandler.OnMouseDown(new Vector2((float)point.X, (float)point.Y), button);
-            e.Pointer.Capture(this);
-            Focus();
-            e.Handled = true;
+            return;
         }
+
+        _isPointerDragActive = true;
+        _inputHandler.OnMouseDown(new Vector2((float)point.X, (float)point.Y), _activeMouseButton);
+        e.Pointer.Capture(this);
+        Focus();
+        e.Handled = true;
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
         var point = e.GetPosition(this);
-        _inputHandler.OnMouseUp(new Vector2((float)point.X, (float)point.Y), e.InitialPressMouseButton);
+        var releasedButton = e.InitialPressMouseButton == MouseButton.None ? _activeMouseButton : e.InitialPressMouseButton;
+
+        Log.Debug("PointerReleased at {Point}. Button={Button}", point, releasedButton);
+
+        _inputHandler.OnMouseUp(new Vector2((float)point.X, (float)point.Y), releasedButton);
+        _isPointerDragActive = false;
+        _activeMouseButton = MouseButton.None;
+
         if (e.Pointer.Captured == this)
         {
             e.Pointer.Capture(null);
@@ -124,38 +134,31 @@ public class SandboxModel3DControl : OpenGlControlBase
         e.Handled = true;
     }
 
+    protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+    {
+        base.OnPointerCaptureLost(e);
+        _isPointerDragActive = false;
+        _activeMouseButton = MouseButton.None;
+        Log.Debug("PointerCaptureLost");
+    }
+
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
         var point = e.GetPosition(this);
-        var properties = e.GetCurrentPoint(this).Properties;
 
-        if (properties.IsLeftButtonPressed || properties.IsRightButtonPressed)
+        if (_isPointerDragActive)
         {
-            var button = properties.IsRightButtonPressed ? MouseButton.Right : MouseButton.Left;
-            _inputHandler.OnMouseDown(new Vector2((float)point.X, (float)point.Y), button);
-            if (e.Pointer.Captured != this)
-            {
-                e.Pointer.Capture(this);
-            }
+            _inputHandler.OnMouseMove(new Vector2((float)point.X, (float)point.Y));
+            e.Handled = true;
         }
-        else
-        {
-            _inputHandler.OnMouseUp(new Vector2((float)point.X, (float)point.Y), MouseButton.None);
-            if (e.Pointer.Captured == this)
-            {
-                e.Pointer.Capture(null);
-            }
-        }
-
-        _inputHandler.OnMouseMove(new Vector2((float)point.X, (float)point.Y));
-        e.Handled = true;
     }
 
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
         _inputHandler.OnMouseWheel((float)e.Delta.Y);
+        Log.Debug("PointerWheel delta={Delta}", e.Delta.Y);
         e.Handled = true;
     }
 
@@ -163,6 +166,19 @@ public class SandboxModel3DControl : OpenGlControlBase
     {
         base.OnKeyDown(e);
         _inputHandler.OnKeyDown(e.Key);
+    }
+
+    private MouseButton ResolveMouseButton(PointerPressedEventArgs e)
+    {
+        var props = e.GetCurrentPoint(this).Properties;
+        return props.PointerUpdateKind switch
+        {
+            PointerUpdateKind.LeftButtonPressed => MouseButton.Left,
+            PointerUpdateKind.RightButtonPressed => MouseButton.Right,
+            _ when props.IsRightButtonPressed => MouseButton.Right,
+            _ when props.IsLeftButtonPressed => MouseButton.Left,
+            _ => MouseButton.None
+        };
     }
 
     private void ApplySensitivity()

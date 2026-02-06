@@ -1,5 +1,6 @@
 using Avalonia.Input;
 using Avalonia3D.Interfaces;
+using Serilog;
 using System.Numerics;
 
 namespace Avalonia3D.Interaction.CameraController;
@@ -55,10 +56,12 @@ public class MouseKeyboardInputHandler : IInputHandler
             if (button == MouseButton.Right)
             {
                 _cameraController.SetControlMode(CameraControlMode.Pan);
+                Log.Debug("Input mode switched to Pan by RMB down");
                 return;
             }
 
             _cameraController.SetControlMode(CameraControlMode.Orbit);
+            Log.Debug("Input mode switched to Orbit by LMB down");
         }
     }
 
@@ -78,6 +81,7 @@ public class MouseKeyboardInputHandler : IInputHandler
         if (key == Key.Tab)
         {
             _cameraController.ToggleControlMode();
+            Log.Debug("Input mode toggled by Tab. Current={Mode}", _cameraController.ControlMode);
         }
     }
 
