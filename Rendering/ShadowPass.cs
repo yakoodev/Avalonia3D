@@ -98,7 +98,7 @@ namespace Avalonia3D.Rendering
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         }
 
-        private bool IsShadowPassSupported(GL gl)
+        private unsafe bool IsShadowPassSupported(GL gl)
         {
             if (_shadowSupportChecked)
             {

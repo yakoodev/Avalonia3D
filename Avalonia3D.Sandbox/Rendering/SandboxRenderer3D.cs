@@ -90,7 +90,7 @@ public sealed class SandboxRenderer3D : IRenderContext
         Scene.Camera.Far = 200f;
     }
 
-    private void LogOpenGlInfo()
+    private unsafe void LogOpenGlInfo()
     {
         if (_gl == null)
         {
