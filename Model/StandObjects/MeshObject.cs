@@ -115,12 +115,12 @@ namespace Avalonia3D.Model.StandObjects
             shader.Use();
             shader.BindMaterial(_resources, Material, renderContext.FrameState.ShadowMapId);
             shader.SetUniforms(renderContext, this, renderContext.FrameState.LightSpaceMatrix);
-            RenderModel();
+            RenderModel(renderContext);
 
             ResetMaterialState(Material);
         }
 
-        public unsafe void RenderModel()
+        public unsafe void RenderModel(IRenderContext? renderContext = null)
         {
             if (_gl == null || _resources == null)
             {
@@ -143,6 +143,10 @@ namespace Avalonia3D.Model.StandObjects
             }
 
             _gl.BindVertexArray(0);
+            if (renderContext != null)
+            {
+                renderContext.FrameState.Metrics.DrawCalls += 1;
+            }
         }
 
         public override void Dispose()

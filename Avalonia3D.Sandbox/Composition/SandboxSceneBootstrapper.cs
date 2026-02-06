@@ -1,6 +1,7 @@
 using Avalonia3D.Composition;
 using Avalonia3D.Model;
 using Avalonia3D.Plugins.Wheel;
+using Avalonia3D.Rendering;
 using System;
 using System.IO;
 
@@ -16,9 +17,9 @@ public sealed class SandboxSceneBootstrapper : ISceneBootstrap
         _innerBootstrap = innerBootstrap ?? DefaultSceneBootstrap.Instance;
     }
 
-    public void Bootstrap(Scene3D scene)
+    public void Bootstrap(Scene3D scene, GraphicsProfile? profile = null)
     {
-        _innerBootstrap.Bootstrap(scene);
+        _innerBootstrap.Bootstrap(scene, profile);
         scene.RegisterModule(_wheelModule);
 
         var wheelAssetsPath = Path.Combine(AppContext.BaseDirectory, "Assets", "gltf");

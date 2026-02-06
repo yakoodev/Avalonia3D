@@ -4,9 +4,9 @@ namespace Avalonia3D.Shaders;
 
 public sealed class PbrShaderSourceBuilder
 {
-    public (string VertexSource, string FragmentSource) Build(PbrFeatures features)
+    public (string VertexSource, string FragmentSource) Build(PbrFeatures features, int maxLights)
     {
-        return (BuildVertexShaderSource(), BuildFragmentShaderSource(features));
+        return (BuildVertexShaderSource(), BuildFragmentShaderSource(features, maxLights));
     }
 
     private static string BuildVertexShaderSource()
@@ -37,7 +37,7 @@ void main()
 }";
     }
 
-    private static string BuildFragmentShaderSource(PbrFeatures features)
+    private static string BuildFragmentShaderSource(PbrFeatures features, int maxLights)
     {
         var sb = new StringBuilder();
 
@@ -51,7 +51,7 @@ void main()
         sb.AppendLine();
         sb.AppendLine("out vec4 FragColor;");
         sb.AppendLine();
-        AppendUniforms(sb);
+        AppendUniforms(sb, maxLights);
         AppendShadowFunction(sb);
 
         if (features.HasFlag(PbrFeatures.NormalMap))
@@ -74,12 +74,12 @@ void main()
             sb.AppendLine();
         }
 
-        AppendMainShaderBody(sb, features);
+        AppendMainShaderBody(sb, features, maxLights);
 
         return sb.ToString();
     }
 
-    private static void AppendUniforms(StringBuilder sb)
+    private static void AppendUniforms(StringBuilder sb, int maxLights)
     {
         sb.AppendLine("uniform sampler2D uBaseColorMap;");
         sb.AppendLine("uniform sampler2D uNormalMap;");
@@ -95,9 +95,9 @@ void main()
         sb.AppendLine();
         sb.AppendLine("uniform sampler2D uShadowMap;");
         sb.AppendLine("uniform int uHasShadowMap;");
-        sb.AppendLine("uniform vec3 uLightPos[2];");
-        sb.AppendLine("uniform vec3 uLightColor[2];");
-        sb.AppendLine("uniform float uIntensity[2];");
+        sb.AppendLine($"uniform vec3 uLightPos[{maxLights}];");
+        sb.AppendLine($"uniform vec3 uLightColor[{maxLights}];");
+        sb.AppendLine($"uniform float uIntensity[{maxLights}];");
         sb.AppendLine("uniform int uLightCount;");
         sb.AppendLine();
         sb.AppendLine("uniform vec3 uViewPos;");
@@ -201,7 +201,7 @@ void main()
         sb.AppendLine();
     }
 
-    private static void AppendMainShaderBody(StringBuilder sb, PbrFeatures features)
+    private static void AppendMainShaderBody(StringBuilder sb, PbrFeatures features, int maxLights)
     {
         sb.AppendLine("void main()");
         sb.AppendLine("{");
@@ -239,7 +239,7 @@ void main()
         }
         sb.AppendLine();
 
-        sb.AppendLine(@"    vec3 albedo = baseColor.rgb;
+        sb.AppendLine($@"    vec3 albedo = baseColor.rgb;
     vec3 diffuseColor = albedo * (1.0 - metallic);
     vec3 specularColor = mix(vec3(0.04), albedo, metallic);
 
@@ -248,8 +248,8 @@ void main()
     float smoothness = clamp(1.0 - roughness, 0.04, 1.0);
     float shininess = mix(2.0, float(uShininess), smoothness);
 
-    for (int i = 0; i < 2; i++)
-    {
+    for (int i = 0; i < {maxLights}; i++)
+    {{
         if (i >= uLightCount)
             break;
 
@@ -265,17 +265,17 @@ void main()
 
         float shadow = uHasShadowMap == 1 ? ShadowCalculation(FragPosLightSpace, norm, lightDir) : 0.0;
         resultLight += (ambient + (1.0 - shadow) * (diffuse + specular)) * uIntensity[i];
-    }
+    }}
 
     if (uLightCount == 0)
-    {
+    {{
         resultLight = albedo * 0.65;
-    }
+    }}
 
     vec3 reflection = ComputeEnvironmentReflection(norm, viewDir, roughness);
     vec3 result = resultLight * ao + emissive + uEmissionColor + reflection;
     float alpha = baseColor.a * uAlpha;
     FragColor = vec4(result, alpha);
-}");
+}}");
     }
 }

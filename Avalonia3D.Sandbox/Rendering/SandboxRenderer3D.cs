@@ -35,7 +35,7 @@ public sealed class SandboxRenderer3D : IRenderContext
     {
         _gl = gl;
         Scene.Init(gl);
-        Scene.ShaderRegistry.Register(ShaderIds.Pbr, GLShader.Create);
+        Scene.ShaderRegistry.Register(ShaderIds.Pbr, glContext => GLShader.Create(glContext, PbrFeatures.None, _renderPipeline.Profile.MaxLights));
         Scene.ShaderRegistry.Register(ShaderIds.Unlit, UnlitShader.Create);
         Scene.ShaderRegistry.Register(ShaderIds.NormalsDebug, NormalsDebugShader.Create);
         Scene.ShaderRegistry.SetDefault(ShaderIds.Pbr);
@@ -63,6 +63,7 @@ public sealed class SandboxRenderer3D : IRenderContext
     {
         if (_gl == null) return;
         _renderPipeline.Execute(this, width, height);
+        Log.Information("Frame metrics: drawCalls={DrawCalls}, culled={Culled}", FrameState.Metrics.DrawCalls, FrameState.Metrics.CulledObjects);
         _framePresenter?.Present(_gl, width, height);
     }
 

@@ -31,7 +31,7 @@ namespace Avalonia3D.Controls
         {
             _gl = gl;
             Scene.Init(gl);
-            _sceneBootstrap.Bootstrap(Scene);
+            _sceneBootstrap.Bootstrap(Scene, _renderPipeline.Profile);
             ConfigureOpenGLState();
             InitializeFramePresenter();
         }

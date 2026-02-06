@@ -4,6 +4,7 @@ namespace Avalonia3D.Rendering
 {
     public sealed class RenderFrameState
     {
+        public FrameMetrics Metrics { get; } = new();
         public uint OutputFramebufferId { get; set; }
         public uint? ShadowMapId { get; set; }
         public Matrix4x4 LightSpaceMatrix { get; set; } = Matrix4x4.Identity;
@@ -11,5 +12,17 @@ namespace Avalonia3D.Rendering
         public float ReflectionIntensity { get; set; }
         public bool ReflectionsEnabled { get; set; }
         public ReflectionMode ReflectionMode { get; set; } = ReflectionMode.Off;
+    }
+
+    public sealed class FrameMetrics
+    {
+        public int DrawCalls { get; set; }
+        public int CulledObjects { get; set; }
+
+        public void Reset()
+        {
+            DrawCalls = 0;
+            CulledObjects = 0;
+        }
     }
 }
