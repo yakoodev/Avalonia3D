@@ -12,9 +12,14 @@ namespace Avalonia3D.Sandbox.Rendering;
 
 public sealed class SandboxRenderer3D : IRenderContext
 {
+    private static readonly TimeSpan MetricsLogInterval = TimeSpan.FromSeconds(1);
+
     private GL? _gl;
     private IFramePresenter? _framePresenter;
     private readonly RenderPipeline _renderPipeline = new(GraphicsProfile.Medium);
+    private DateTime _nextMetricsLogUtc = DateTime.MinValue;
+    private int _lastLoggedDrawCalls = -1;
+    private int _lastLoggedCulledObjects = -1;
 
     public GL? GL => _gl;
     public Scene3D Scene { get; } = new();
@@ -63,7 +68,7 @@ public sealed class SandboxRenderer3D : IRenderContext
     {
         if (_gl == null) return;
         _renderPipeline.Execute(this, width, height);
-        Log.Information("Frame metrics: drawCalls={DrawCalls}, culled={Culled}", FrameState.Metrics.DrawCalls, FrameState.Metrics.CulledObjects);
+        LogFrameMetricsIfNeeded();
         _framePresenter?.Present(_gl, width, height);
     }
 
@@ -117,5 +122,27 @@ public sealed class SandboxRenderer3D : IRenderContext
         var renderer = Marshal.PtrToStringAnsi((nint)_gl.GetString(GLEnum.Renderer)) ?? "<unknown>";
         var vendor = Marshal.PtrToStringAnsi((nint)_gl.GetString(GLEnum.Vendor)) ?? "<unknown>";
         Log.Information("OpenGL init. Vendor: {Vendor}, Renderer: {Renderer}, Version: {Version}", vendor, renderer, version);
+    }
+
+    private void LogFrameMetricsIfNeeded()
+    {
+        var now = DateTime.UtcNow;
+        if (now < _nextMetricsLogUtc)
+        {
+            return;
+        }
+
+        var drawCalls = FrameState.Metrics.DrawCalls;
+        var culledObjects = FrameState.Metrics.CulledObjects;
+        if (drawCalls == _lastLoggedDrawCalls && culledObjects == _lastLoggedCulledObjects)
+        {
+            _nextMetricsLogUtc = now + MetricsLogInterval;
+            return;
+        }
+
+        _lastLoggedDrawCalls = drawCalls;
+        _lastLoggedCulledObjects = culledObjects;
+        _nextMetricsLogUtc = now + MetricsLogInterval;
+        Log.Information("Frame metrics: drawCalls={DrawCalls}, culled={Culled}", drawCalls, culledObjects);
     }
 }
