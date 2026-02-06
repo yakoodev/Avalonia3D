@@ -38,6 +38,18 @@ public static class SceneCameraFramer
         return true;
     }
 
+    public static bool TryComputeWorldBounds(SceneGraph sceneGraph, out Vector3 min, out Vector3 max)
+    {
+        if (sceneGraph == null)
+        {
+            min = Vector3.Zero;
+            max = Vector3.Zero;
+            return false;
+        }
+
+        return TryComputeWorldBounds(sceneGraph.RootObjects, out min, out max);
+    }
+
     private static bool TryComputeWorldBounds(IReadOnlyList<SceneObject> roots, out Vector3 min, out Vector3 max)
     {
         min = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);

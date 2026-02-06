@@ -18,7 +18,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _sceneLoader = new SceneLoader(scene, assetsRoot, renderThreadScheduler);
         _sceneLoader.SceneChanged += sceneInfo => CurrentSceneTitle = sceneInfo.Title;
 
-        var scenes = SceneCatalog.CreateDefault();
+        var scenes = SceneCatalog.CreateDefault(assetsRoot);
         Scenes = new ObservableCollection<SceneItemViewModel>(
             scenes.Select(sceneInfo =>
                 new SceneItemViewModel(
