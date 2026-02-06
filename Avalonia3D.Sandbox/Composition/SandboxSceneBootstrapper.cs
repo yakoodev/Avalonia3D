@@ -1,4 +1,5 @@
 using Avalonia3D.Composition;
+using Avalonia3D.Interaction.Behaviors;
 using Avalonia3D.Model;
 using Avalonia3D.Plugins.Wheel;
 using Avalonia3D.Rendering;
@@ -21,6 +22,9 @@ public sealed class SandboxSceneBootstrapper : ISceneBootstrap
     {
         _innerBootstrap.Bootstrap(scene, profile);
         scene.RegisterModule(_wheelModule);
+
+        scene.RegisterBehavior(new DoorBehavior("door.main"));
+        scene.RegisterBehavior(new WheelRotationBehavior("wheel.front.left", radiansPerSecond: 2.5f));
 
         var wheelAssetsPath = Path.Combine(AppContext.BaseDirectory, "Assets", "gltf");
         if (!Directory.Exists(wheelAssetsPath))

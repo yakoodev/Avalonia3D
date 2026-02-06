@@ -135,6 +135,15 @@
                   <Button Content="Stop" Command="{Binding StopClipCommand}" />
                 </StackPanel>
                 <TextBlock Text="{Binding ClipStateText}" Foreground="#CFCFCF" TextWrapping="Wrap" />
+
+                <Separator Margin="0,8,0,2" />
+                <TextBlock Text="Команды поведения (semantic id)" Foreground="White" FontWeight="SemiBold" />
+                <TextBox Text="{Binding BehaviorTargetSemanticId}" Watermark="например: door.main или wheel.front.left" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Content="Open" Command="{Binding OpenSemanticTargetCommand}" />
+                  <Button Content="Close" Command="{Binding CloseSemanticTargetCommand}" />
+                  <Button Content="Toggle" Command="{Binding ToggleSemanticTargetCommand}" />
+                </StackPanel>
               </StackPanel>
             </ScrollViewer>
           </TabItem>
