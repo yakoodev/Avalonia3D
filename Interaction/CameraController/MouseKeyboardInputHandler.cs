@@ -42,16 +42,24 @@ public class MouseKeyboardInputHandler : IInputHandler
 
     public void OnMouseDown(Vector2 position, MouseButton button)
     {
-        _lastPosition = position;
-        _isPrimaryAction = button is MouseButton.Left or MouseButton.Right;
-
-        if (button == MouseButton.Right)
+        if (button is not (MouseButton.Left or MouseButton.Right))
         {
-            _cameraController.SetControlMode(CameraControlMode.Pan);
             return;
         }
 
-        _cameraController.SetControlMode(CameraControlMode.Orbit);
+        if (!_isPrimaryAction)
+        {
+            _lastPosition = position;
+            _isPrimaryAction = true;
+
+            if (button == MouseButton.Right)
+            {
+                _cameraController.SetControlMode(CameraControlMode.Pan);
+                return;
+            }
+
+            _cameraController.SetControlMode(CameraControlMode.Orbit);
+        }
     }
 
     public void OnMouseUp(Vector2 position, MouseButton button)

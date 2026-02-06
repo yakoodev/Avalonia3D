@@ -95,9 +95,20 @@ public class SandboxModel3DControl : OpenGlControlBase
     {
         base.OnPointerPressed(e);
         var point = e.GetPosition(this);
-        var button = e.GetCurrentPoint(this).Properties.IsRightButtonPressed ? MouseButton.Right : MouseButton.Left;
-        _inputHandler.OnMouseDown(new Vector2((float)point.X, (float)point.Y), button);
-        e.Handled = true;
+        var properties = e.GetCurrentPoint(this).Properties;
+        var button = properties.IsRightButtonPressed
+            ? MouseButton.Right
+            : properties.IsLeftButtonPressed
+                ? MouseButton.Left
+                : MouseButton.None;
+
+        if (button != MouseButton.None)
+        {
+            _inputHandler.OnMouseDown(new Vector2((float)point.X, (float)point.Y), button);
+            e.Pointer.Capture(this);
+            Focus();
+            e.Handled = true;
+        }
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -105,6 +116,11 @@ public class SandboxModel3DControl : OpenGlControlBase
         base.OnPointerReleased(e);
         var point = e.GetPosition(this);
         _inputHandler.OnMouseUp(new Vector2((float)point.X, (float)point.Y), e.InitialPressMouseButton);
+        if (e.Pointer.Captured == this)
+        {
+            e.Pointer.Capture(null);
+        }
+
         e.Handled = true;
     }
 
@@ -112,6 +128,26 @@ public class SandboxModel3DControl : OpenGlControlBase
     {
         base.OnPointerMoved(e);
         var point = e.GetPosition(this);
+        var properties = e.GetCurrentPoint(this).Properties;
+
+        if (properties.IsLeftButtonPressed || properties.IsRightButtonPressed)
+        {
+            var button = properties.IsRightButtonPressed ? MouseButton.Right : MouseButton.Left;
+            _inputHandler.OnMouseDown(new Vector2((float)point.X, (float)point.Y), button);
+            if (e.Pointer.Captured != this)
+            {
+                e.Pointer.Capture(this);
+            }
+        }
+        else
+        {
+            _inputHandler.OnMouseUp(new Vector2((float)point.X, (float)point.Y), MouseButton.None);
+            if (e.Pointer.Captured == this)
+            {
+                e.Pointer.Capture(null);
+            }
+        }
+
         _inputHandler.OnMouseMove(new Vector2((float)point.X, (float)point.Y));
         e.Handled = true;
     }
