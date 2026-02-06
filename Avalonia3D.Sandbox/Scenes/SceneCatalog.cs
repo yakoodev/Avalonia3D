@@ -10,18 +10,7 @@ public static class SceneCatalog
 {
     public static IReadOnlyList<ISandboxScene> CreateDefault(string assetsRoot)
     {
-        var scenes = new List<ISandboxScene>
-        {
-            new SimpleScene(),
-            new HierarchyScene(),
-            new PbrScene(),
-            new VehicleScene()
-        };
-
-        foreach (var scene in DiscoverGltfScenes(assetsRoot))
-        {
-            scenes.Add(scene);
-        }
+        var scenes = DiscoverGltfScenes(assetsRoot).ToList();
 
         Log.Information("Scene catalog initialized. Total scenes: {Count}", scenes.Count);
         return scenes;
@@ -34,24 +23,11 @@ public static class SceneCatalog
             yield break;
         }
 
-        var excludedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        foreach (var path in Directory.EnumerateFiles(assetsRoot, "*.gltf", SearchOption.AllDirectories)
+                     .OrderBy(path => Path.GetRelativePath(assetsRoot, path), StringComparer.OrdinalIgnoreCase))
         {
-            "SimpleScene.gltf",
-            "HierarchyScene.gltf",
-            "PbrScene.gltf",
-            "scene.gltf"
-        };
-
-        foreach (var path in Directory.EnumerateFiles(assetsRoot, "*.gltf", SearchOption.TopDirectoryOnly)
-                     .OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase))
-        {
-            var fileName = Path.GetFileName(path);
-            if (excludedNames.Contains(fileName))
-            {
-                continue;
-            }
-
-            yield return new GltfFileScene(fileName);
+            var relativePath = Path.GetRelativePath(assetsRoot, path);
+            yield return new GltfFileScene(relativePath);
         }
     }
 }
