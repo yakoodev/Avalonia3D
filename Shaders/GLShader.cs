@@ -12,6 +12,8 @@ namespace Avalonia3D.Shaders
     public sealed class GLShader : IShader3D, IDisposable
     {
         private const int MaxLights = 2;
+        private readonly PbrFeatures _features;
+        private readonly PbrShaderSourceBuilder _sourceBuilder;
         // Кэшированные uniform-локации
         private int _mvpLocation = -1;
         private int _modelLocation = -1;
@@ -52,6 +54,16 @@ namespace Avalonia3D.Shaders
         private GL _gl;
         private uint _shaderProgram;
 
+        public GLShader() : this(PbrFeatures.None, null)
+        {
+        }
+
+        public GLShader(PbrFeatures features, PbrShaderSourceBuilder? sourceBuilder = null)
+        {
+            _features = features;
+            _sourceBuilder = sourceBuilder ?? new PbrShaderSourceBuilder();
+        }
+
         public void Dispose()
         {
             if (_shaderProgram != 0)
@@ -70,218 +82,9 @@ namespace Avalonia3D.Shaders
 
         private uint CreateShaderProgram()
         {
-            // Вершинный шейдер
-            string vertSource = @"#version 300 es
-precision mediump float;
-layout(location = 0) in vec3 aPosition;
-layout(location = 1) in vec3 aNormal;
-layout(location = 2) in vec2 aTexCoord;
-
-uniform mat4 uMVP;
-uniform mat4 uModel;
-uniform mat4 uLightSpaceMatrix;
-
-out vec3 FragPos;
-out vec3 Normal;
-out vec2 TexCoord;
-out vec4 FragPosLightSpace;
-
-void main()
-{
-    gl_Position = uMVP * vec4(aPosition, 1.0);
-    FragPos = vec3(uModel * vec4(aPosition, 1.0));
-    mat3 normalMatrix = transpose(inverse(mat3(uModel)));
-    Normal = normalize(mat3(uModel) * aNormal);
-    TexCoord = aTexCoord;
-    FragPosLightSpace = uLightSpaceMatrix * vec4(FragPos, 1.0);
-}";
-
-            // Фрагментный шейдер
-            string fragSource = @"#version 300 es
-precision mediump float;
-
-in vec2 TexCoord;
-in vec3 Normal;
-in vec3 FragPos;
-in vec4 FragPosLightSpace;
-
-out vec4 FragColor;
-
-uniform sampler2D uBaseColorMap;
-uniform sampler2D uNormalMap;
-uniform sampler2D uMetallicRoughnessMap;
-uniform sampler2D uOcclusionMap;
-uniform sampler2D uEmissiveMap;
-
-uniform int uHasBaseColorMap;
-uniform int uHasNormalMap;
-uniform int uHasMetallicRoughnessMap;
-uniform int uHasOcclusionMap;
-uniform int uHasEmissiveMap;
-
-uniform sampler2D uShadowMap;
-uniform int uHasShadowMap;
-uniform vec3 uLightPos[2];
-uniform vec3 uLightColor[2];
-uniform float uIntensity[2];
-uniform int uLightCount;
-
-uniform vec3 uViewPos;
-
-uniform float uAmbientStrength;
-uniform float uSpecularStrength;
-uniform int uShininess;
-
-uniform vec3 uModelColor;
-uniform vec3 uEmissionColor;
-
-uniform vec4 uBaseColorFactor;
-uniform float uMetallicFactor;
-uniform float uRoughnessFactor;
-uniform float uOcclusionStrength;
-uniform vec3 uEmissiveFactor;
-
-uniform sampler2D uEnvironmentMap;
-uniform float uReflectionIntensity;
-uniform int uHasEnvironmentMap;
-
-uniform float uAlpha;
-
-float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
-{
-    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
-    projCoords = projCoords * 0.5 + 0.5;
-
-    float closestDepth = texture(uShadowMap, projCoords.xy).r;
-    float currentDepth = projCoords.z;
-
-    float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.0005);
-    float shadow = 0.0;
-    vec2 texelSize = 1.0 / vec2(textureSize(uShadowMap, 0));
-
-    for(int x = -1; x <= 1; ++x)
-    {
-        for(int y = -1; y <= 1; ++y)
-        {
-            float pcfDepth = texture(uShadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
-            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
-        }
-    }
-    shadow /= 9.0;
-
-    if(projCoords.z > 1.0)
-        shadow = 0.0;
-
-    return shadow;
-}
-
-vec3 GetNormal()
-{
-    vec3 norm = normalize(Normal);
-    if (uHasNormalMap == 0)
-    {
-        return norm;
-    }
-
-    vec3 tangentNormal = texture(uNormalMap, TexCoord).xyz * 2.0 - 1.0;
-
-    vec3 Q1 = dFdx(FragPos);
-    vec3 Q2 = dFdy(FragPos);
-    vec2 st1 = dFdx(TexCoord);
-    vec2 st2 = dFdy(TexCoord);
-
-    vec3 T = normalize(Q1 * st2.t - Q2 * st1.t);
-    vec3 B = -normalize(cross(norm, T));
-    mat3 TBN = mat3(T, B, norm);
-
-    return normalize(TBN * tangentNormal);
-}
-
-vec3 ComputeEnvironmentReflection(vec3 normal, vec3 viewDir, float roughness)
-{
-    if (uHasEnvironmentMap == 0)
-    {
-        return vec3(0.0);
-    }
-
-    vec3 reflectionDir = reflect(-viewDir, normal);
-    vec2 envUv = vec2(atan(reflectionDir.z, reflectionDir.x) / (2.0 * 3.14159265) + 0.5, acos(clamp(reflectionDir.y, -1.0, 1.0)) / 3.14159265);
-    vec3 reflectedColor = texture(uEnvironmentMap, envUv).rgb;
-    float roughnessFade = 1.0 - clamp(roughness, 0.0, 1.0);
-    return reflectedColor * roughnessFade * uReflectionIntensity;
-}
-
-void main()
-{
-    vec3 norm = GetNormal();
-    vec3 viewDir = normalize(uViewPos - FragPos);
-
-    vec4 baseColor = uBaseColorFactor;
-    if (uHasBaseColorMap == 1)
-    {
-        baseColor *= texture(uBaseColorMap, TexCoord);
-    }
-
-    float metallic = uMetallicFactor;
-    float roughness = uRoughnessFactor;
-    if (uHasMetallicRoughnessMap == 1)
-    {
-        vec4 mrSample = texture(uMetallicRoughnessMap, TexCoord);
-        metallic *= mrSample.b;
-        roughness *= mrSample.g;
-    }
-
-    float ao = 1.0;
-    if (uHasOcclusionMap == 1)
-    {
-        float aoSample = texture(uOcclusionMap, TexCoord).r;
-        ao = mix(1.0, aoSample, uOcclusionStrength);
-    }
-
-    vec3 emissive = uEmissiveFactor;
-    if (uHasEmissiveMap == 1)
-    {
-        emissive *= texture(uEmissiveMap, TexCoord).rgb;
-    }
-
-    vec3 albedo = baseColor.rgb;
-    vec3 diffuseColor = albedo * (1.0 - metallic);
-    vec3 specularColor = mix(vec3(0.04), albedo, metallic);
-
-    vec3 resultLight = vec3(0.0);
-
-    float smoothness = clamp(1.0 - roughness, 0.04, 1.0);
-    float shininess = mix(2.0, float(uShininess), smoothness);
-
-    for (int i = 0; i < 2; i++)
-    {
-        if (i >= uLightCount)
-            break;
-
-        vec3 ambient = uAmbientStrength * uLightColor[i];
-
-        vec3 lightDir = normalize(uLightPos[i] - FragPos);
-        float diff = max(dot(norm, lightDir), 0.0);
-        vec3 diffuse = diff * diffuseColor * uLightColor[i];
-
-        vec3 reflectDir = reflect(-lightDir, norm);
-        float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
-        vec3 specular = uSpecularStrength * spec * specularColor * uLightColor[i];
-
-        float shadow = uHasShadowMap == 1 ? ShadowCalculation(FragPosLightSpace, norm, lightDir) : 0.0;
-        resultLight += (ambient + (1.0 - shadow) * (diffuse + specular)) * uIntensity[i];
-    }
-
-    if (uLightCount == 0)
-    {
-        resultLight = albedo * 0.65;
-    }
-
-    vec3 reflection = ComputeEnvironmentReflection(norm, viewDir, roughness);
-    vec3 result = resultLight * ao + emissive + uEmissionColor + reflection;
-    float alpha = baseColor.a * uAlpha;
-    FragColor = vec4(result, alpha);
-}";
+            var shaderSource = _sourceBuilder.Build(_features);
+            string vertSource = shaderSource.VertexSource;
+            string fragSource = shaderSource.FragmentSource;
 
             uint vertexShader = CompileShader(ShaderType.VertexShader, vertSource);
             uint fragmentShader = CompileShader(ShaderType.FragmentShader, fragSource);
@@ -332,7 +135,14 @@ void main()
 
         public static IShader3D Create(GL gL)
         {
-            var sh = new GLShader();
+            var sh = new GLShader(PbrFeatures.None);
+            sh.InitializeShaders(gL);
+            return sh;
+        }
+
+        public static IShader3D Create(GL gL, PbrFeatures features)
+        {
+            var sh = new GLShader(features);
             sh.InitializeShaders(gL);
             return sh;
         }

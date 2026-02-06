@@ -32,6 +32,11 @@ namespace Avalonia3D.Controls
             _gl = gl;
             Scene.Init(gl);
             Scene.ShaderRegistry.Register(ShaderIds.Pbr, GLShader.Create);
+            Scene.ShaderRegistry.Register(ShaderIds.PbrBaseColor, glContext => GLShader.Create(glContext, PbrFeatures.BaseColorMap));
+            Scene.ShaderRegistry.Register(ShaderIds.PbrBaseColorNormal, glContext => GLShader.Create(glContext, PbrFeatures.BaseColorMap | PbrFeatures.NormalMap));
+            Scene.ShaderRegistry.Register(ShaderIds.PbrBaseColorNormalMetallicRoughness, glContext => GLShader.Create(glContext, PbrFeatures.BaseColorMap | PbrFeatures.NormalMap | PbrFeatures.MetallicRoughnessMap));
+            Scene.ShaderRegistry.Register(ShaderIds.PbrBaseColorNormalMetallicRoughnessAoEmissive, glContext => GLShader.Create(glContext, PbrFeatures.BaseColorMap | PbrFeatures.NormalMap | PbrFeatures.MetallicRoughnessMap | PbrFeatures.OcclusionMap | PbrFeatures.EmissiveMap));
+            Scene.ShaderRegistry.Register(ShaderIds.PbrFull, glContext => GLShader.Create(glContext, PbrFeatures.BaseColorMap | PbrFeatures.NormalMap | PbrFeatures.MetallicRoughnessMap | PbrFeatures.OcclusionMap | PbrFeatures.EmissiveMap | PbrFeatures.ReflectionsIbl));
             Scene.ShaderRegistry.Register(ShaderIds.Unlit, UnlitShader.Create);
             Scene.ShaderRegistry.Register(ShaderIds.NormalsDebug, NormalsDebugShader.Create);
             Scene.ShaderRegistry.SetDefault(ShaderIds.Pbr);

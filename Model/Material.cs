@@ -1,4 +1,5 @@
 ﻿using Avalonia3D.Interfaces;
+using Avalonia3D.Shaders;
 using System.Numerics;
 
 namespace Avalonia3D.Model
@@ -21,5 +22,7 @@ namespace Avalonia3D.Model
 
         public IShader? Shader { get; set; }
         public string? ShaderId { get; set; }
+
+        public PbrFeatures Features { get; set; } = PbrFeatures.None;
     }
 }
