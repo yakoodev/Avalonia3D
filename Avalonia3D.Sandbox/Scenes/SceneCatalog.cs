@@ -10,7 +10,8 @@ public static class SceneCatalog
         {
             new SimpleScene(),
             new HierarchyScene(),
-            new PbrScene()
+            new PbrScene(),
+            new VehicleScene()
         };
     }
 }
