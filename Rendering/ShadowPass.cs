@@ -14,6 +14,8 @@ namespace Avalonia3D.Rendering
         private uint _framebuffer;
         private int _shadowMapSize = DefaultShadowMapSize;
         private ShadowShader? _shadowShader;
+        private bool _shadowSupportChecked;
+        private bool _supportsShadowPass = true;
 
         public string Name => "ShadowPass";
 
@@ -27,6 +29,12 @@ namespace Avalonia3D.Rendering
             }
 
             var gl = context.Gl;
+            if (!IsShadowPassSupported(gl))
+            {
+                context.RenderContext.FrameState.ShadowMapId = null;
+                context.RenderContext.FrameState.LightSpaceMatrix = Matrix4x4.Identity;
+                return;
+            }
             EnsureResources(gl);
 
             var lightSpaceMatrix = CalculateLightSpaceMatrix(context.Scene);
@@ -87,6 +95,26 @@ namespace Avalonia3D.Rendering
             gl.DrawBuffer(GLEnum.None);
             gl.ReadBuffer(GLEnum.None);
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        }
+
+        private bool IsShadowPassSupported(GL gl)
+        {
+            if (_shadowSupportChecked)
+            {
+                return _supportsShadowPass;
+            }
+
+            _shadowSupportChecked = true;
+            var version = gl.GetString(StringName.Version);
+            if (!string.IsNullOrWhiteSpace(version) &&
+                version.Contains("OpenGL ES", StringComparison.OrdinalIgnoreCase))
+            {
+                _supportsShadowPass = false;
+                return false;
+            }
+
+            _supportsShadowPass = true;
+            return true;
         }
 
         private static Matrix4x4 CalculateLightSpaceMatrix(Scene3D scene)
