@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media.Imaging;
 using Avalonia3D.Backend;
+using Avalonia3D.Composition;
 using Avalonia3D.Interaction.CameraController;
 using Avalonia3D.Interfaces;
 using Avalonia3D.Model;
@@ -18,7 +19,7 @@ namespace Avalonia3D.Controls
     public class Model3DEmbeddedControl : Control, IControl3D
     {
         private GL? _gl;
-        private readonly GLRenderer3D _renderer = new();
+        private readonly GLRenderer3D _renderer;
         private readonly IInputHandler _inputHandler;
 
         public Scene3D Scene => _renderer.Scene;
@@ -35,7 +36,13 @@ namespace Avalonia3D.Controls
         }
 
         public Model3DEmbeddedControl()
+            : this(null)
         {
+        }
+
+        public Model3DEmbeddedControl(ISceneBootstrap? sceneBootstrap)
+        {
+            _renderer = new GLRenderer3D(sceneBootstrap);
             CameraController = new CameraController(_renderer.Scene.Camera, () => _renderer.Scene.SceneGraph);
             _inputHandler = new MouseKeyboardInputHandler(CameraController);
 
