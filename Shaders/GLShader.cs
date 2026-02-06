@@ -348,18 +348,14 @@ void main()
             var viewProjection = camera.View * camera.Projection;
             var mvpMatrix = modelMatrix * viewProjection;
 
-            var glMvpMatrix = Matrix4x4.Transpose(mvpMatrix);
-            var glModelMatrix = Matrix4x4.Transpose(modelMatrix);
-            var glLightSpaceMatrix = Matrix4x4.Transpose(lightSpaceMatrix);
-
             if (_mvpLocation != -1)
-                _gl.UniformMatrix4(_mvpLocation, 1, false, (float*)&glMvpMatrix);
+                _gl.UniformMatrix4(_mvpLocation, 1, false, (float*)&mvpMatrix);
 
             if (_modelLocation != -1)
-                _gl.UniformMatrix4(_modelLocation, 1, false, (float*)&glModelMatrix);
+                _gl.UniformMatrix4(_modelLocation, 1, false, (float*)&modelMatrix);
 
             if (_lightSpaceMatrixLocation != -1)
-                _gl.UniformMatrix4(_lightSpaceMatrixLocation, 1, false, (float*)&glLightSpaceMatrix);
+                _gl.UniformMatrix4(_lightSpaceMatrixLocation, 1, false, (float*)&lightSpaceMatrix);
 
             var lights = renderContext.Scene.Lights;
             var lightCount = Math.Min(lights.Count, MaxLights);
