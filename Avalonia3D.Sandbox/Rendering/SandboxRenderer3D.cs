@@ -14,6 +14,7 @@ public sealed class SandboxRenderer3D : IRenderContext
     private IFramePresenter? _framePresenter;
     private readonly RenderPipeline _renderPipeline = new();
 
+    public GL? GL => _gl;
     public Scene3D Scene { get; } = new();
     public RenderFrameState FrameState { get; } = new();
 
