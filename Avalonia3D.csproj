@@ -12,6 +12,10 @@
 		<EmbeddedResource Remove="Avalonia3D.Sandbox\**" />
 		<None Remove="Avalonia3D.Sandbox\**" />
 		<AvaloniaXaml Remove="Avalonia3D.Sandbox\**" />
+		<AvaloniaXaml Remove="Avalonia3D.Tests\**" />
+		<Compile Remove="Avalonia3D.Tests\**" />
+		<EmbeddedResource Remove="Avalonia3D.Tests\**" />
+		<None Remove="Avalonia3D.Tests\**" />
 		<AvaloniaXaml Remove="Assets\cube\**" />
 		<AvaloniaXaml Remove="Assets\fish\**" />
 		<AvaloniaXaml Remove="Converters\**" />
