@@ -10,6 +10,8 @@ namespace Avalonia3D.Model
 
         public string? Name { get; set; }
         public string? StableId { get; set; }
+        public string? ExternalId { get; set; }
+        public string? SemanticId { get; set; }
         public Vector3 Position { get; set; } = Vector3.Zero;
         public Quaternion Rotation { get; set; } = Quaternion.Identity;
         public Vector3 Scale { get; set; } = Vector3.One;

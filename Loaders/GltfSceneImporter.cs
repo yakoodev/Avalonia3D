@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
+using System.Text.Json.Nodes;
 
 namespace Avalonia3D.Loaders
 {
@@ -169,8 +170,14 @@ namespace Avalonia3D.Loaders
                 Name = string.IsNullOrWhiteSpace(node.Name) ? $"Node_{node.LogicalIndex}" : node.Name
             };
 
-            var stableId = $"node:{node.LogicalIndex}";
+            var externalId = TryGetExternalId(node);
+            var stableId = !string.IsNullOrWhiteSpace(externalId)
+                ? externalId!
+                : $"node:{node.LogicalIndex}";
+
             group.Node.StableId = stableId;
+            group.Node.ExternalId = externalId;
+            group.Node.SemanticId = TryGetSemanticId(node);
 
             ApplyTransform(group, node.LocalMatrix);
 
@@ -200,6 +207,39 @@ namespace Avalonia3D.Loaders
             }
 
             return group;
+        }
+
+        private static string? TryGetExternalId(Node node)
+        {
+            return TryGetFirstStringFromExtras(node, "externalId", "external_id", "stableId", "stable_id", "id", "guid", "uuid");
+        }
+
+        private static string? TryGetSemanticId(Node node)
+        {
+            return TryGetFirstStringFromExtras(node, "semanticId", "semantic_id", "path", "nodePath", "node_path", "key");
+        }
+
+        private static string? TryGetFirstStringFromExtras(Node node, params string[] keys)
+        {
+            if (node.Extras is not JsonObject extras)
+            {
+                return null;
+            }
+
+            foreach (var key in keys)
+            {
+                if (!extras.TryGetPropertyValue(key, out var valueNode) || valueNode is null)
+                {
+                    continue;
+                }
+
+                if (valueNode is JsonValue value && value.TryGetValue<string>(out var stringValue) && !string.IsNullOrWhiteSpace(stringValue))
+                {
+                    return stringValue;
+                }
+            }
+
+            return null;
         }
 
         private static List<AnimationClip> ExtractAnimationClips(ModelRoot gltf, IReadOnlyDictionary<Node, string> nodeKeys)

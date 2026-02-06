@@ -19,6 +19,7 @@ public sealed class VehicleScene : ISandboxScene
         Log.Information("Loading custom scene from: {Path}", path);
         GltfAssetDiagnostics.LogAssetStatus(path);
         scene.LoadScene(path);
+        GltfAssetDiagnostics.LogNodeIdConflicts(scene.SceneGraph, Path.GetFileName(path));
 
         scene.Lights.Add(new Light
         {

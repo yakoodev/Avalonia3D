@@ -37,6 +37,7 @@ public sealed class GltfFileScene : ISandboxScene
         Log.Information("Loading auto-discovered GLTF scene from: {Path}", path);
         GltfAssetDiagnostics.LogAssetStatus(path);
         scene.LoadScene(path);
+        GltfAssetDiagnostics.LogNodeIdConflicts(scene.SceneGraph, Path.GetFileName(path));
 
         if (scene.Lights.Count == 0)
         {

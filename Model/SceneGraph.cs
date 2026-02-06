@@ -10,7 +10,7 @@ namespace Avalonia3D.Model
 
         public SceneGraph()
         {
-            Root = new SceneNode { Name = "Root", StableId = "Root" };
+            Root = new SceneNode { Name = "Root", StableId = "Root", SemanticId = "Root" };
         }
 
         public SceneNode Root { get; }
@@ -63,6 +63,12 @@ namespace Avalonia3D.Model
             return Root.FindByName(name);
         }
 
+
+        public SceneNode? FindNodeBySemanticId(string semanticId)
+        {
+            return FindNodeByPredicate(node => string.Equals(node.SemanticId, semanticId, StringComparison.Ordinal));
+        }
+
         public SceneNode? FindNodeByStableId(string stableId)
         {
             return FindNodeByPredicate(node => string.Equals(node.StableId, stableId, StringComparison.Ordinal));
@@ -80,7 +86,8 @@ namespace Avalonia3D.Model
                 return null;
             }
 
-            return FindNodeByStableId(key)
+            return FindNodeBySemanticId(key)
+                ?? FindNodeByStableId(key)
                 ?? FindNodeByPath(key)
                 ?? FindNode(key);
         }
