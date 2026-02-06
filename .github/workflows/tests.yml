@@ -1,0 +1,31 @@
+name: Tests
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+
+jobs:
+  test-all:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Restore
+        run: dotnet restore Avalonia3D.sln
+      - name: Test (all)
+        run: dotnet test Avalonia3D.Tests/Avalonia3D.Tests.csproj --configuration Release --no-restore
+
+  test-domain-logic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Restore
+        run: dotnet restore Avalonia3D.sln
+      - name: Test (domain only, no graphics)
+        run: dotnet test Avalonia3D.Tests/Avalonia3D.Tests.csproj --configuration Release --no-restore --filter "TestTarget=DomainLogic"

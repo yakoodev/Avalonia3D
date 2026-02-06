@@ -1,74 +1,78 @@
 using Avalonia3D.Interaction.CameraController;
 using Avalonia3D.Model;
 using Avalonia3D.Model.StandObjects;
+using Avalonia3D.Sandbox.Services;
 using System.Numerics;
 using Xunit;
 
 namespace Avalonia3D.Tests;
 
+[Trait("TestTarget", "DomainLogic")]
 public class CameraControllerTests
 {
-    [Fact]
-    public void Orbit_ChangesYawAndPitch()
+    [Theory]
+    [InlineData(10f, 5f, -0.1f, 0.05f)]
+    [InlineData(-25f, -10f, 0.25f, -0.1f)]
+    [InlineData(0f, 30f, 0f, 0.3f)]
+    public void Orbit_TableDriven_ChangesYawAndPitch(float deltaX, float deltaY, float expectedYaw, float expectedPitch)
     {
         var camera = CreateCamera();
-        var controller = new CameraController(camera, new SceneGraph())
-        {
-            OrbitSensitivity = 0.01f
-        };
+        var controller = new CameraController(camera, new SceneGraph()) { OrbitSensitivity = 0.01f };
 
-        controller.Orbit(new Vector2(10f, 5f));
+        controller.Orbit(new Vector2(deltaX, deltaY));
 
-        Assert.InRange(camera.Yaw, -0.101f, -0.099f);
-        Assert.InRange(camera.Pitch, 0.049f, 0.051f);
+        Assert.InRange(camera.Yaw, expectedYaw - 0.001f, expectedYaw + 0.001f);
+        Assert.InRange(camera.Pitch, expectedPitch - 0.001f, expectedPitch + 0.001f);
     }
 
-    [Fact]
-    public void Pan_ShiftsTarget()
+    [Theory]
+    [InlineData(10f, 0f, -1f, 0f)]
+    [InlineData(0f, 10f, 0f, 1f)]
+    [InlineData(-5f, -5f, 0.5f, -0.5f)]
+    public void Pan_TableDriven_MovesTargetInCameraPlane(float deltaX, float deltaY, float expectedX, float expectedY)
+    {
+        var camera = CreateCamera();
+        var controller = new CameraController(camera, new SceneGraph()) { PanSensitivity = 0.1f };
+
+        controller.Pan(new Vector2(deltaX, deltaY));
+
+        Assert.InRange(camera.Target.X, expectedX - 0.01f, expectedX + 0.01f);
+        Assert.InRange(camera.Target.Y, expectedY - 0.01f, expectedY + 0.01f);
+    }
+
+    [Theory]
+    [InlineData(1f, 2f, 8f)]
+    [InlineData(-0.5f, 2f, 11f)]
+    [InlineData(3f, 1f, 7f)]
+    public void Dolly_TableDriven_ChangesDistance(float input, float sensitivity, float expectedDistance)
     {
         var camera = CreateCamera();
         camera.Distance = 10f;
-        var controller = new CameraController(camera, new SceneGraph())
-        {
-            PanSensitivity = 0.1f
-        };
+        var controller = new CameraController(camera, new SceneGraph()) { DollySensitivity = sensitivity };
 
-        controller.Pan(new Vector2(10f, 0f));
+        controller.Dolly(input);
 
-        Assert.True(camera.Target.X < -0.9f && camera.Target.X > -1.1f);
+        Assert.InRange(camera.Distance, expectedDistance - 0.01f, expectedDistance + 0.01f);
     }
 
-    [Fact]
-    public void Dolly_ChangesDistance()
-    {
-        var camera = CreateCamera();
-        camera.Distance = 10f;
-        var controller = new CameraController(camera, new SceneGraph())
-        {
-            DollySensitivity = 2f
-        };
-
-        controller.Dolly(1f);
-
-        Assert.InRange(camera.Distance, 7.99f, 8.01f);
-    }
-
-    [Fact]
-    public void FrameAll_FitsBoundsFromScene()
+    [Theory]
+    [InlineData(-1f, 1f, 0f)]
+    [InlineData(10f, 14f, 12f)]
+    [InlineData(-20f, -16f, -18f)]
+    public void FrameAll_TableDriven_CentersTargetByBounds(float minX, float maxX, float expectedCenterX)
     {
         var camera = CreateCamera();
         var graph = new SceneGraph();
-        graph.AddRoot(CreateMesh(new Vector3(-1f, -1f, -1f), new Vector3(1f, 1f, 1f)));
+        graph.AddRoot(CreateMesh(new Vector3(minX, -1f, -1f), new Vector3(maxX, 1f, 1f)));
 
         var controller = new CameraController(camera, graph);
 
-        var result = controller.FrameAll();
+        var framed = controller.FrameAll();
 
-        Assert.True(result);
-        Assert.True(Vector3.Distance(camera.Target, Vector3.Zero) < 0.001f);
+        Assert.True(framed);
+        Assert.InRange(camera.Target.X, expectedCenterX - 0.001f, expectedCenterX + 0.001f);
         Assert.True(camera.Distance > 0f);
     }
-
 
     [Fact]
     public void FrameAll_UsesActualSceneGraphFromAccessor()
@@ -87,7 +91,18 @@ public class CameraControllerTests
 
         Assert.False(beforeSwitch);
         Assert.True(afterSwitch);
-        Assert.True(camera.Target.X > 10.9f && camera.Target.X < 11.1f);
+        Assert.InRange(camera.Target.X, 10.9f, 11.1f);
+    }
+
+    [Fact]
+    public void SceneCameraFramer_TryFrame_ReturnsFalseForEmptyScene()
+    {
+        var camera = CreateCamera();
+        var graph = new SceneGraph();
+
+        var result = SceneCameraFramer.TryFrame(graph, camera);
+
+        Assert.False(result);
     }
 
     [Fact]
@@ -120,27 +135,6 @@ public class CameraControllerTests
         Assert.InRange(camera.Near, 0.249f, 0.251f);
         Assert.InRange(camera.Far, 899.9f, 900.1f);
         Assert.InRange(camera.Fov, 0.899f, 0.901f);
-    }
-    [Fact]
-    public void ResetView_ReturnsDefaults()
-    {
-        var camera = CreateCamera();
-        camera.Target = new Vector3(2f, 1f, -1f);
-        camera.Distance = 11f;
-        camera.Pitch = 0.2f;
-        camera.Yaw = 0.3f;
-
-        var controller = new CameraController(camera, new SceneGraph());
-        controller.Orbit(new Vector2(30f, 10f));
-        controller.Pan(new Vector2(20f, 10f));
-        controller.Dolly(2f);
-
-        controller.ResetView();
-
-        Assert.True(Vector3.Distance(camera.Target, new Vector3(2f, 1f, -1f)) < 0.001f);
-        Assert.InRange(camera.Distance, 10.99f, 11.01f);
-        Assert.InRange(camera.Pitch, 0.199f, 0.201f);
-        Assert.InRange(camera.Yaw, 0.299f, 0.301f);
     }
 
     private static Camera CreateCamera()

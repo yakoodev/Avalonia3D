@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Avalonia3D.csproj" />
+    <ProjectReference Include="..\Avalonia3D.Sandbox\Avalonia3D.Sandbox.csproj" />
   </ItemGroup>
 
 </Project>
