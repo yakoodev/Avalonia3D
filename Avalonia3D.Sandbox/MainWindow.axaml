@@ -23,6 +23,21 @@
                   Command="{Binding SwitchShaderModeCommand}"
                   CommandParameter="{Binding SelectedRenderMode}"
                   HorizontalAlignment="Left" />
+          <TextBlock Text="Анимация" FontSize="16" FontWeight="Bold" Foreground="White" Margin="0,8,0,0" />
+          <ComboBox ItemsSource="{Binding AvailableClips}"
+                    SelectedItem="{Binding SelectedClipName}"
+                    HorizontalAlignment="Stretch" />
+          <CheckBox Content="Loop" IsChecked="{Binding IsLoopEnabled}" Foreground="White" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="Speed" Foreground="White" VerticalAlignment="Center"/>
+            <NumericUpDown Minimum="0.1" Maximum="4" Increment="0.1" Value="{Binding PlaybackSpeed}" Width="120"/>
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="Play" Command="{Binding PlayClipCommand}" />
+            <Button Content="Pause" Command="{Binding PauseClipCommand}" />
+            <Button Content="Stop" Command="{Binding StopClipCommand}" />
+          </StackPanel>
+          <TextBlock Text="{Binding ClipStateText}" Foreground="#CFCFCF" TextWrapping="Wrap" />
           <ItemsControl ItemsSource="{Binding Scenes}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="viewModels:SceneItemViewModel">

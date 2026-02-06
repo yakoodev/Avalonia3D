@@ -169,8 +169,13 @@ namespace Avalonia3D.Model
         public SceneGraph LoadScene(string gltfPath)
         {
             ResetSceneGraph();
-            SceneGraph = Importer.Import(gltfPath);
+            var importResult = Importer.ImportWithAnimations(gltfPath);
+            SceneGraph = importResult.Graph;
             AnimatorComponent.SetSceneGraph(SceneGraph);
+            foreach (var clip in importResult.Clips)
+            {
+                AnimatorComponent.RegisterClip(clip);
+            }
             BuildRenderResources();
             LookChanged?.Invoke(this, _lookState);
             return SceneGraph;

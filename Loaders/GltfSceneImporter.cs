@@ -1,3 +1,4 @@
+using Avalonia3D.Animation;
 using Avalonia3D.Helpers;
 using Avalonia3D.Memory;
 using Avalonia3D.Model;
@@ -11,11 +12,28 @@ using System.Numerics;
 
 namespace Avalonia3D.Loaders
 {
+    public sealed class SceneImportResult
+    {
+        public SceneImportResult(SceneGraph graph, IReadOnlyList<AnimationClip> clips)
+        {
+            Graph = graph;
+            Clips = clips;
+        }
+
+        public SceneGraph Graph { get; }
+        public IReadOnlyList<AnimationClip> Clips { get; }
+    }
+
     public class GltfSceneImporter
     {
         private readonly Dictionary<string, List<Model.Model>> _modelCache = new(StringComparer.OrdinalIgnoreCase);
 
         public SceneGraph Import(string gltfPath)
+        {
+            return ImportWithAnimations(gltfPath).Graph;
+        }
+
+        public SceneImportResult ImportWithAnimations(string gltfPath)
         {
             if (string.IsNullOrWhiteSpace(gltfPath))
             {
@@ -39,7 +57,7 @@ namespace Avalonia3D.Loaders
             try
             {
                 var gltf = ModelRoot.Load(gltfPath);
-                return Import(gltf);
+                return ImportWithAnimations(gltf);
             }
             finally
             {
@@ -52,12 +70,18 @@ namespace Avalonia3D.Loaders
 
         public SceneGraph Import(ModelRoot gltf)
         {
+            return ImportWithAnimations(gltf).Graph;
+        }
+
+        public SceneImportResult ImportWithAnimations(ModelRoot gltf)
+        {
             var graph = new SceneGraph();
             if (gltf == null)
             {
-                return graph;
+                return new SceneImportResult(graph, []);
             }
 
+            var nodeKeys = new Dictionary<Node, string>();
             var scenes = gltf.LogicalScenes;
             if (scenes.Count > 0)
             {
@@ -65,7 +89,7 @@ namespace Avalonia3D.Loaders
                 {
                     foreach (var root in scene.VisualChildren)
                     {
-                        BuildNode(graph, null, root);
+                        BuildNode(graph, null, root, nodeKeys);
                     }
                 }
             }
@@ -73,14 +97,16 @@ namespace Avalonia3D.Loaders
             {
                 foreach (var node in gltf.LogicalNodes)
                 {
-                    BuildNode(graph, null, node);
+                    BuildNode(graph, null, node, nodeKeys);
                 }
             }
+
+            var clips = ExtractAnimationClips(gltf, nodeKeys);
 
             ModelLoader.ClearAllCaches();
             MemoryManager.PerformAggressiveCleanup();
             MemoryManager.LogMemoryState("After GLTF load");
-            return graph;
+            return new SceneImportResult(graph, clips);
         }
 
         public void ImportInto(string gltfPath, MeshGroup target)
@@ -111,12 +137,15 @@ namespace Avalonia3D.Loaders
             MemoryManager.PerformAggressiveCleanup();
         }
 
-        private MeshGroup BuildNode(SceneGraph graph, MeshGroup? parent, Node node)
+        private MeshGroup BuildNode(SceneGraph graph, MeshGroup? parent, Node node, Dictionary<Node, string> nodeKeys)
         {
             var group = new MeshGroup
             {
-                Name = string.IsNullOrWhiteSpace(node.Name) ? $"Node_{node.GetHashCode()}" : node.Name
+                Name = string.IsNullOrWhiteSpace(node.Name) ? $"Node_{node.LogicalIndex}" : node.Name
             };
+
+            var stableId = $"node:{node.LogicalIndex}";
+            group.Node.StableId = stableId;
 
             ApplyTransform(group, node.LocalMatrix);
 
@@ -129,6 +158,8 @@ namespace Avalonia3D.Loaders
                 parent.Add(group);
             }
 
+            nodeKeys[node] = stableId;
+
             if (node.Mesh != null)
             {
                 foreach (var model in ModelLoader.LoadModelsForNode(node))
@@ -140,10 +171,89 @@ namespace Avalonia3D.Loaders
 
             foreach (var child in node.VisualChildren)
             {
-                BuildNode(graph, group, child);
+                BuildNode(graph, group, child, nodeKeys);
             }
 
             return group;
+        }
+
+        private static List<AnimationClip> ExtractAnimationClips(ModelRoot gltf, IReadOnlyDictionary<Node, string> nodeKeys)
+        {
+            var clips = new List<AnimationClip>();
+            foreach (var animation in gltf.LogicalAnimations)
+            {
+                var clipName = string.IsNullOrWhiteSpace(animation.Name)
+                    ? $"Animation_{animation.LogicalIndex}"
+                    : animation.Name;
+
+                var clip = new AnimationClip(clipName);
+
+                foreach (var channel in animation.Channels)
+                {
+                    if (channel.TargetNode == null)
+                    {
+                        continue;
+                    }
+
+                    if (!nodeKeys.TryGetValue(channel.TargetNode, out var targetNodeKey))
+                    {
+                        continue;
+                    }
+
+                    var targetProperty = MapTargetProperty(channel.TargetNodePath);
+                    if (targetProperty == null)
+                    {
+                        continue;
+                    }
+
+                    var animChannel = new Avalonia3D.Animation.AnimationChannel(targetNodeKey, targetProperty.Value);
+
+                    switch (targetProperty.Value)
+                    {
+                        case AnimationTargetProperty.Position:
+                            foreach (var (time, value) in channel.GetTranslationSampler().GetLinearKeys())
+                            {
+                                animChannel.AddKeyframe(time, value);
+                            }
+                            break;
+                        case AnimationTargetProperty.Scale:
+                            foreach (var (time, value) in channel.GetScaleSampler().GetLinearKeys())
+                            {
+                                animChannel.AddKeyframe(time, value);
+                            }
+                            break;
+                        case AnimationTargetProperty.Rotation:
+                            foreach (var (time, value) in channel.GetRotationSampler().GetLinearKeys())
+                            {
+                                animChannel.AddKeyframe(time, value);
+                            }
+                            break;
+                    }
+
+                    if (animChannel.HasData)
+                    {
+                        clip.Channels.Add(animChannel);
+                    }
+                }
+
+                if (clip.Channels.Count > 0)
+                {
+                    clips.Add(clip);
+                }
+            }
+
+            return clips;
+        }
+
+        private static AnimationTargetProperty? MapTargetProperty(PropertyPath path)
+        {
+            return path switch
+            {
+                PropertyPath.translation => AnimationTargetProperty.Position,
+                PropertyPath.rotation => AnimationTargetProperty.Rotation,
+                PropertyPath.scale => AnimationTargetProperty.Scale,
+                _ => null
+            };
         }
 
         private List<Model.Model> LoadModelsForPath(string gltfPath)

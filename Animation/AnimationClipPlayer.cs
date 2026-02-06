@@ -7,6 +7,7 @@ namespace Avalonia3D.Animation
     public sealed class AnimationClipPlayer : IAnimation
     {
         private readonly Dictionary<AnimationChannel, SceneNode?> _channelNodes = new();
+        private bool _isStopped;
 
         public AnimationClipPlayer(AnimationClip clip, SceneGraph sceneGraph, Action<AnimationClipPlayer>? onCompleted = null)
         {
@@ -38,6 +39,7 @@ namespace Avalonia3D.Animation
             Speed = speed;
             IsPaused = false;
             Time = 0;
+            _isStopped = false;
         }
 
         public void Pause()
@@ -54,10 +56,16 @@ namespace Avalonia3D.Animation
         {
             IsPaused = false;
             Time = 0;
+            _isStopped = true;
         }
 
         public bool Update(float deltaTime)
         {
+            if (_isStopped)
+            {
+                return false;
+            }
+
             if (IsPaused)
             {
                 return true;
@@ -128,7 +136,7 @@ namespace Avalonia3D.Animation
             _channelNodes.Clear();
             foreach (var channel in Clip.Channels)
             {
-                var node = SceneGraph.FindNode(channel.TargetNodeName);
+                var node = SceneGraph.FindNodeByKey(channel.TargetNodeKey);
                 _channelNodes[channel] = node;
             }
         }

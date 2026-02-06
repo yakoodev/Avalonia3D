@@ -12,13 +12,14 @@ namespace Avalonia3D.Animation
 
     public class AnimationChannel
     {
-        public AnimationChannel(string targetNodeName, AnimationTargetProperty property)
+        public AnimationChannel(string targetNodeKey, AnimationTargetProperty property)
         {
-            TargetNodeName = targetNodeName;
+            TargetNodeKey = targetNodeKey;
             Property = property;
         }
 
-        public string TargetNodeName { get; }
+        public string TargetNodeKey { get; }
+        public string TargetNodeName => TargetNodeKey;
         public AnimationTargetProperty Property { get; }
 
         public List<AnimationKeyframe<Vector3>> Vector3Keyframes { get; } = [];
