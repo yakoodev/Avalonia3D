@@ -20,18 +20,22 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly Scene3D _scene;
     private readonly CameraController _cameraController;
     private readonly IRenderThreadScheduler _renderThreadScheduler;
+    private readonly Action<RenderQualitySettings> _applyRenderQuality;
     private string _currentSceneTitle = "Сцена не выбрана";
     private ShaderRenderMode _selectedRenderMode;
     private string? _selectedClipName;
     private bool _isLoopEnabled;
     private double _playbackSpeed = 1.0;
     private ClipPlaybackState _selectedClipState;
+    private RenderQualityPreset _selectedQualityPreset = RenderQualityPreset.Medium;
+    private RenderQualitySettings _renderQualitySettings = RenderQualitySettings.Medium;
 
-    public MainWindowViewModel(Scene3D scene, CameraController cameraController, string assetsRoot, IRenderThreadScheduler renderThreadScheduler)
+    public MainWindowViewModel(Scene3D scene, CameraController cameraController, string assetsRoot, IRenderThreadScheduler renderThreadScheduler, Action<RenderQualitySettings> applyRenderQuality)
     {
         _scene = scene;
         _cameraController = cameraController;
         _renderThreadScheduler = renderThreadScheduler;
+        _applyRenderQuality = applyRenderQuality;
         _sceneLoader = new SceneLoader(scene, assetsRoot, renderThreadScheduler);
         _sceneLoader.SceneChanged += sceneInfo =>
         {
@@ -59,6 +63,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         });
 
         AvailableClips = new ObservableCollection<string>();
+        QualityPresets = new ObservableCollection<RenderQualityPreset>(new[]
+        {
+            RenderQualityPreset.Low,
+            RenderQualityPreset.Medium,
+            RenderQualityPreset.High,
+            RenderQualityPreset.Custom
+        });
 
         SwitchShaderModeCommand = new RelayCommand(mode =>
         {
@@ -81,6 +92,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             Dispatcher.UIThread.Post(() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CurrentCameraMode))));
         });
 
+        ApplyRenderQualityPreset(RenderQualityPreset.Medium);
+
         _scene.BindRenderMode(ShaderRenderMode.Pbr, ShaderIds.Pbr);
         _scene.BindRenderMode(ShaderRenderMode.Unlit, ShaderIds.Unlit);
         _scene.BindRenderMode(ShaderRenderMode.NormalsDebug, ShaderIds.NormalsDebug);
@@ -95,6 +108,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public ObservableCollection<SceneItemViewModel> Scenes { get; }
     public ObservableCollection<ShaderRenderMode> ShaderModes { get; }
     public ObservableCollection<string> AvailableClips { get; }
+    public ObservableCollection<RenderQualityPreset> QualityPresets { get; }
     public RelayCommand SwitchShaderModeCommand { get; }
     public RelayCommand PlayClipCommand { get; }
     public RelayCommand PauseClipCommand { get; }
@@ -105,6 +119,22 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public RelayCommand ToggleCameraModeCommand { get; }
 
     public string CurrentCameraMode => _cameraController.ControlMode.ToString();
+
+    public RenderQualityPreset SelectedQualityPreset
+    {
+        get => _selectedQualityPreset;
+        set
+        {
+            if (_selectedQualityPreset == value)
+            {
+                return;
+            }
+
+            ApplyRenderQualityPreset(value);
+        }
+    }
+
+    public string ActiveQualitySummary => $"Preset: {SelectedQualityPreset}, shadows={_renderQualitySettings.ShadowsEnabled}, shadowMap={_renderQualitySettings.ShadowMapSize}, postfx={_renderQualitySettings.PostEffects}, gamma={_renderQualitySettings.Gamma:0.00}, msaa={_renderQualitySettings.MsaaPolicy}";
 
     public double OrbitSensitivity
     {
@@ -238,6 +268,16 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _scene.ActiveShaderId = _scene.GetShaderIdForMode(mode) ?? ShaderIds.Pbr;
 
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedRenderMode)));
+    }
+
+
+    private void ApplyRenderQualityPreset(RenderQualityPreset preset)
+    {
+        _selectedQualityPreset = preset;
+        _renderQualitySettings = RenderQualitySettings.FromPreset(preset, _renderQualitySettings).Validate();
+        _applyRenderQuality(_renderQualitySettings);
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedQualityPreset)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ActiveQualitySummary)));
     }
 
     private void RefreshClips()

@@ -5,6 +5,7 @@ using Avalonia.OpenGL.Controls;
 using Avalonia3D.Interaction.CameraController;
 using Avalonia3D.Interfaces;
 using Avalonia3D.Model;
+using Avalonia3D.Rendering;
 using Avalonia3D.Sandbox.Rendering;
 using Avalonia3D.Sandbox.Services;
 using Serilog;
@@ -43,6 +44,13 @@ public class SandboxModel3DControl : OpenGlControlBase
 
     public IRenderThreadScheduler RenderThreadScheduler => _renderThreadScheduler;
 
+
+    public void ApplyRenderQuality(RenderQualitySettings settings)
+    {
+        _renderThreadScheduler.Enqueue(() => _renderer.SetRenderQuality(settings));
+    }
+
+    public RenderQualitySettings GetRenderQuality() => _renderer.RenderQualitySettings;
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
