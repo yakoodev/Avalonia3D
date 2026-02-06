@@ -384,6 +384,10 @@ namespace Avalonia3D.Rendering
 
             Gl.BindTexture(TextureTarget.Texture2D, textureId);
 
+            while (Gl.GetError() != GLEnum.NoError)
+            {
+            }
+
             fixed (byte* dataPtr = textureData.Data)
             {
                 Gl.TexImage2D(TextureTarget.Texture2D, 0, (int)InternalFormat.Rgba,

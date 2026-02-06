@@ -2,12 +2,19 @@ using Avalonia3D.Model;
 using Avalonia3D.Sandbox.Scenes;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 
 namespace Avalonia3D.Sandbox.Services;
 
 public sealed class SceneLoader
 {
+    private static readonly Dictionary<string, CameraPreset> CameraPresets = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["default"] = new CameraPreset(12f, -0.3f, 0.6f, 0.1f, 200f),
+        ["vehicle"] = new CameraPreset(35f, -0.2f, 0.6f, 0.1f, 1000f)
+    };
+
     private readonly Scene3D _scene;
     private readonly string _assetsRoot;
     private readonly IRenderThreadScheduler _renderThreadScheduler;
@@ -60,6 +67,21 @@ public sealed class SceneLoader
     {
         ApplyDefaults(scene);
         scene.Load(_scene, _assetsRoot);
+
+        if (SceneCameraFramer.TryFrame(_scene.SceneGraph, _scene.Camera))
+        {
+            Log.Information("Camera auto-framed for scene {SceneId}. Target: {Target}, Distance: {Distance:0.00}, Near/Far: {Near:0.00}/{Far:0.00}",
+                scene.Id,
+                _scene.Camera.Target,
+                _scene.Camera.Distance,
+                _scene.Camera.Near,
+                _scene.Camera.Far);
+        }
+        else
+        {
+            Log.Warning("Scene {SceneId} has no geometry bounds for auto-frame; using preset camera.", scene.Id);
+        }
+
         Log.Information("Scene loaded: {SceneId} - {SceneTitle}", scene.Id, scene.Title);
         SceneChanged?.Invoke(scene);
     }
@@ -68,13 +90,19 @@ public sealed class SceneLoader
     {
         _scene.Lights.Clear();
 
+        var preset = CameraPresets.TryGetValue(scene.Id, out var scenePreset)
+            ? scenePreset
+            : CameraPresets["default"];
+
         var camera = _scene.Camera;
         camera.Target = Vector3.Zero;
-        camera.Distance = scene.Id == "vehicle" ? 35f : 12f;
-        camera.Pitch = scene.Id == "vehicle" ? -0.2f : -0.3f;
-        camera.Yaw = 0.6f;
+        camera.Distance = preset.Distance;
+        camera.Pitch = preset.Pitch;
+        camera.Yaw = preset.Yaw;
         camera.Fov = MathF.PI / 4;
-        camera.Near = 0.1f;
-        camera.Far = scene.Id == "vehicle" ? 1000f : 200f;
+        camera.Near = preset.Near;
+        camera.Far = preset.Far;
     }
+
+    private readonly record struct CameraPreset(float Distance, float Pitch, float Yaw, float Near, float Far);
 }
