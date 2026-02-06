@@ -7,22 +7,20 @@ namespace Avalonia3D.Interaction.CameraController;
 public class CameraController
 {
     private readonly Camera _camera;
-    private readonly SceneGraph _sceneGraph;
+    private readonly Func<SceneGraph> _sceneGraphAccessor;
 
-    private readonly float _defaultDistance;
-    private readonly float _defaultPitch;
-    private readonly float _defaultYaw;
-    private readonly Vector3 _defaultTarget;
+    private CameraViewState _homeView;
 
-    public CameraController(Camera camera, SceneGraph sceneGraph)
+    public CameraController(Camera camera, Func<SceneGraph> sceneGraphAccessor)
     {
         _camera = camera ?? throw new ArgumentNullException(nameof(camera));
-        _sceneGraph = sceneGraph ?? throw new ArgumentNullException(nameof(sceneGraph));
+        _sceneGraphAccessor = sceneGraphAccessor ?? throw new ArgumentNullException(nameof(sceneGraphAccessor));
+        _homeView = CameraViewState.FromCamera(camera);
+    }
 
-        _defaultDistance = camera.Distance;
-        _defaultPitch = camera.Pitch;
-        _defaultYaw = camera.Yaw;
-        _defaultTarget = camera.Target;
+    public CameraController(Camera camera, SceneGraph sceneGraph)
+        : this(camera, () => sceneGraph)
+    {
     }
 
     public Camera Camera => _camera;
@@ -71,7 +69,8 @@ public class CameraController
 
     public bool FrameAll(float minDistance = 3f)
     {
-        if (!CameraBoundsCalculator.TryComputeWorldBounds(_sceneGraph, out var min, out var max))
+        var sceneGraph = _sceneGraphAccessor();
+        if (!CameraBoundsCalculator.TryComputeWorldBounds(sceneGraph, out var min, out var max))
         {
             return false;
         }
@@ -79,12 +78,14 @@ public class CameraController
         return FitBounds(min, max, minDistance);
     }
 
+    public void CaptureHomeView()
+    {
+        _homeView = CameraViewState.FromCamera(_camera);
+    }
+
     public void ResetView()
     {
-        _camera.Target = _defaultTarget;
-        _camera.Pitch = _defaultPitch;
-        _camera.Yaw = _defaultYaw;
-        _camera.Distance = _defaultDistance;
+        _homeView.ApplyTo(_camera);
     }
 
     private bool FitBounds(Vector3 min, Vector3 max, float minDistance)
@@ -103,5 +104,24 @@ public class CameraController
         _camera.Near = MathF.Max(0.01f, _camera.Distance * 0.02f);
         _camera.Far = MathF.Max(_camera.Distance + radius * 4f, _camera.Distance * 3f);
         return true;
+    }
+
+    private readonly record struct CameraViewState(Vector3 Target, float Distance, float Pitch, float Yaw, float Near, float Far, float Fov)
+    {
+        public static CameraViewState FromCamera(Camera camera)
+        {
+            return new CameraViewState(camera.Target, camera.Distance, camera.Pitch, camera.Yaw, camera.Near, camera.Far, camera.Fov);
+        }
+
+        public void ApplyTo(Camera camera)
+        {
+            camera.Target = Target;
+            camera.Pitch = Pitch;
+            camera.Yaw = Yaw;
+            camera.Distance = Distance;
+            camera.Near = Near;
+            camera.Far = Far;
+            camera.Fov = Fov;
+        }
     }
 }

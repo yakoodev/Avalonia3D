@@ -36,7 +36,7 @@ namespace Avalonia3D.Controls
 
         public Model3DEmbeddedControl()
         {
-            CameraController = new CameraController(_renderer.Scene.Camera, _renderer.Scene.SceneGraph);
+            CameraController = new CameraController(_renderer.Scene.Camera, () => _renderer.Scene.SceneGraph);
             _inputHandler = new MouseKeyboardInputHandler(CameraController);
 
             _glThread = new Thread(GLThreadProc)

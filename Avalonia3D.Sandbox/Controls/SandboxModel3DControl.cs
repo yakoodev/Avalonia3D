@@ -24,7 +24,7 @@ public class SandboxModel3DControl : OpenGlControlBase
 
     public SandboxModel3DControl()
     {
-        CameraController = new CameraController(_renderer.Scene.Camera, _renderer.Scene.SceneGraph);
+        CameraController = new CameraController(_renderer.Scene.Camera, () => _renderer.Scene.SceneGraph);
         _inputHandler = new MouseKeyboardInputHandler(CameraController);
         _renderer.RendererInitialized += () => RendererInitialized?.Invoke(this, EventArgs.Empty);
     }

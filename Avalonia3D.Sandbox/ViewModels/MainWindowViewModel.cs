@@ -34,6 +34,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         {
             CurrentSceneTitle = sceneInfo.Title;
             RefreshClips();
+            _cameraController.CaptureHomeView();
         };
 
         var scenes = SceneCatalog.CreateDefault(assetsRoot);

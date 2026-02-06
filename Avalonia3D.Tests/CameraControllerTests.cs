@@ -69,6 +69,58 @@ public class CameraControllerTests
         Assert.True(camera.Distance > 0f);
     }
 
+
+    [Fact]
+    public void FrameAll_UsesActualSceneGraphFromAccessor()
+    {
+        var camera = CreateCamera();
+        var graphA = new SceneGraph();
+        var graphB = new SceneGraph();
+        graphB.AddRoot(CreateMesh(new Vector3(10f, -1f, -1f), new Vector3(12f, 1f, 1f)));
+
+        var useSecond = false;
+        var controller = new CameraController(camera, () => useSecond ? graphB : graphA);
+
+        var beforeSwitch = controller.FrameAll();
+        useSecond = true;
+        var afterSwitch = controller.FrameAll();
+
+        Assert.False(beforeSwitch);
+        Assert.True(afterSwitch);
+        Assert.True(camera.Target.X > 10.9f && camera.Target.X < 11.1f);
+    }
+
+    [Fact]
+    public void ResetView_RestoresCapturedHomeIncludingClipPlanes()
+    {
+        var camera = CreateCamera();
+        var controller = new CameraController(camera, new SceneGraph());
+
+        camera.Target = new Vector3(3f, 2f, 1f);
+        camera.Distance = 22f;
+        camera.Pitch = -0.15f;
+        camera.Yaw = 0.44f;
+        camera.Near = 0.25f;
+        camera.Far = 900f;
+        camera.Fov = 0.9f;
+        controller.CaptureHomeView();
+
+        controller.Orbit(new Vector2(30f, 10f));
+        controller.Dolly(2f);
+        camera.Near = 1f;
+        camera.Far = 10f;
+        camera.Fov = 0.5f;
+
+        controller.ResetView();
+
+        Assert.True(Vector3.Distance(camera.Target, new Vector3(3f, 2f, 1f)) < 0.001f);
+        Assert.InRange(camera.Distance, 21.99f, 22.01f);
+        Assert.InRange(camera.Pitch, -0.151f, -0.149f);
+        Assert.InRange(camera.Yaw, 0.439f, 0.441f);
+        Assert.InRange(camera.Near, 0.249f, 0.251f);
+        Assert.InRange(camera.Far, 899.9f, 900.1f);
+        Assert.InRange(camera.Fov, 0.899f, 0.901f);
+    }
     [Fact]
     public void ResetView_ReturnsDefaults()
     {
