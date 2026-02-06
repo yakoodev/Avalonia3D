@@ -1,6 +1,7 @@
 using Avalonia3D.Model;
 using Avalonia3D.Model.StandObjects;
 using Avalonia3D.Shaders;
+using Silk.NET.Core.Loader;
 using Silk.NET.OpenGL;
 using System;
 using System.Numerics;
@@ -99,8 +100,7 @@ namespace Avalonia3D.Rendering
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, _framebuffer);
             gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthAttachment,
                 TextureTarget.Texture2D, _depthMap, 0);
-            gl.DrawBuffer(GLEnum.None);
-            gl.ReadBuffer(GLEnum.None);
+            ConfigureDepthOnlyTargets(gl);
 
             var status = gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
@@ -112,6 +112,21 @@ namespace Avalonia3D.Rendering
 
             _supportsShadowPass = false;
             return false;
+        }
+
+
+        private static void ConfigureDepthOnlyTargets(GL gl)
+        {
+            try
+            {
+                gl.DrawBuffer(GLEnum.None);
+                gl.ReadBuffer(GLEnum.None);
+            }
+            catch (SymbolLoadingException)
+            {
+                // На некоторых GLES-драйверах glDrawBuffer/glReadBuffer не экспортируются.
+                // Для depth-only FBO это допустимо: продолжаем без вызовов.
+            }
         }
 
         private bool IsShadowPassSupported(GL gl)

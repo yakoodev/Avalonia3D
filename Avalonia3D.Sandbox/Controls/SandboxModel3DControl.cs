@@ -5,6 +5,7 @@ using Avalonia.OpenGL.Controls;
 using Avalonia3D.Interaction.CameraController;
 using Avalonia3D.Interfaces;
 using Avalonia3D.Model;
+using Avalonia3D.Rendering;
 using Avalonia3D.Sandbox.Rendering;
 using Avalonia3D.Sandbox.Services;
 using Serilog;
