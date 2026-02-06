@@ -1,0 +1,39 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Avalonia3D.Sandbox"
+        mc:Ignorable="d"
+        x:Class="Avalonia3D.Sandbox.MainWindow"
+        Title="Avalonia3D Sandbox"
+        Width="1200"
+        Height="720">
+  <Grid ColumnDefinitions="280,*" Background="#1E1E1E">
+    <Border Grid.Column="0" Background="#252526" Padding="16">
+      <ScrollViewer>
+        <StackPanel Spacing="12">
+          <TextBlock Text="Тестовые сцены" FontSize="18" FontWeight="Bold" Foreground="White" />
+          <ItemsControl ItemsSource="{Binding Scenes}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Background="#2D2D30" Padding="12" CornerRadius="6">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="{Binding Title}" FontWeight="Bold" Foreground="White" />
+                    <TextBlock Text="{Binding Description}" Foreground="#CFCFCF" TextWrapping="Wrap" />
+                    <Button Content="Открыть" Command="{Binding LoadCommand}" HorizontalAlignment="Left" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </ScrollViewer>
+    </Border>
+    <Grid Grid.Column="1">
+      <local:SandboxModel3DControl x:Name="Viewport" Background="Black" />
+      <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16" Background="#66000000" Padding="8" CornerRadius="4">
+        <TextBlock Text="{Binding CurrentSceneTitle}" Foreground="White" />
+      </Border>
+    </Grid>
+  </Grid>
+</Window>
