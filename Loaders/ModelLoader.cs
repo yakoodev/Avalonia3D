@@ -7,20 +7,54 @@ using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using System;
-using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Runtime;
+using System.Text.Json;
 
 namespace Avalonia3D.Loaders
 {
     public static class ModelLoader
     {
-        // Убираем глобальный кеш - будем использовать только GPU-кеш из MeshObject
-        private static readonly Dictionary<string, WeakReference<byte[]>> TextureCache = new();
-        private static readonly object TextureCacheLock = new();
+        private enum TextureAlphaHeuristicProfile
+        {
+            Strict,
+            Balanced,
+            Permissive
+        }
+
+        private static class TextureAlphaHeuristics
+        {
+            public const byte SoftTransparentAlphaThreshold = 253;
+            public const byte RegularTransparentAlphaThreshold = 245;
+            public const byte DeepTransparentAlphaThreshold = 64;
+            public const byte OpaqueAlphaThreshold = 254;
+
+            public const int MaxSamples = 8192;
+            public const float MinOpaqueRatio = 0.05f;
+            public const float MinDeepTransparentRatio = 0.001f;
+            public const float MinRegularTransparentRatio = 0.01f;
+            public const float MinSoftTransparentRatio = 0.15f;
+
+            public const float DenseDeepMaskOpaqueRatio = 0.35f;
+            public const float StrictDenseDeepMaskRatio = 0.15f;
+            public const float BalancedDenseDeepMaskRatio = 0.20f;
+            public const float PermissiveDenseDeepMaskRatio = 0.35f;
+
+            public static TextureAlphaHeuristicProfile ActiveProfile { get; set; } = TextureAlphaHeuristicProfile.Balanced;
+
+            public static float GetDenseDeepMaskRatioThreshold()
+            {
+                return ActiveProfile switch
+                {
+                    TextureAlphaHeuristicProfile.Strict => StrictDenseDeepMaskRatio,
+                    TextureAlphaHeuristicProfile.Permissive => PermissiveDenseDeepMaskRatio,
+                    _ => BalancedDenseDeepMaskRatio,
+                };
+            }
+        }
 
         private unsafe static long EstimateModelMemory(Model.Model m)
         {
@@ -30,7 +64,7 @@ namespace Avalonia3D.Loaders
             return v + i + t;
         }
 
-        private static TextureData LoadTextureFromImage(byte[] imageData, int maxDimension = 512) // Уменьшен размер по умолчанию
+        private static TextureData LoadTextureFromImage(byte[] imageData, int maxDimension = 1024) // Уменьшен размер по умолчанию
         {
             if (imageData == null || imageData.Length == 0) return null;
 
@@ -62,18 +96,17 @@ namespace Avalonia3D.Loaders
                 }
 
                 int size = w * h * 4;
-                var pool = ArrayPool<byte>.Shared;
-                byte[] rented = pool.Rent(size);
+                byte[] data = new byte[size];
 
-                var span = rented.AsSpan(0, size);
+                var span = data.AsSpan();
                 image.CopyPixelDataTo(span);
 
                 return new TextureData
                 {
                     Width = w,
                     Height = h,
-                    Data = rented,
-                    DataIsPooled = true
+                    Data = data,
+                    DataIsPooled = false
                 };
             }
             catch (Exception ex)
@@ -204,6 +237,7 @@ namespace Avalonia3D.Loaders
 
             var result = new Avalonia3D.Model.Material();
             ApplyPbrFactors(material, result);
+            ApplySurfaceSettings(material, result);
             result.Opacity = result.BaseColorFactor.W;
 
             var baseColorChannel = material.FindChannel("BaseColor");
@@ -236,13 +270,365 @@ namespace Avalonia3D.Loaders
                 result.EmissiveFactor = new Vector3(emissiveColor.X, emissiveColor.Y, emissiveColor.Z);
             }
 
-            if (result.Opacity < 0.999f)
-            {
-                result.IsTransparent = true;
-            }
+            result.HasTextureTransparency = HasMeaningfulTextureTransparency(result.BaseColorTexture);
+            ApplyAlphaFallbackForUnsupportedBlend(result);
+
+            result.IsTransparent = result.AlphaMode == MaterialAlphaMode.Blend;
 
             model.Material = result;
             model.TextureData = result.BaseColorTexture;
+        }
+
+
+        private static void ApplySurfaceSettings(SharpGLTF.Schema2.Material material, Avalonia3D.Model.Material target)
+        {
+            if (material == null || target == null)
+            {
+                return;
+            }
+
+            target.AlphaMode = ParseAlphaMode(material.Alpha);
+            target.AlphaCutoff = material.AlphaCutoff;
+            target.DoubleSided = material.DoubleSided;
+            target.EmissiveIntensity = ReadEmissiveStrength(material);
+            target.TransmissionFactor = ReadTransmissionFactor(material);
+            target.HasTransmission = target.TransmissionFactor > 0.001f;
+        }
+
+        private static MaterialAlphaMode ParseAlphaMode(AlphaMode alphaMode)
+        {
+            return alphaMode switch
+            {
+                AlphaMode.MASK => MaterialAlphaMode.Mask,
+                AlphaMode.BLEND => MaterialAlphaMode.Blend,
+                _ => MaterialAlphaMode.Opaque
+            };
+        }
+
+        private static float ReadEmissiveStrength(SharpGLTF.Schema2.Material material)
+        {
+            const float fallback = 1f;
+
+            if (material == null)
+            {
+                return fallback;
+            }
+
+            if (TryReadEmissiveStrengthFromObject(material, out var directStrength))
+            {
+                return directStrength;
+            }
+
+            try
+            {
+                var extrasJson = material.Extras?.ToString();
+                if (!string.IsNullOrWhiteSpace(extrasJson))
+                {
+                    using var doc = JsonDocument.Parse(extrasJson);
+                    if (TryReadEmissiveStrengthFromJson(doc.RootElement, out var extrasStrength))
+                    {
+                        return extrasStrength;
+                    }
+                }
+            }
+            catch
+            {
+                // ignored, fallback below
+            }
+
+            return fallback;
+        }
+
+        private static bool TryReadEmissiveStrengthFromObject(object source, out float strength)
+        {
+            strength = 1f;
+            if (source == null)
+            {
+                return false;
+            }
+
+            var type = source.GetType();
+            foreach (var prop in type.GetProperties())
+            {
+                var name = prop.Name;
+                object value;
+
+                try
+                {
+                    value = prop.GetValue(source);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (value == null)
+                {
+                    continue;
+                }
+
+                if (name.Contains("EmissiveStrength", StringComparison.OrdinalIgnoreCase) ||
+                    (name.Contains("Strength", StringComparison.OrdinalIgnoreCase) && name.Contains("Emissive", StringComparison.OrdinalIgnoreCase)))
+                {
+                    if (value is float f)
+                    {
+                        strength = Math.Max(0f, f);
+                        return true;
+                    }
+
+                    if (value is double d)
+                    {
+                        strength = Math.Max(0f, (float)d);
+                        return true;
+                    }
+                }
+
+                if (value is string)
+                {
+                    continue;
+                }
+
+                if (value is System.Collections.IEnumerable sequence)
+                {
+                    foreach (var item in sequence)
+                    {
+                        if (item != null && TryReadEmissiveStrengthFromObject(item, out strength))
+                        {
+                            return true;
+                        }
+                    }
+
+                    continue;
+                }
+
+                if (name.Contains("Extension", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("Emissive", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (TryReadEmissiveStrengthFromObject(value, out strength))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryReadEmissiveStrengthFromJson(JsonElement element, out float strength)
+        {
+            strength = 1f;
+            if (element.ValueKind != JsonValueKind.Object)
+            {
+                return false;
+            }
+
+            if (element.TryGetProperty("KHR_materials_emissive_strength", out var ext) &&
+                ext.TryGetProperty("emissiveStrength", out var emissiveStrength) &&
+                emissiveStrength.ValueKind == JsonValueKind.Number &&
+                emissiveStrength.TryGetSingle(out var extValue))
+            {
+                strength = Math.Max(0f, extValue);
+                return true;
+            }
+
+            foreach (var property in element.EnumerateObject())
+            {
+                if (property.Value.ValueKind == JsonValueKind.Object &&
+                    TryReadEmissiveStrengthFromJson(property.Value, out strength))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+
+        private static float ReadTransmissionFactor(SharpGLTF.Schema2.Material material)
+        {
+            if (material == null)
+            {
+                return 0f;
+            }
+
+            if (TryReadTransmissionFactorFromObject(material, out var factor))
+            {
+                return Math.Clamp(factor, 0f, 1f);
+            }
+
+            return 0f;
+        }
+
+        private static bool TryReadTransmissionFactorFromObject(object source, out float factor)
+        {
+            factor = 0f;
+            if (source == null)
+            {
+                return false;
+            }
+
+            foreach (var prop in source.GetType().GetProperties())
+            {
+                object value;
+                try
+                {
+                    value = prop.GetValue(source);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (value == null)
+                {
+                    continue;
+                }
+
+                if (prop.Name.Contains("TransmissionFactor", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (value is float f)
+                    {
+                        factor = f;
+                        return true;
+                    }
+
+                    if (value is double d)
+                    {
+                        factor = (float)d;
+                        return true;
+                    }
+                }
+
+                if (value is string)
+                {
+                    continue;
+                }
+
+                if (value is System.Collections.IEnumerable seq)
+                {
+                    foreach (var item in seq)
+                    {
+                        if (item != null && TryReadTransmissionFactorFromObject(item, out factor))
+                        {
+                            return true;
+                        }
+                    }
+
+                    continue;
+                }
+
+                if (prop.Name.Contains("Transmission", StringComparison.OrdinalIgnoreCase) || prop.Name.Contains("Extension", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (TryReadTransmissionFactorFromObject(value, out factor))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static void ApplyAlphaFallbackForUnsupportedBlend(Avalonia3D.Model.Material material)
+        {
+            if (material == null || material.AlphaMode != MaterialAlphaMode.Blend)
+            {
+                return;
+            }
+
+            var hasFactorTransparency = material.BaseColorFactor.W < 0.999f;
+            if (!hasFactorTransparency && !material.HasTextureTransparency)
+            {
+                // Оставляем BLEND только если есть явный alpha-сигнал (factor либо значимая texture-alpha).
+                material.AlphaMode = MaterialAlphaMode.Opaque;
+            }
+        }
+
+        private static bool HasMeaningfulTextureTransparency(TextureData? texture)
+        {
+            if (texture?.Data == null || texture.Data.Length < 4)
+            {
+                return false;
+            }
+
+            var data = texture.Data;
+            var pixelCount = data.Length / 4;
+            if (pixelCount <= 0)
+            {
+                return false;
+            }
+
+            int sampled = 0;
+            int softTransparent = 0;
+            int regularTransparent = 0;
+            int deepTransparent = 0;
+            int opaque = 0;
+
+            int stepPixels = Math.Max(1, pixelCount / TextureAlphaHeuristics.MaxSamples);
+            var step = stepPixels * 4;
+
+            for (int i = 3; i < data.Length; i += step)
+            {
+                sampled++;
+                var alpha = data[i];
+
+                if (alpha <= TextureAlphaHeuristics.SoftTransparentAlphaThreshold)
+                {
+                    softTransparent++;
+                }
+
+                if (alpha <= TextureAlphaHeuristics.RegularTransparentAlphaThreshold)
+                {
+                    regularTransparent++;
+                }
+
+                if (alpha <= TextureAlphaHeuristics.DeepTransparentAlphaThreshold)
+                {
+                    deepTransparent++;
+                }
+
+                if (alpha >= TextureAlphaHeuristics.OpaqueAlphaThreshold)
+                {
+                    opaque++;
+                }
+            }
+
+            if (sampled == 0)
+            {
+                return false;
+            }
+
+            var opaqueRatio = opaque / (float)sampled;
+            if (opaqueRatio < TextureAlphaHeuristics.MinOpaqueRatio)
+            {
+                // Если texture alpha почти полностью прозрачная, это обычно служебный канал,
+                // а не осмысленная геометрическая прозрачность.
+                return false;
+            }
+
+            var deepTransparentRatio = deepTransparent / (float)sampled;
+            var denseDeepMaskThreshold = TextureAlphaHeuristics.GetDenseDeepMaskRatioThreshold();
+            if (deepTransparentRatio > denseDeepMaskThreshold &&
+                opaqueRatio >= TextureAlphaHeuristics.DenseDeepMaskOpaqueRatio)
+            {
+                // Плотная глубокая alpha вместе с заметной долей полностью непрозрачных пикселей
+                // обычно означает маску экспорта/вырез, а не полупрозрачную поверхность.
+                return false;
+            }
+
+            if (deepTransparentRatio >= TextureAlphaHeuristics.MinDeepTransparentRatio)
+            {
+                return true;
+            }
+
+            var regularTransparentRatio = regularTransparent / (float)sampled;
+            if (regularTransparentRatio >= TextureAlphaHeuristics.MinRegularTransparentRatio)
+            {
+                return true;
+            }
+
+            var softTransparentRatio = softTransparent / (float)sampled;
+            return softTransparentRatio >= TextureAlphaHeuristics.MinSoftTransparentRatio;
         }
 
         private static TextureData? LoadTextureFromChannel(MaterialChannel? channel)
@@ -258,23 +644,8 @@ namespace Avalonia3D.Loaders
 
         private static TextureData? LoadTextureFromImage(SharpGLTF.Schema2.Image image)
         {
-            var textureKey = image.Content.GetHashCode().ToString();
-
-            lock (TextureCacheLock)
-            {
-                if (TextureCache.TryGetValue(textureKey, out var weakRef) &&
-                    weakRef.TryGetTarget(out var cachedBytes))
-                {
-                    var copyBytes = new byte[cachedBytes.Length];
-                    Array.Copy(cachedBytes, copyBytes, cachedBytes.Length);
-                    return LoadTextureFromImage(copyBytes);
-                }
-
-                var texBytes = image.Content.Content.ToArray();
-                var textureData = LoadTextureFromImage(texBytes);
-                TextureCache[textureKey] = new WeakReference<byte[]>(texBytes);
-                return textureData;
-            }
+            var texBytes = image.Content.Content.ToArray();
+            return LoadTextureFromImage(texBytes);
         }
 
         private static Vector4 GetChannelColor(MaterialChannel? channel, Vector4 fallback)
@@ -357,32 +728,12 @@ namespace Avalonia3D.Loaders
 
         private static void CleanupTextureCache()
         {
-            lock (TextureCacheLock)
-            {
-                var keysToRemove = new List<string>();
-                foreach (var kvp in TextureCache)
-                {
-                    if (!kvp.Value.TryGetTarget(out _))
-                    {
-                        keysToRemove.Add(kvp.Key);
-                    }
-                }
-
-                foreach (var key in keysToRemove)
-                {
-                    TextureCache.Remove(key);
-                }
-            }
+            // no-op: CPU texture cache removed to avoid excessive RAM usage
         }
 
         public static void ClearAllCaches()
         {
-            lock (TextureCacheLock)
-            {
-                TextureCache.Clear();
-            }
-
-            // Принудительная сборка мусора
+            // no-op: CPU texture cache removed to avoid excessive RAM usage
             GC.Collect(2, GCCollectionMode.Aggressive);
             GC.WaitForPendingFinalizers();
             GC.Collect(2, GCCollectionMode.Aggressive);

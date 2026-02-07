@@ -38,7 +38,8 @@ namespace Avalonia3D.Model.StandObjects
             {
                 BaseColor = new Vector3(model.Material.BaseColorFactor.X, model.Material.BaseColorFactor.Y, model.Material.BaseColorFactor.Z);
                 EmissionColor = model.Material.EmissiveFactor;
-                Opacity = model.Material.Opacity;
+                // Opacity сцены — это runtime override; alpha материала учитывается в shader через baseColor.a
+                Opacity = 1f;
             }
         }
 
@@ -110,14 +111,14 @@ namespace Avalonia3D.Model.StandObjects
                 return;
             }
 
-            ApplyMaterialState(Material);
+            ApplyMaterialState(Material, renderContext.Scene.RenderMode);
 
             shader.Use();
             shader.BindMaterial(_resources, Material, renderContext.FrameState.ShadowMapId);
             shader.SetUniforms(renderContext, this, renderContext.FrameState.LightSpaceMatrix);
             RenderModel(renderContext);
 
-            ResetMaterialState(Material);
+            ResetMaterialState(Material, renderContext.Scene.RenderMode);
         }
 
         public unsafe void RenderModel(IRenderContext? renderContext = null)
@@ -167,15 +168,45 @@ namespace Avalonia3D.Model.StandObjects
             _gl = null;
         }
 
-        private void ApplyMaterialState(Material? material)
+
+        public static MaterialAlphaMode ResolveAlphaMode(Material? material, float opacity, ShaderRenderMode renderMode)
+        {
+            if (renderMode == ShaderRenderMode.NormalsDebug)
+            {
+                return MaterialAlphaMode.Opaque;
+            }
+
+            if (renderMode == ShaderRenderMode.Unlit && material?.AlphaMode == MaterialAlphaMode.Blend)
+            {
+                var hasFactorTransparency = material.Opacity < 0.999f;
+                if (!hasFactorTransparency && !material.HasTextureTransparency)
+                {
+                    return MaterialAlphaMode.Opaque;
+                }
+            }
+
+            return ResolveAlphaMode(material, opacity);
+        }
+
+        public static MaterialAlphaMode ResolveAlphaMode(Material? material, float opacity)
+        {
+            if (material != null)
+            {
+                return material.AlphaMode;
+            }
+
+            return opacity < 0.999f ? MaterialAlphaMode.Blend : MaterialAlphaMode.Opaque;
+        }
+
+        private void ApplyMaterialState(Material? material, ShaderRenderMode renderMode)
         {
             if (_gl == null)
             {
                 return;
             }
 
-            bool transparent = material?.IsTransparent == true || Opacity < 1f;
-            if (transparent)
+            var alphaMode = ResolveAlphaMode(material, Opacity, renderMode);
+            if (alphaMode == MaterialAlphaMode.Blend)
             {
                 _gl.Enable(EnableCap.Blend);
                 _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
@@ -186,18 +217,32 @@ namespace Avalonia3D.Model.StandObjects
                 _gl.Disable(EnableCap.Blend);
                 _gl.DepthMask(true);
             }
+
+            if (material?.DoubleSided == true)
+            {
+                _gl.Disable(EnableCap.CullFace);
+            }
+            else
+            {
+                _gl.Enable(EnableCap.CullFace);
+            }
         }
 
-        private void ResetMaterialState(Material? material)
+        private void ResetMaterialState(Material? material, ShaderRenderMode renderMode)
         {
             if (_gl == null)
             {
                 return;
             }
 
-            if (material?.IsTransparent == true || Opacity < 1f)
+            if (ResolveAlphaMode(material, Opacity, renderMode) == MaterialAlphaMode.Blend)
             {
                 _gl.DepthMask(true);
+            }
+
+            if (material?.DoubleSided == true)
+            {
+                _gl.Enable(EnableCap.CullFace);
             }
         }
     }

@@ -84,7 +84,7 @@ namespace Avalonia3D.Rendering
 
             foreach (var obj in visibleObjects)
             {
-                if (IsTransparent(obj))
+                if (IsTransparent(obj, renderContext.Scene.RenderMode))
                 {
                     transparentObjects.Add(obj);
                 }
@@ -241,10 +241,11 @@ namespace Avalonia3D.Rendering
             };
         }
 
-        private static bool IsTransparent(MeshObject obj)
+        private static bool IsTransparent(MeshObject obj, ShaderRenderMode renderMode)
         {
             var material = obj.Material;
-            return material?.IsTransparent == true || obj.Opacity < 1f;
+            var resolvedAlpha = MeshObject.ResolveAlphaMode(material, obj.Opacity, renderMode);
+            return resolvedAlpha == MaterialAlphaMode.Blend;
         }
 
         private static void SortTransparentObjects(Camera camera, List<MeshObject> transparentObjects)

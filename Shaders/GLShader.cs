@@ -40,6 +40,9 @@ namespace Avalonia3D.Shaders
         private int _intensityLocation;
         private int _shininessLocation = -1;
         private int _alphaLocation = -1;
+        private int _alphaCutoffLocation = -1;
+        private int _alphaModeLocation = -1;
+        private int _emissiveIntensityLocation = -1;
         private int _modelEmissionColorLocation = -1;
         private int _baseColorFactorLocation = -1;
         private int _metallicFactorLocation = -1;
@@ -186,6 +189,9 @@ namespace Avalonia3D.Shaders
             _intensityLocation = _gl.GetUniformLocation(_shaderProgram, "uIntensity[0]");
             _shininessLocation = _gl.GetUniformLocation(_shaderProgram, "uShininess");
             _alphaLocation = _gl.GetUniformLocation(_shaderProgram, "uAlpha");
+            _alphaCutoffLocation = _gl.GetUniformLocation(_shaderProgram, "uAlphaCutoff");
+            _alphaModeLocation = _gl.GetUniformLocation(_shaderProgram, "uAlphaMode");
+            _emissiveIntensityLocation = _gl.GetUniformLocation(_shaderProgram, "uEmissiveIntensity");
             _environmentMapLocation = _gl.GetUniformLocation(_shaderProgram, "uEnvironmentMap");
             _reflectionIntensityLocation = _gl.GetUniformLocation(_shaderProgram, "uReflectionIntensity");
             _hasEnvironmentMapLocation = _gl.GetUniformLocation(_shaderProgram, "uHasEnvironmentMap");
@@ -256,7 +262,10 @@ namespace Avalonia3D.Shaders
             var metallicFactor = material?.MetallicFactor ?? 0f;
             var roughnessFactor = material?.RoughnessFactor ?? 1f;
             var occlusionStrength = material?.OcclusionStrength ?? 1f;
-            var alpha = material?.Opacity ?? sceneObject.Opacity;
+            var alpha = sceneObject.Opacity;
+            var alphaCutoff = material?.AlphaCutoff ?? 0.5f;
+            var alphaMode = material?.AlphaMode ?? (alpha < 0.999f ? MaterialAlphaMode.Blend : MaterialAlphaMode.Opaque);
+            var emissiveIntensity = material?.EmissiveIntensity ?? 1f;
             var emissionColor = material != null ? Vector3.Zero : sceneObject.EmissionColor;
 
             if (_modelColorLocation != -1)
@@ -282,6 +291,15 @@ namespace Avalonia3D.Shaders
 
             if (_alphaLocation != -1)
                 _gl.Uniform1(_alphaLocation, alpha);
+
+            if (_alphaCutoffLocation != -1)
+                _gl.Uniform1(_alphaCutoffLocation, alphaCutoff);
+
+            if (_alphaModeLocation != -1)
+                _gl.Uniform1(_alphaModeLocation, (int)alphaMode);
+
+            if (_emissiveIntensityLocation != -1)
+                _gl.Uniform1(_emissiveIntensityLocation, emissiveIntensity);
 
             var primaryLight = lightCount > 0 ? lights[0] : null;
 
