@@ -39,6 +39,16 @@ namespace Avalonia3D.Rendering
                 return;
             }
 
+            var threshold = bloom.Threshold;
+            var intensity = bloom.Intensity;
+            if (context.Scene.RenderMode == ShaderRenderMode.Unlit)
+            {
+                // В unlit-сценарии luminance часто ниже из-за отсутствия PBR lighting,
+                // поэтому адаптивно усиливаем Bloom без изменения глобального профиля.
+                threshold *= 0.25f;
+                intensity *= 2.5f;
+            }
+
             var gl = context.Gl;
             if (!EnsurePrograms(gl) || !EnsureQuad(gl) || !EnsureTargets(gl, context.Width, context.Height, bloom.Iterations))
             {
@@ -54,9 +64,9 @@ namespace Avalonia3D.Rendering
             gl.Disable(EnableCap.Blend);
             gl.BindVertexArray(_vao);
 
-            RenderBrightPass(gl, context.Width, context.Height, bloom.Threshold);
+            RenderBrightPass(gl, context.Width, context.Height, threshold);
             RenderDownsampleBlurChain(gl, bloom.Radius);
-            RenderComposite(gl, context.RenderContext.FrameState.OutputFramebufferId, bloom.Intensity);
+            RenderComposite(gl, context.RenderContext.FrameState.OutputFramebufferId, intensity);
 
             gl.BindVertexArray(0);
             gl.UseProgram(0);
