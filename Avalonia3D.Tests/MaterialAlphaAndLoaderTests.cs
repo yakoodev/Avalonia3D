@@ -22,6 +22,22 @@ public sealed class MaterialAlphaAndLoaderTests
         Assert.Equal(MaterialAlphaMode.Opaque, mode);
     }
 
+
+    [Fact]
+    public void ResolveAlphaMode_Unlit_BlendWithoutTransparency_FallsBackToOpaque()
+    {
+        var material = new Avalonia3D.Model.Material
+        {
+            AlphaMode = MaterialAlphaMode.Blend,
+            Opacity = 1f,
+            HasTextureTransparency = false
+        };
+
+        var mode = MeshObject.ResolveAlphaMode(material, opacity: 1f, ShaderRenderMode.Unlit);
+
+        Assert.Equal(MaterialAlphaMode.Opaque, mode);
+    }
+
     [Fact]
     public void ResolveAlphaMode_UsesExplicitMaterialMode()
     {

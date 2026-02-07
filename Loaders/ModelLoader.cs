@@ -233,6 +233,7 @@ namespace Avalonia3D.Loaders
                 result.EmissiveFactor = new Vector3(emissiveColor.X, emissiveColor.Y, emissiveColor.Z);
             }
 
+            result.HasTextureTransparency = HasMeaningfulTextureTransparency(result.BaseColorTexture);
             ApplyAlphaFallbackForUnsupportedBlend(result);
 
             result.IsTransparent = result.AlphaMode == MaterialAlphaMode.Blend;
@@ -411,8 +412,7 @@ namespace Avalonia3D.Loaders
             }
 
             var hasFactorTransparency = material.BaseColorFactor.W < 0.999f;
-            var hasTextureTransparency = TextureHasTransparentPixels(material.BaseColorTexture);
-            if (!hasFactorTransparency && !hasTextureTransparency)
+            if (!hasFactorTransparency && !material.HasTextureTransparency)
             {
                 // Fallback: BLEND без реальной прозрачности даёт артефакты сортировки/глубины,
                 // поэтому принудительно интерпретируем как OPAQUE до реализации transmission/refraction.
@@ -420,7 +420,7 @@ namespace Avalonia3D.Loaders
             }
         }
 
-        private static bool TextureHasTransparentPixels(TextureData? texture)
+        private static bool HasMeaningfulTextureTransparency(TextureData? texture)
         {
             if (texture?.Data == null || texture.Data.Length < 4)
             {
@@ -428,16 +428,33 @@ namespace Avalonia3D.Loaders
             }
 
             var data = texture.Data;
-            var stride = Math.Max(4, (data.Length / 4096 / 4) * 4);
-            for (int i = 3; i < data.Length; i += stride)
+            var pixelCount = data.Length / 4;
+            if (pixelCount <= 0)
             {
-                if (data[i] < 250)
+                return false;
+            }
+
+            int sampled = 0;
+            int transparent = 0;
+            int stepPixels = Math.Max(1, pixelCount / 8192);
+            var step = stepPixels * 4;
+
+            for (int i = 3; i < data.Length; i += step)
+            {
+                sampled++;
+                if (data[i] < 245)
                 {
-                    return true;
+                    transparent++;
                 }
             }
 
-            return false;
+            if (sampled == 0)
+            {
+                return false;
+            }
+
+            var transparencyRatio = transparent / (float)sampled;
+            return transparencyRatio > 0.005f;
         }
 
         private static TextureData? LoadTextureFromChannel(MaterialChannel? channel)

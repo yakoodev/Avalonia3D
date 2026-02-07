@@ -176,6 +176,15 @@ namespace Avalonia3D.Model.StandObjects
                 return MaterialAlphaMode.Opaque;
             }
 
+            if (renderMode == ShaderRenderMode.Unlit && material?.AlphaMode == MaterialAlphaMode.Blend)
+            {
+                var hasFactorTransparency = material.Opacity < 0.999f;
+                if (!hasFactorTransparency && !material.HasTextureTransparency)
+                {
+                    return MaterialAlphaMode.Opaque;
+                }
+            }
+
             return ResolveAlphaMode(material, opacity);
         }
 

@@ -17,6 +17,7 @@ namespace Avalonia3D.Model
         public float AlphaCutoff { get; set; } = 0.5f;
         public bool DoubleSided { get; set; }
         public float EmissiveIntensity { get; set; } = 1f;
+        public bool HasTextureTransparency { get; set; }
     }
 
     public class Material
@@ -52,6 +53,12 @@ namespace Avalonia3D.Model
         {
             get => Surface.EmissiveIntensity;
             set => Surface.EmissiveIntensity = value;
+        }
+
+        public bool HasTextureTransparency
+        {
+            get => Surface.HasTextureTransparency;
+            set => Surface.HasTextureTransparency = value;
         }
 
         public TextureData? BaseColorTexture { get; set; }
