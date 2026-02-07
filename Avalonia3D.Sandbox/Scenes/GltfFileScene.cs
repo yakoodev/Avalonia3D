@@ -15,12 +15,19 @@ public sealed class GltfFileScene : ISandboxScene
     public GltfFileScene(string relativePath)
     {
         if (string.IsNullOrWhiteSpace(relativePath))
-            throw new ArgumentException("GLTF relative path is required.", nameof(relativePath));
+            throw new ArgumentException("Model relative path is required.", nameof(relativePath));
 
         _relativePath = relativePath;
+        FileName = Path.GetFileName(relativePath);
+        Extension = Path.GetExtension(relativePath).ToLowerInvariant();
+        Directory = NormalizeDirectory(Path.GetDirectoryName(relativePath));
+
         var shortName = Path.GetFileNameWithoutExtension(relativePath);
         var normalizedPath = relativePath.Replace(Path.DirectorySeparatorChar, '/').Replace(Path.AltDirectorySeparatorChar, '/');
-        var normalizedId = normalizedPath.Replace(".gltf", string.Empty, StringComparison.OrdinalIgnoreCase).ToLowerInvariant();
+        var normalizedId = normalizedPath
+            .Replace(".gltf", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace(".glb", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .ToLowerInvariant();
 
         Id = $"gltf:{normalizedId}";
         Title = $"Модель: {shortName}";
@@ -30,6 +37,20 @@ public sealed class GltfFileScene : ISandboxScene
     public string Id { get; }
     public string Title { get; }
     public string Description { get; }
+    public string FileName { get; }
+    public string Directory { get; }
+    public string Extension { get; }
+
+
+    private static string NormalizeDirectory(string? directory)
+    {
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            return "/";
+        }
+
+        return directory.Replace(Path.DirectorySeparatorChar, '/').Replace(Path.AltDirectorySeparatorChar, '/');
+    }
 
     public void Load(Scene3D scene, string assetsRoot)
     {

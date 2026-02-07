@@ -23,8 +23,15 @@ public static class SceneCatalog
             yield break;
         }
 
-        foreach (var path in Directory.EnumerateFiles(assetsRoot, "*.gltf", SearchOption.AllDirectories)
-                     .OrderBy(path => Path.GetRelativePath(assetsRoot, path), StringComparer.OrdinalIgnoreCase))
+        var modelFiles = Directory.EnumerateFiles(assetsRoot, "*.*", SearchOption.AllDirectories)
+            .Where(path =>
+            {
+                var ext = Path.GetExtension(path);
+                return ext.Equals(".gltf", StringComparison.OrdinalIgnoreCase) || ext.Equals(".glb", StringComparison.OrdinalIgnoreCase);
+            })
+            .OrderBy(path => Path.GetRelativePath(assetsRoot, path), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var path in modelFiles)
         {
             var relativePath = Path.GetRelativePath(assetsRoot, path);
             yield return new GltfFileScene(relativePath);
