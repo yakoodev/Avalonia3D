@@ -92,6 +92,23 @@ public sealed class MaterialAlphaAndLoaderTests
     }
 
 
+
+    [Fact]
+    public void LoadModels_BlendWithFactorAlpha_KeepsBlendMode()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"mat-loader-blend-factor-{Guid.NewGuid():N}.gltf");
+        File.WriteAllText(path, GetBlendFactorAlphaGltfJson());
+
+        var gltf = SharpGLTF.Schema2.ModelRoot.Load(path);
+        var models = ModelLoader.LoadModels(gltf);
+        File.Delete(path);
+        var material = Assert.Single(models).Material;
+
+        Assert.NotNull(material);
+        Assert.Equal(MaterialAlphaMode.Blend, material!.AlphaMode);
+        Assert.True(material.IsTransparent);
+    }
+
     [Fact]
     public void LoadModels_BlendModeWithoutActualAlpha_FallsBackToOpaque()
     {
@@ -212,6 +229,51 @@ public sealed class MaterialAlphaAndLoaderTests
               "alphaMode": "OPAQUE",
               "pbrMetallicRoughness": {
                 "baseColorFactor": [1,1,1,0.5],
+                "metallicFactor": 0,
+                "roughnessFactor": 1
+              }
+            }
+          ],
+          "buffers": [
+            {
+              "uri": "data:application/octet-stream;base64,AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAABAAIA",
+              "byteLength": 42
+            }
+          ],
+          "bufferViews": [
+            { "buffer": 0, "byteOffset": 0, "byteLength": 36, "target": 34962 },
+            { "buffer": 0, "byteOffset": 36, "byteLength": 6, "target": 34963 }
+          ],
+          "accessors": [
+            { "bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3", "min": [0,0,0], "max": [1,1,0] },
+            { "bufferView": 1, "componentType": 5123, "count": 3, "type": "SCALAR" }
+          ]
+        }
+        """;
+
+
+    private static string GetBlendFactorAlphaGltfJson() =>
+        """
+        {
+          "asset": { "version": "2.0" },
+          "scenes": [ { "nodes": [0] } ],
+          "nodes": [ { "mesh": 0, "name": "n" } ],
+          "meshes": [
+            {
+              "primitives": [
+                {
+                  "attributes": { "POSITION": 0 },
+                  "indices": 1,
+                  "material": 0
+                }
+              ]
+            }
+          ],
+          "materials": [
+            {
+              "alphaMode": "BLEND",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [1,1,1,0.35],
                 "metallicFactor": 0,
                 "roughnessFactor": 1
               }

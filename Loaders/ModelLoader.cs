@@ -508,10 +508,9 @@ namespace Avalonia3D.Loaders
             }
 
             var hasFactorTransparency = material.BaseColorFactor.W < 0.999f;
-            if (!hasFactorTransparency)
+            if (!hasFactorTransparency && !material.HasTextureTransparency)
             {
-                // В текущем рендерере texture-alpha для BLEND часто даёт ложные self-overlap артефакты
-                // (atlas/unused area), поэтому BLEND оставляем только при явной factor-прозрачности.
+                // Оставляем BLEND только если есть явный alpha-сигнал (factor либо значимая texture-alpha).
                 material.AlphaMode = MaterialAlphaMode.Opaque;
             }
         }
@@ -538,7 +537,7 @@ namespace Avalonia3D.Loaders
             for (int i = 3; i < data.Length; i += step)
             {
                 sampled++;
-                if (data[i] < 240)
+                if (data[i] < 220)
                 {
                     transparent++;
                 }
@@ -550,7 +549,7 @@ namespace Avalonia3D.Loaders
             }
 
             var transparencyRatio = transparent / (float)sampled;
-            return transparencyRatio > 0.05f;
+            return transparencyRatio > 0.2f;
         }
 
         private static TextureData? LoadTextureFromChannel(MaterialChannel? channel)
