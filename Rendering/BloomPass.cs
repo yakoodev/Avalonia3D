@@ -8,6 +8,7 @@ namespace Avalonia3D.Rendering
     {
         private readonly GraphicsProfile _settings;
         private uint _sceneCopyTexture;
+        private uint _sceneCopyFramebuffer;
         private uint _extractProgram;
         private uint _blurProgram;
         private uint _compositeProgram;
@@ -57,8 +58,8 @@ namespace Avalonia3D.Rendering
             }
 
             gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, context.RenderContext.FrameState.OutputFramebufferId);
-            gl.BindTexture(TextureTarget.Texture2D, _sceneCopyTexture);
-            gl.CopyTexSubImage2D(TextureTarget.Texture2D, 0, 0, 0, 0, 0, (uint)context.Width, (uint)context.Height);
+            gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, _sceneCopyFramebuffer);
+            gl.BlitFramebuffer(0, 0, context.Width, context.Height, 0, 0, context.Width, context.Height, (uint)ClearBufferMask.ColorBufferBit, GLEnum.Linear);
 
             gl.Disable(EnableCap.DepthTest);
             gl.Disable(EnableCap.Blend);
@@ -149,12 +150,20 @@ namespace Avalonia3D.Rendering
                 _sceneCopyTexture = gl.GenTexture();
             }
 
+            if (_sceneCopyFramebuffer == 0)
+            {
+                _sceneCopyFramebuffer = gl.GenFramebuffer();
+            }
+
             gl.BindTexture(TextureTarget.Texture2D, _sceneCopyTexture);
             gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, (uint)width, (uint)height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, null);
             gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
             gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
             gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
             gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, _sceneCopyFramebuffer);
+            gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, TextureTarget.Texture2D, _sceneCopyTexture, 0);
 
             for (var level = 0; level < levels; level++)
             {
