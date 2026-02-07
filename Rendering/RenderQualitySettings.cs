@@ -7,7 +7,8 @@ namespace Avalonia3D.Rendering
     {
         None = 0,
         ToneMapping = 1 << 0,
-        GammaCorrection = 1 << 1
+        GammaCorrection = 1 << 1,
+        Bloom = 1 << 2
     }
 
     public enum ToneMappingOperator
@@ -51,9 +52,14 @@ namespace Avalonia3D.Rendering
 
         public bool ShadowsEnabled { get; init; } = true;
         public int ShadowMapSize { get; init; } = 2048;
-        public PostEffectsFlags PostEffects { get; init; } = PostEffectsFlags.ToneMapping | PostEffectsFlags.GammaCorrection;
+        public PostEffectsFlags PostEffects { get; init; } = PostEffectsFlags.ToneMapping | PostEffectsFlags.GammaCorrection | PostEffectsFlags.Bloom;
         public ToneMappingOperator ToneMapping { get; init; } = ToneMappingOperator.Reinhard;
         public float Gamma { get; init; } = 2.2f;
+        public bool BloomEnabled { get; init; } = true;
+        public float BloomThreshold { get; init; } = 1.0f;
+        public float BloomIntensity { get; init; } = 0.8f;
+        public float BloomRadius { get; init; } = 1.0f;
+        public int BloomIterations { get; init; } = 4;
         public MsaaPolicy MsaaPolicy { get; init; } = MsaaPolicy.X4;
         public bool ReflectionsEnabled { get; init; } = true;
         public ReflectionMode ReflectionMode { get; init; } = ReflectionMode.IBL;
@@ -76,7 +82,15 @@ namespace Avalonia3D.Rendering
                 {
                     Effects = PostEffects,
                     ToneMapping = ToneMapping,
-                    Gamma = Gamma
+                    Gamma = Gamma,
+                    Bloom = new BloomProfile
+                    {
+                        Enabled = BloomEnabled,
+                        Threshold = BloomThreshold,
+                        Intensity = BloomIntensity,
+                        Radius = BloomRadius,
+                        Iterations = BloomIterations
+                    }
                 },
                 Reflections = new ReflectionProfile
                 {
@@ -99,6 +113,11 @@ namespace Avalonia3D.Rendering
                 PostEffects = validated.PostFx.Effects,
                 ToneMapping = validated.PostFx.ToneMapping,
                 Gamma = validated.PostFx.Gamma,
+                BloomEnabled = validated.PostFx.Bloom.Enabled,
+                BloomThreshold = validated.PostFx.Bloom.Threshold,
+                BloomIntensity = validated.PostFx.Bloom.Intensity,
+                BloomRadius = validated.PostFx.Bloom.Radius,
+                BloomIterations = validated.PostFx.Bloom.Iterations,
                 MsaaPolicy = validated.MsaaPolicy,
                 ReflectionsEnabled = validated.Reflections.Enabled,
                 ReflectionMode = validated.Reflections.Mode,

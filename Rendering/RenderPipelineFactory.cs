@@ -4,6 +4,13 @@ namespace Avalonia3D.Rendering
 {
     public sealed class RenderPipelineFactory
     {
+        private readonly IPostProcessingEffectRegistry _postProcessingEffects;
+
+        public RenderPipelineFactory(IPostProcessingEffectRegistry? postProcessingEffects = null)
+        {
+            _postProcessingEffects = postProcessingEffects ?? PostProcessingEffectRegistry.CreateDefault();
+        }
+
         public IReadOnlyList<IRenderPass> CreatePasses(GraphicsProfile profile)
         {
             var validated = (profile ?? GraphicsProfile.Medium).Validate();
@@ -21,7 +28,12 @@ namespace Avalonia3D.Rendering
 
             passes.Add(new ForwardPass(validated));
 
-            if (validated.PostFx.Effects != PostEffectsFlags.None)
+            foreach (var postProcessingPass in _postProcessingEffects.CreateEnabledPasses(validated))
+            {
+                passes.Add(postProcessingPass);
+            }
+
+            if (validated.PostFx.Effects.HasFlag(PostEffectsFlags.ToneMapping) || validated.PostFx.Effects.HasFlag(PostEffectsFlags.GammaCorrection))
             {
                 passes.Add(new PostEffectsPass(validated));
             }

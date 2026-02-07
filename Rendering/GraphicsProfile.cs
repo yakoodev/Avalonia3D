@@ -10,11 +10,21 @@ namespace Avalonia3D.Rendering
         public int MapSize { get; init; } = 2048;
     }
 
+    public sealed record BloomProfile
+    {
+        public bool Enabled { get; init; } = true;
+        public float Threshold { get; init; } = 1.0f;
+        public float Intensity { get; init; } = 0.8f;
+        public float Radius { get; init; } = 1.0f;
+        public int Iterations { get; init; } = 4;
+    }
+
     public sealed record PostFxProfile
     {
         public PostEffectsFlags Effects { get; init; } = PostEffectsFlags.ToneMapping | PostEffectsFlags.GammaCorrection;
         public ToneMappingOperator ToneMapping { get; init; } = ToneMappingOperator.Reinhard;
         public float Gamma { get; init; } = 2.2f;
+        public BloomProfile Bloom { get; init; } = new();
     }
 
     public sealed record ReflectionProfile
@@ -69,7 +79,15 @@ namespace Avalonia3D.Rendering
             {
                 Effects = PostEffectsFlags.GammaCorrection,
                 ToneMapping = ToneMappingOperator.None,
-                Gamma = 2.0f
+                Gamma = 2.0f,
+                Bloom = new BloomProfile
+                {
+                    Enabled = false,
+                    Threshold = 1.2f,
+                    Intensity = 0.35f,
+                    Radius = 0.75f,
+                    Iterations = 2
+                }
             },
             Reflections = new ReflectionProfile
             {
@@ -96,9 +114,17 @@ namespace Avalonia3D.Rendering
             Shadows = new ShadowProfile { Enabled = true, MapSize = 1536 },
             PostFx = new PostFxProfile
             {
-                Effects = PostEffectsFlags.ToneMapping | PostEffectsFlags.GammaCorrection,
+                Effects = PostEffectsFlags.ToneMapping | PostEffectsFlags.GammaCorrection | PostEffectsFlags.Bloom,
                 ToneMapping = ToneMappingOperator.Reinhard,
-                Gamma = 2.2f
+                Gamma = 2.2f,
+                Bloom = new BloomProfile
+                {
+                    Enabled = true,
+                    Threshold = 1.0f,
+                    Intensity = 0.75f,
+                    Radius = 1.0f,
+                    Iterations = 4
+                }
             },
             Reflections = new ReflectionProfile
             {
@@ -125,9 +151,17 @@ namespace Avalonia3D.Rendering
             Shadows = new ShadowProfile { Enabled = true, MapSize = 4096 },
             PostFx = new PostFxProfile
             {
-                Effects = PostEffectsFlags.ToneMapping | PostEffectsFlags.GammaCorrection,
+                Effects = PostEffectsFlags.ToneMapping | PostEffectsFlags.GammaCorrection | PostEffectsFlags.Bloom,
                 ToneMapping = ToneMappingOperator.Reinhard,
-                Gamma = 2.2f
+                Gamma = 2.2f,
+                Bloom = new BloomProfile
+                {
+                    Enabled = true,
+                    Threshold = 0.9f,
+                    Intensity = 1.0f,
+                    Radius = 1.2f,
+                    Iterations = 5
+                }
             },
             Reflections = new ReflectionProfile
             {
@@ -153,12 +187,25 @@ namespace Avalonia3D.Rendering
                 MapSize = Math.Clamp(Shadows?.MapSize ?? 2048, RenderQualitySettings.MinShadowMapSize, RenderQualitySettings.MaxShadowMapSize)
             };
 
+            var bloom = PostFx?.Bloom ?? new BloomProfile();
+            var bloomEnabledBySettings = (PostFx?.Effects ?? PostEffectsFlags.None).HasFlag(PostEffectsFlags.Bloom) && bloom.Enabled;
             var validatedPostFx = (PostFx ?? new PostFxProfile()) with
             {
+                Effects = bloomEnabledBySettings
+                    ? (PostFx?.Effects ?? PostEffectsFlags.None) | PostEffectsFlags.Bloom
+                    : (PostFx?.Effects ?? PostEffectsFlags.None) & ~PostEffectsFlags.Bloom,
                 Gamma = Math.Clamp(PostFx?.Gamma ?? 2.2f, 1.0f, 3.0f),
                 ToneMapping = (PostFx?.Effects ?? PostEffectsFlags.None).HasFlag(PostEffectsFlags.ToneMapping)
                     ? PostFx?.ToneMapping ?? ToneMappingOperator.Reinhard
-                    : ToneMappingOperator.None
+                    : ToneMappingOperator.None,
+                Bloom = bloom with
+                {
+                    Enabled = bloomEnabledBySettings,
+                    Threshold = Math.Clamp(bloom.Threshold, 0f, 16f),
+                    Intensity = Math.Clamp(bloom.Intensity, 0f, 8f),
+                    Radius = Math.Clamp(bloom.Radius, 0.1f, 4f),
+                    Iterations = Math.Clamp(bloom.Iterations, 1, 8)
+                }
             };
 
             var reflections = Reflections ?? new ReflectionProfile();
@@ -218,7 +265,7 @@ namespace Avalonia3D.Rendering
         }
 
         public string ToSummary() =>
-            $"Profile={Name} ({QualityPreset}), shadows={Shadows.Enabled}:{Shadows.MapSize}, postfx={PostFx.Effects}, gamma={PostFx.Gamma:0.00}, refl={Reflections.Mode}:{Reflections.Intensity:0.00}, exposure={PbrTuning.Exposure:0.00}, ibl={PbrTuning.IblIntensity:0.00}, lights={MaxLights}, msaa={MsaaPolicy}, bg=({Background.Red:0.00},{Background.Green:0.00},{Background.Blue:0.00})";
+            $"Profile={Name} ({QualityPreset}), shadows={Shadows.Enabled}:{Shadows.MapSize}, postfx={PostFx.Effects}, gamma={PostFx.Gamma:0.00}, bloom={PostFx.Bloom.Enabled}:{PostFx.Bloom.Threshold:0.00}/{PostFx.Bloom.Intensity:0.00}/{PostFx.Bloom.Radius:0.00}x{PostFx.Bloom.Iterations}, refl={Reflections.Mode}:{Reflections.Intensity:0.00}, exposure={PbrTuning.Exposure:0.00}, ibl={PbrTuning.IblIntensity:0.00}, lights={MaxLights}, msaa={MsaaPolicy}, bg=({Background.Red:0.00},{Background.Green:0.00},{Background.Blue:0.00})";
 
         private static string? ResolveDefaultEnvironmentMapPath(bool reflectionsEnabled, ReflectionMode mode)
         {

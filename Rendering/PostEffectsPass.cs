@@ -1,6 +1,5 @@
 using Silk.NET.OpenGL;
 using System;
-using System.Runtime.InteropServices;
 
 namespace Avalonia3D.Rendering
 {
@@ -24,7 +23,7 @@ namespace Avalonia3D.Rendering
 
         public unsafe void Execute(RenderPipelineContext context)
         {
-            if (_failed || _settings.PostFx.Effects == PostEffectsFlags.None)
+            if (_failed || !HasToneOrGamma(_settings.PostFx.Effects))
             {
                 return;
             }
@@ -202,6 +201,12 @@ void main()
             gl.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, 4 * sizeof(float), (void*)(2 * sizeof(float)));
             gl.BindVertexArray(0);
             return true;
+        }
+
+
+        private static bool HasToneOrGamma(PostEffectsFlags effects)
+        {
+            return effects.HasFlag(PostEffectsFlags.ToneMapping) || effects.HasFlag(PostEffectsFlags.GammaCorrection);
         }
 
         private static uint CompileShader(GL gl, ShaderType type, string source)
