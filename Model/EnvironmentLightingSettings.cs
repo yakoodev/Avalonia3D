@@ -11,13 +11,18 @@ namespace Avalonia3D.Model
 
         public static EnvironmentLightingSettings FromRenderQuality(RenderQualitySettings settings)
         {
-            var validated = settings.Validate();
+            return FromGraphicsProfile(settings.ToProfile());
+        }
+
+        public static EnvironmentLightingSettings FromGraphicsProfile(GraphicsProfile profile)
+        {
+            var validated = (profile ?? GraphicsProfile.Medium).Validate();
             return new EnvironmentLightingSettings
             {
-                ReflectionsEnabled = validated.ReflectionsEnabled,
-                ReflectionMode = validated.ReflectionMode,
-                ReflectionIntensity = validated.ReflectionIntensity,
-                EnvironmentMapPath = validated.EnvironmentMapPath
+                ReflectionsEnabled = validated.Reflections.Enabled,
+                ReflectionMode = validated.Reflections.Mode,
+                ReflectionIntensity = validated.Reflections.Intensity,
+                EnvironmentMapPath = validated.Reflections.EnvironmentMapPath
             };
         }
     }

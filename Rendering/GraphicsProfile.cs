@@ -41,6 +41,8 @@ namespace Avalonia3D.Rendering
 
     public sealed record GraphicsProfile
     {
+        public const string DefaultEnvironmentMapPath = "Assets/gltf/wheel_basecolor.png";
+
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
             WriteIndented = true,
@@ -102,7 +104,8 @@ namespace Avalonia3D.Rendering
             {
                 Enabled = true,
                 Mode = ReflectionMode.IBL,
-                Intensity = 0.3f
+                Intensity = 0.3f,
+                EnvironmentMapPath = DefaultEnvironmentMapPath
             },
             PbrTuning = new PbrTuningProfile
             {
@@ -130,7 +133,8 @@ namespace Avalonia3D.Rendering
             {
                 Enabled = true,
                 Mode = ReflectionMode.IBL,
-                Intensity = 0.45f
+                Intensity = 0.45f,
+                EnvironmentMapPath = DefaultEnvironmentMapPath
             },
             PbrTuning = new PbrTuningProfile
             {
@@ -163,7 +167,7 @@ namespace Avalonia3D.Rendering
                 Intensity = Math.Clamp(reflections.Intensity, 0f, 2f),
                 Mode = reflections.Enabled ? reflections.Mode : ReflectionMode.Off,
                 EnvironmentMapPath = string.IsNullOrWhiteSpace(reflections.EnvironmentMapPath)
-                    ? null
+                    ? ResolveDefaultEnvironmentMapPath(reflections.Enabled, reflections.Mode)
                     : reflections.EnvironmentMapPath.Trim()
             };
 
@@ -215,5 +219,15 @@ namespace Avalonia3D.Rendering
 
         public string ToSummary() =>
             $"Profile={Name} ({QualityPreset}), shadows={Shadows.Enabled}:{Shadows.MapSize}, postfx={PostFx.Effects}, gamma={PostFx.Gamma:0.00}, refl={Reflections.Mode}:{Reflections.Intensity:0.00}, exposure={PbrTuning.Exposure:0.00}, ibl={PbrTuning.IblIntensity:0.00}, lights={MaxLights}, msaa={MsaaPolicy}, bg=({Background.Red:0.00},{Background.Green:0.00},{Background.Blue:0.00})";
+
+        private static string? ResolveDefaultEnvironmentMapPath(bool reflectionsEnabled, ReflectionMode mode)
+        {
+            if (!reflectionsEnabled || mode != ReflectionMode.IBL)
+            {
+                return null;
+            }
+
+            return DefaultEnvironmentMapPath;
+        }
     }
 }
