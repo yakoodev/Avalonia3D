@@ -7,22 +7,17 @@ using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using System;
-using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Runtime;
-using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace Avalonia3D.Loaders
 {
     public static class ModelLoader
     {
-        // Убираем глобальный кеш - будем использовать только GPU-кеш из MeshObject
-        private static readonly Dictionary<string, WeakReference<byte[]>> TextureCache = new();
-        private static readonly object TextureCacheLock = new();
 
         private unsafe static long EstimateModelMemory(Model.Model m)
         {
@@ -32,7 +27,7 @@ namespace Avalonia3D.Loaders
             return v + i + t;
         }
 
-        private static TextureData LoadTextureFromImage(byte[] imageData, int maxDimension = 2048) // Уменьшен размер по умолчанию
+        private static TextureData LoadTextureFromImage(byte[] imageData, int maxDimension = 1024) // Уменьшен размер по умолчанию
         {
             if (imageData == null || imageData.Length == 0) return null;
 
@@ -64,18 +59,17 @@ namespace Avalonia3D.Loaders
                 }
 
                 int size = w * h * 4;
-                var pool = ArrayPool<byte>.Shared;
-                byte[] rented = pool.Rent(size);
+                byte[] data = new byte[size];
 
-                var span = rented.AsSpan(0, size);
+                var span = data.AsSpan();
                 image.CopyPixelDataTo(span);
 
                 return new TextureData
                 {
                     Width = w,
                     Height = h,
-                    Data = rented,
-                    DataIsPooled = true
+                    Data = data,
+                    DataIsPooled = false
                 };
             }
             catch (Exception ex)
@@ -460,33 +454,7 @@ namespace Avalonia3D.Loaders
         private static TextureData? LoadTextureFromImage(SharpGLTF.Schema2.Image image)
         {
             var texBytes = image.Content.Content.ToArray();
-            var textureKey = ComputeTextureCacheKey(texBytes);
-
-            lock (TextureCacheLock)
-            {
-                if (TextureCache.TryGetValue(textureKey, out var weakRef) &&
-                    weakRef.TryGetTarget(out var cachedBytes))
-                {
-                    var copyBytes = new byte[cachedBytes.Length];
-                    Array.Copy(cachedBytes, copyBytes, cachedBytes.Length);
-                    return LoadTextureFromImage(copyBytes);
-                }
-
-                var textureData = LoadTextureFromImage(texBytes);
-                TextureCache[textureKey] = new WeakReference<byte[]>(texBytes);
-                return textureData;
-            }
-        }
-
-        private static string ComputeTextureCacheKey(byte[] texBytes)
-        {
-            if (texBytes == null || texBytes.Length == 0)
-            {
-                return "empty";
-            }
-
-            var hash = SHA256.HashData(texBytes);
-            return Convert.ToHexString(hash);
+            return LoadTextureFromImage(texBytes);
         }
 
         private static Vector4 GetChannelColor(MaterialChannel? channel, Vector4 fallback)
@@ -569,32 +537,12 @@ namespace Avalonia3D.Loaders
 
         private static void CleanupTextureCache()
         {
-            lock (TextureCacheLock)
-            {
-                var keysToRemove = new List<string>();
-                foreach (var kvp in TextureCache)
-                {
-                    if (!kvp.Value.TryGetTarget(out _))
-                    {
-                        keysToRemove.Add(kvp.Key);
-                    }
-                }
-
-                foreach (var key in keysToRemove)
-                {
-                    TextureCache.Remove(key);
-                }
-            }
+            // no-op: CPU texture cache removed to avoid excessive RAM usage
         }
 
         public static void ClearAllCaches()
         {
-            lock (TextureCacheLock)
-            {
-                TextureCache.Clear();
-            }
-
-            // Принудительная сборка мусора
+            // no-op: CPU texture cache removed to avoid excessive RAM usage
             GC.Collect(2, GCCollectionMode.Aggressive);
             GC.WaitForPendingFinalizers();
             GC.Collect(2, GCCollectionMode.Aggressive);
