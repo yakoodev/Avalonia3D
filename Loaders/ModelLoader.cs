@@ -18,6 +18,15 @@ namespace Avalonia3D.Loaders
 {
     public static class ModelLoader
     {
+        private static class TextureAlphaHeuristics
+        {
+            public const byte TransparentAlphaThreshold = 253;
+            public const byte OpaqueAlphaThreshold = 254;
+            public const int MaxSamples = 8192;
+            public const int MinTransparentSamples = 1;
+            public const float MinTransparentRatio = 0.005f;
+            public const float MinOpaqueRatio = 0.05f;
+        }
 
         private unsafe static long EstimateModelMemory(Model.Model m)
         {
@@ -531,15 +540,24 @@ namespace Avalonia3D.Loaders
 
             int sampled = 0;
             int transparent = 0;
-            int stepPixels = Math.Max(1, pixelCount / 8192);
+            int opaque = 0;
+
+            int stepPixels = Math.Max(1, pixelCount / TextureAlphaHeuristics.MaxSamples);
             var step = stepPixels * 4;
 
             for (int i = 3; i < data.Length; i += step)
             {
                 sampled++;
-                if (data[i] < 220)
+                var alpha = data[i];
+
+                if (alpha <= TextureAlphaHeuristics.TransparentAlphaThreshold)
                 {
                     transparent++;
+                }
+
+                if (alpha >= TextureAlphaHeuristics.OpaqueAlphaThreshold)
+                {
+                    opaque++;
                 }
             }
 
@@ -549,7 +567,17 @@ namespace Avalonia3D.Loaders
             }
 
             var transparencyRatio = transparent / (float)sampled;
-            return transparencyRatio > 0.2f;
+            var opaqueRatio = opaque / (float)sampled;
+
+            if (opaqueRatio < TextureAlphaHeuristics.MinOpaqueRatio)
+            {
+                // Если texture alpha почти полностью прозрачная, это обычно служебный канал,
+                // а не осмысленная геометрическая прозрачность.
+                return false;
+            }
+
+            return transparent >= TextureAlphaHeuristics.MinTransparentSamples &&
+                   transparencyRatio >= TextureAlphaHeuristics.MinTransparentRatio;
         }
 
         private static TextureData? LoadTextureFromChannel(MaterialChannel? channel)

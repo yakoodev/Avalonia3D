@@ -243,15 +243,9 @@ namespace Avalonia3D.Rendering
 
         private static bool IsTransparent(MeshObject obj, ShaderRenderMode renderMode)
         {
-            if (renderMode == ShaderRenderMode.NormalsDebug)
-            {
-                return false;
-            }
-
             var material = obj.Material;
-            return material != null
-                ? material.AlphaMode == MaterialAlphaMode.Blend || material.IsTransparent
-                : obj.Opacity < 1f;
+            var resolvedAlpha = MeshObject.ResolveAlphaMode(material, obj.Opacity, renderMode);
+            return resolvedAlpha == MaterialAlphaMode.Blend;
         }
 
         private static void SortTransparentObjects(Camera camera, List<MeshObject> transparentObjects)

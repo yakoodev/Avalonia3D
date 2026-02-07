@@ -38,6 +38,64 @@ public sealed class MaterialAlphaAndLoaderTests
         Assert.Equal(MaterialAlphaMode.Opaque, mode);
     }
 
+
+    [Fact]
+    public void ResolveAlphaMode_RenderPipelineTransparency_UsesResolvedModeNotLegacyFlag()
+    {
+        var material = new Avalonia3D.Model.Material
+        {
+            AlphaMode = MaterialAlphaMode.Blend,
+            Opacity = 1f,
+            HasTextureTransparency = false,
+            IsTransparent = true
+        };
+
+        var mode = MeshObject.ResolveAlphaMode(material, opacity: 1f, ShaderRenderMode.Unlit);
+
+        Assert.Equal(MaterialAlphaMode.Opaque, mode);
+    }
+
+    [Fact]
+    public void TextureTransparencyHeuristic_DetectsNearOpaqueAlphaCuts()
+    {
+        var method = typeof(ModelLoader).GetMethod("HasMeaningfulTextureTransparency", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var texture = new TextureData
+        {
+            Width = 16,
+            Height = 16,
+            Data = BuildTextureAlphaData(16, 16, 255)
+        };
+
+        // Несколько почти-непрозрачных alpha-пикселей, типичный кейс для оконных масок.
+        SetAlpha(texture.Data, pixelIndex: 10, alpha: 252);
+        SetAlpha(texture.Data, pixelIndex: 50, alpha: 252);
+        SetAlpha(texture.Data, pixelIndex: 90, alpha: 252);
+
+        var result = (bool)method!.Invoke(null, new object?[] { texture })!;
+
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void TextureTransparencyHeuristic_IgnoresAlmostFullyTransparentTextures()
+    {
+        var method = typeof(ModelLoader).GetMethod("HasMeaningfulTextureTransparency", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var texture = new TextureData
+        {
+            Width = 16,
+            Height = 16,
+            Data = BuildTextureAlphaData(16, 16, 0)
+        };
+
+        var result = (bool)method!.Invoke(null, new object?[] { texture })!;
+
+        Assert.False(result);
+    }
+
     [Fact]
     public void ResolveAlphaMode_UsesExplicitMaterialMode()
     {
@@ -389,5 +447,24 @@ public sealed class MaterialAlphaAndLoaderTests
           ]
         }
         """;
+
+    private static byte[] BuildTextureAlphaData(int width, int height, byte alpha)
+    {
+        var data = new byte[width * height * 4];
+        for (var i = 0; i < data.Length; i += 4)
+        {
+            data[i] = 255;
+            data[i + 1] = 255;
+            data[i + 2] = 255;
+            data[i + 3] = alpha;
+        }
+
+        return data;
+    }
+
+    private static void SetAlpha(byte[] data, int pixelIndex, byte alpha)
+    {
+        data[pixelIndex * 4 + 3] = alpha;
+    }
 
 }
