@@ -114,6 +114,13 @@ namespace Avalonia3D.Loaders
                 try
                 {
                     var model = ModelRoot.Load(gltfPath, relaxedSettings);
+                    var onlyBenignIssues = HasOnlyBenignValidationIssues(issues);
+                    if (onlyBenignIssues)
+                    {
+                        Log.Warning("GLTF loaded in compatibility mode for {Path}. Non-critical validation issues were ignored.", gltfPath);
+                        return new ModelLoadOutcome(model, SceneImportStatus.Success, issues);
+                    }
+
                     Log.Warning("GLTF loaded with degraded quality for {Path}.", gltfPath);
                     return new ModelLoadOutcome(model, SceneImportStatus.Degraded, issues);
                 }
@@ -124,6 +131,39 @@ namespace Avalonia3D.Loaders
                     return new ModelLoadOutcome(null, SceneImportStatus.Degraded, issues);
                 }
             }
+        }
+
+
+        private static bool HasOnlyBenignValidationIssues(IReadOnlyList<string> issues)
+        {
+            if (issues == null || issues.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var issue in issues)
+            {
+                if (string.IsNullOrWhiteSpace(issue))
+                {
+                    continue;
+                }
+
+                if (issue.StartsWith("Missing dependency:", StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                var normalized = issue.Replace("\r", string.Empty).Replace("\n", " ");
+                if (normalized.Contains("AnimationSampler", StringComparison.OrdinalIgnoreCase) &&
+                    normalized.Contains("_byteStride: must NOT be defined", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                return false;
+            }
+
+            return true;
         }
 
         private static InvalidDataException CreateStrictImportException(string gltfPath, IReadOnlyList<string> issues, Exception innerException)
