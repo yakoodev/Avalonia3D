@@ -18,6 +18,7 @@ public sealed class DefaultSceneBootstrap : ISceneBootstrap
     public void Bootstrap(Scene3D scene, GraphicsProfile? profile = null)
     {
         var validatedProfile = (profile ?? GraphicsProfile.Medium).Validate();
+        scene.ApplyGraphicsProfile(validatedProfile);
         scene.ShaderRegistry.Register(ShaderIds.Pbr, glContext => GLShader.Create(glContext, PbrFeatures.None, validatedProfile.MaxLights));
         scene.ShaderRegistry.Register(ShaderIds.PbrBaseColor, glContext => GLShader.Create(glContext, PbrFeatures.BaseColorMap, validatedProfile.MaxLights));
         scene.ShaderRegistry.Register(ShaderIds.PbrBaseColorNormal, glContext => GLShader.Create(glContext, PbrFeatures.BaseColorMap | PbrFeatures.NormalMap, validatedProfile.MaxLights));

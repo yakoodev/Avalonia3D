@@ -4,6 +4,7 @@ using Silk.NET.OpenGL;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using System;
+using System.IO;
 
 namespace Avalonia3D.Rendering
 {
@@ -14,6 +15,7 @@ namespace Avalonia3D.Rendering
         private readonly GraphicsProfile _settings;
         private uint _environmentMapTexture;
         private string? _loadedPath;
+        private bool _fallbackWarningLogged;
         private bool _missingEnvironmentMapWarningLogged;
 
         public EnvironmentLightingPass(GraphicsProfile settings)
@@ -55,28 +57,49 @@ namespace Avalonia3D.Rendering
 
         private bool EnsureEnvironmentMap(GL gl, string? environmentMapPath)
         {
+            var userPath = NormalizePath(environmentMapPath);
+            if (TryLoadEnvironmentMap(gl, userPath, out _))
+            {
+                _fallbackWarningLogged = false;
+                _missingEnvironmentMapWarningLogged = false;
+                return true;
+            }
+
+            var fallbackPath = ResolveBuiltInEnvironmentMapPath();
+            if (TryLoadEnvironmentMap(gl, fallbackPath, out _))
+            {
+                LogFallbackWarningOnce(userPath, fallbackPath);
+                _missingEnvironmentMapWarningLogged = false;
+                return true;
+            }
+
+            LogWarningOnce($"Unable to load environment map. User path='{userPath ?? "<empty>"}', fallback path='{fallbackPath ?? "<missing>"}'. Reflections are disabled.");
+            return false;
+        }
+
+        private bool TryLoadEnvironmentMap(GL gl, string? environmentMapPath, out string? loadedPath)
+        {
+            loadedPath = null;
             if (string.IsNullOrWhiteSpace(environmentMapPath))
             {
-                LogWarningOnce("Environment map path is not configured. Reflections are disabled.");
                 return false;
             }
 
             var normalizedPath = environmentMapPath.Trim();
             if (_environmentMapTexture != 0 && string.Equals(_loadedPath, normalizedPath, StringComparison.OrdinalIgnoreCase))
             {
+                loadedPath = normalizedPath;
                 return true;
             }
 
-            if (!System.IO.File.Exists(normalizedPath))
+            if (!File.Exists(normalizedPath))
             {
-                LogWarningOnce($"Environment map '{normalizedPath}' was not found. Reflections are disabled.");
                 return false;
             }
 
             var textureData = LoadTexture(normalizedPath);
             if (textureData == null)
             {
-                LogWarningOnce($"Environment map '{normalizedPath}' could not be loaded. Reflections are disabled.");
                 return false;
             }
 
@@ -87,8 +110,30 @@ namespace Avalonia3D.Rendering
 
             _environmentMapTexture = UploadEnvironmentTexture(gl, textureData);
             _loadedPath = normalizedPath;
-            _missingEnvironmentMapWarningLogged = false;
+            loadedPath = normalizedPath;
             return _environmentMapTexture != 0;
+        }
+
+        private static string? NormalizePath(string? path)
+        {
+            return string.IsNullOrWhiteSpace(path) ? null : path.Trim();
+        }
+
+        private static string? ResolveBuiltInEnvironmentMapPath()
+        {
+            var configuredPath = GraphicsProfile.DefaultEnvironmentMapPath;
+            if (string.IsNullOrWhiteSpace(configuredPath))
+            {
+                return null;
+            }
+
+            if (Path.IsPathRooted(configuredPath))
+            {
+                return configuredPath;
+            }
+
+            var rooted = Path.Combine(AppContext.BaseDirectory, configuredPath);
+            return File.Exists(rooted) ? rooted : configuredPath;
         }
 
         private static TextureData? LoadTexture(string path)
@@ -141,6 +186,18 @@ namespace Avalonia3D.Rendering
             context.RenderContext.FrameState.ReflectionIntensity = 0f;
             context.RenderContext.FrameState.ReflectionsEnabled = false;
             context.RenderContext.FrameState.ReflectionMode = ReflectionMode.Off;
+        }
+
+        private void LogFallbackWarningOnce(string? userPath, string? fallbackPath)
+        {
+            if (_fallbackWarningLogged)
+            {
+                return;
+            }
+
+            _fallbackWarningLogged = true;
+            var reportedUserPath = userPath ?? "<empty>";
+            Log.Warning("Environment map '{UserPath}' is missing or invalid. Using built-in fallback '{FallbackPath}'.", reportedUserPath, fallbackPath ?? "<missing>");
         }
 
         private void LogWarningOnce(string message)

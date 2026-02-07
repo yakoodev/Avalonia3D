@@ -54,7 +54,8 @@ namespace Avalonia3D.Model
         public ShaderSelectionPolicy ShaderSelectionPolicy { get; } = new();
         public string? ActiveShaderId { get; set; }
         public ShaderRenderMode RenderMode { get; set; } = ShaderRenderMode.Default;
-        public EnvironmentLightingSettings EnvironmentLighting { get; set; } = new();
+        public EnvironmentLightingSettings EnvironmentLighting { get; set; } = EnvironmentLightingSettings.FromGraphicsProfile(GraphicsProfile.Medium);
+        public GraphicsProfile ActiveGraphicsProfile { get; private set; } = GraphicsProfile.Medium.Validate();
         internal Animator Animator { get; private set; } = new();
         public AnimatorComponent AnimatorComponent { get; private set; }
         public SceneImportReport LastImportReport { get; private set; } = SceneImportReport.Success;
@@ -64,6 +65,7 @@ namespace Avalonia3D.Model
         {
             Importer.ValidationPolicy = ImportValidationConfiguration.CurrentPolicy;
             AnimatorComponent = new AnimatorComponent(SceneGraph, Animator);
+            ApplyGraphicsProfile(GraphicsProfile.Medium);
         }
 
         public void BindRenderMode(ShaderRenderMode mode, string shaderId)
@@ -85,6 +87,14 @@ namespace Avalonia3D.Model
         {
             _resourceManager = new RenderResourceManager(gl);
             MemoryManager.Initialize(_resourceManager);
+        }
+
+
+        public void ApplyGraphicsProfile(GraphicsProfile profile)
+        {
+            var validatedProfile = (profile ?? GraphicsProfile.Medium).Validate();
+            ActiveGraphicsProfile = validatedProfile;
+            EnvironmentLighting = EnvironmentLightingSettings.FromGraphicsProfile(validatedProfile);
         }
 
         public event EventHandler<Look>? LookChanged;

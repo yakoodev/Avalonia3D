@@ -29,7 +29,7 @@ public class RenderQualitySettingsTests
         Assert.Equal(3.0f, validated.Gamma);
         Assert.Equal(ToneMappingOperator.None, validated.ToneMapping);
         Assert.Equal(2f, validated.ReflectionIntensity);
-        Assert.Null(validated.EnvironmentMapPath);
+        Assert.Equal(GraphicsProfile.DefaultEnvironmentMapPath, validated.EnvironmentMapPath);
         Assert.Equal(RenderQualitySettings.MaxSupportedLights, validated.MaxLights);
     }
 
@@ -61,6 +61,17 @@ public class RenderQualitySettingsTests
         var fromCustom = RenderQualitySettings.FromPreset(RenderQualityPreset.Custom, custom);
         Assert.Equal(777, fromCustom.ShadowMapSize);
         Assert.Equal(7, fromCustom.MaxLights);
+    }
+
+
+    [Fact]
+    public void FromPreset_MediumAndHigh_HaveEnvironmentMapPath()
+    {
+        var medium = RenderQualitySettings.FromPreset(RenderQualityPreset.Medium);
+        var high = RenderQualitySettings.FromPreset(RenderQualityPreset.High);
+
+        Assert.False(string.IsNullOrWhiteSpace(medium.EnvironmentMapPath));
+        Assert.False(string.IsNullOrWhiteSpace(high.EnvironmentMapPath));
     }
 
     [Fact]

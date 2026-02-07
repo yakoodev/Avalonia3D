@@ -34,12 +34,14 @@ public sealed class SandboxRenderer3D : IRenderContext
     public void SetGraphicsProfile(GraphicsProfile profile)
     {
         _renderPipeline.ApplyProfile(profile);
+        Scene.ApplyGraphicsProfile(_renderPipeline.Profile);
     }
 
     public void Init(GL gl)
     {
         _gl = gl;
         Scene.Init(gl);
+        Scene.ApplyGraphicsProfile(_renderPipeline.Profile);
         Scene.ShaderRegistry.Register(ShaderIds.Pbr, glContext => GLShader.Create(glContext, PbrFeatures.None, _renderPipeline.Profile.MaxLights));
         Scene.ShaderRegistry.Register(ShaderIds.Unlit, UnlitShader.Create);
         Scene.ShaderRegistry.Register(ShaderIds.NormalsDebug, NormalsDebugShader.Create);
