@@ -262,7 +262,7 @@ namespace Avalonia3D.Shaders
             var metallicFactor = material?.MetallicFactor ?? 0f;
             var roughnessFactor = material?.RoughnessFactor ?? 1f;
             var occlusionStrength = material?.OcclusionStrength ?? 1f;
-            var alpha = material?.Opacity ?? sceneObject.Opacity;
+            var alpha = sceneObject.Opacity;
             var alphaCutoff = material?.AlphaCutoff ?? 0.5f;
             var alphaMode = material?.AlphaMode ?? (alpha < 0.999f ? MaterialAlphaMode.Blend : MaterialAlphaMode.Opaque);
             var emissiveIntensity = material?.EmissiveIntensity ?? 1f;

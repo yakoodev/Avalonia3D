@@ -38,7 +38,8 @@ namespace Avalonia3D.Model.StandObjects
             {
                 BaseColor = new Vector3(model.Material.BaseColorFactor.X, model.Material.BaseColorFactor.Y, model.Material.BaseColorFactor.Z);
                 EmissionColor = model.Material.EmissiveFactor;
-                Opacity = model.Material.Opacity;
+                // Opacity сцены — это runtime override; alpha материала учитывается в shader через baseColor.a
+                Opacity = 1f;
             }
         }
 

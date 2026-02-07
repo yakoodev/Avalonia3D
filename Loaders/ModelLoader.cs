@@ -238,10 +238,7 @@ namespace Avalonia3D.Loaders
                 result.EmissiveFactor = new Vector3(emissiveColor.X, emissiveColor.Y, emissiveColor.Z);
             }
 
-            if (result.AlphaMode == MaterialAlphaMode.Blend || result.Opacity < 0.999f)
-            {
-                result.IsTransparent = true;
-            }
+            result.IsTransparent = result.AlphaMode == MaterialAlphaMode.Blend;
 
             model.Material = result;
             model.TextureData = result.BaseColorTexture;
