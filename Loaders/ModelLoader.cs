@@ -13,6 +13,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Runtime;
+using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace Avalonia3D.Loaders
@@ -31,7 +32,7 @@ namespace Avalonia3D.Loaders
             return v + i + t;
         }
 
-        private static TextureData LoadTextureFromImage(byte[] imageData, int maxDimension = 512) // Уменьшен размер по умолчанию
+        private static TextureData LoadTextureFromImage(byte[] imageData, int maxDimension = 2048) // Уменьшен размер по умолчанию
         {
             if (imageData == null || imageData.Length == 0) return null;
 
@@ -238,6 +239,8 @@ namespace Avalonia3D.Loaders
                 result.EmissiveFactor = new Vector3(emissiveColor.X, emissiveColor.Y, emissiveColor.Z);
             }
 
+            ApplyAlphaFallbackForUnsupportedBlend(result);
+
             result.IsTransparent = result.AlphaMode == MaterialAlphaMode.Blend;
 
             model.Material = result;
@@ -406,6 +409,43 @@ namespace Avalonia3D.Loaders
             return false;
         }
 
+        private static void ApplyAlphaFallbackForUnsupportedBlend(Avalonia3D.Model.Material material)
+        {
+            if (material == null || material.AlphaMode != MaterialAlphaMode.Blend)
+            {
+                return;
+            }
+
+            var hasFactorTransparency = material.BaseColorFactor.W < 0.999f;
+            var hasTextureTransparency = TextureHasTransparentPixels(material.BaseColorTexture);
+            if (!hasFactorTransparency && !hasTextureTransparency)
+            {
+                // Fallback: BLEND без реальной прозрачности даёт артефакты сортировки/глубины,
+                // поэтому принудительно интерпретируем как OPAQUE до реализации transmission/refraction.
+                material.AlphaMode = MaterialAlphaMode.Opaque;
+            }
+        }
+
+        private static bool TextureHasTransparentPixels(TextureData? texture)
+        {
+            if (texture?.Data == null || texture.Data.Length < 4)
+            {
+                return false;
+            }
+
+            var data = texture.Data;
+            var stride = Math.Max(4, (data.Length / 4096 / 4) * 4);
+            for (int i = 3; i < data.Length; i += stride)
+            {
+                if (data[i] < 250)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static TextureData? LoadTextureFromChannel(MaterialChannel? channel)
         {
             var image = channel?.Texture?.PrimaryImage;
@@ -419,7 +459,8 @@ namespace Avalonia3D.Loaders
 
         private static TextureData? LoadTextureFromImage(SharpGLTF.Schema2.Image image)
         {
-            var textureKey = image.Content.GetHashCode().ToString();
+            var texBytes = image.Content.Content.ToArray();
+            var textureKey = ComputeTextureCacheKey(texBytes);
 
             lock (TextureCacheLock)
             {
@@ -431,11 +472,21 @@ namespace Avalonia3D.Loaders
                     return LoadTextureFromImage(copyBytes);
                 }
 
-                var texBytes = image.Content.Content.ToArray();
                 var textureData = LoadTextureFromImage(texBytes);
                 TextureCache[textureKey] = new WeakReference<byte[]>(texBytes);
                 return textureData;
             }
+        }
+
+        private static string ComputeTextureCacheKey(byte[] texBytes)
+        {
+            if (texBytes == null || texBytes.Length == 0)
+            {
+                return "empty";
+            }
+
+            var hash = SHA256.HashData(texBytes);
+            return Convert.ToHexString(hash);
         }
 
         private static Vector4 GetChannelColor(MaterialChannel? channel, Vector4 fallback)
