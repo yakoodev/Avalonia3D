@@ -20,12 +20,16 @@ namespace Avalonia3D.Loaders
     {
         private static class TextureAlphaHeuristics
         {
-            public const byte TransparentAlphaThreshold = 253;
+            public const byte SoftTransparentAlphaThreshold = 253;
+            public const byte RegularTransparentAlphaThreshold = 245;
+            public const byte DeepTransparentAlphaThreshold = 64;
             public const byte OpaqueAlphaThreshold = 254;
+
             public const int MaxSamples = 8192;
-            public const int MinTransparentSamples = 1;
-            public const float MinTransparentRatio = 0.005f;
             public const float MinOpaqueRatio = 0.05f;
+            public const float MinDeepTransparentRatio = 0.001f;
+            public const float MinRegularTransparentRatio = 0.01f;
+            public const float MinSoftTransparentRatio = 0.15f;
         }
 
         private unsafe static long EstimateModelMemory(Model.Model m)
@@ -508,14 +512,6 @@ namespace Avalonia3D.Loaders
                 return;
             }
 
-            if (material.HasTransmission)
-            {
-                // transmission extension пока не реализовано физически корректно;
-                // в текущем пайплайне BLEND делает такие части почти невидимыми.
-                material.AlphaMode = MaterialAlphaMode.Opaque;
-                return;
-            }
-
             var hasFactorTransparency = material.BaseColorFactor.W < 0.999f;
             if (!hasFactorTransparency && !material.HasTextureTransparency)
             {
@@ -539,7 +535,9 @@ namespace Avalonia3D.Loaders
             }
 
             int sampled = 0;
-            int transparent = 0;
+            int softTransparent = 0;
+            int regularTransparent = 0;
+            int deepTransparent = 0;
             int opaque = 0;
 
             int stepPixels = Math.Max(1, pixelCount / TextureAlphaHeuristics.MaxSamples);
@@ -550,9 +548,19 @@ namespace Avalonia3D.Loaders
                 sampled++;
                 var alpha = data[i];
 
-                if (alpha <= TextureAlphaHeuristics.TransparentAlphaThreshold)
+                if (alpha <= TextureAlphaHeuristics.SoftTransparentAlphaThreshold)
                 {
-                    transparent++;
+                    softTransparent++;
+                }
+
+                if (alpha <= TextureAlphaHeuristics.RegularTransparentAlphaThreshold)
+                {
+                    regularTransparent++;
+                }
+
+                if (alpha <= TextureAlphaHeuristics.DeepTransparentAlphaThreshold)
+                {
+                    deepTransparent++;
                 }
 
                 if (alpha >= TextureAlphaHeuristics.OpaqueAlphaThreshold)
@@ -566,9 +574,7 @@ namespace Avalonia3D.Loaders
                 return false;
             }
 
-            var transparencyRatio = transparent / (float)sampled;
             var opaqueRatio = opaque / (float)sampled;
-
             if (opaqueRatio < TextureAlphaHeuristics.MinOpaqueRatio)
             {
                 // Если texture alpha почти полностью прозрачная, это обычно служебный канал,
@@ -576,8 +582,20 @@ namespace Avalonia3D.Loaders
                 return false;
             }
 
-            return transparent >= TextureAlphaHeuristics.MinTransparentSamples &&
-                   transparencyRatio >= TextureAlphaHeuristics.MinTransparentRatio;
+            var deepTransparentRatio = deepTransparent / (float)sampled;
+            if (deepTransparentRatio >= TextureAlphaHeuristics.MinDeepTransparentRatio)
+            {
+                return true;
+            }
+
+            var regularTransparentRatio = regularTransparent / (float)sampled;
+            if (regularTransparentRatio >= TextureAlphaHeuristics.MinRegularTransparentRatio)
+            {
+                return true;
+            }
+
+            var softTransparentRatio = softTransparent / (float)sampled;
+            return softTransparentRatio >= TextureAlphaHeuristics.MinSoftTransparentRatio;
         }
 
         private static TextureData? LoadTextureFromChannel(MaterialChannel? channel)

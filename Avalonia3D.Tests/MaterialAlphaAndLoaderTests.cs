@@ -56,7 +56,7 @@ public sealed class MaterialAlphaAndLoaderTests
     }
 
     [Fact]
-    public void TextureTransparencyHeuristic_DetectsNearOpaqueAlphaCuts()
+    public void TextureTransparencyHeuristic_DetectsMeaningfulDeepAlphaCuts()
     {
         var method = typeof(ModelLoader).GetMethod("HasMeaningfulTextureTransparency", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
         Assert.NotNull(method);
@@ -68,14 +68,37 @@ public sealed class MaterialAlphaAndLoaderTests
             Data = BuildTextureAlphaData(16, 16, 255)
         };
 
-        // Несколько почти-непрозрачных alpha-пикселей, типичный кейс для оконных масок.
+        // Достаточно глубокие alpha-пиксели должны считаться осмысленной прозрачностью.
+        SetAlpha(texture.Data, pixelIndex: 10, alpha: 32);
+        SetAlpha(texture.Data, pixelIndex: 50, alpha: 48);
+        SetAlpha(texture.Data, pixelIndex: 90, alpha: 64);
+
+        var result = (bool)method!.Invoke(null, new object?[] { texture })!;
+
+        Assert.True(result);
+    }
+
+
+    [Fact]
+    public void TextureTransparencyHeuristic_IgnoresSparseNearOpaqueAlphaNoise()
+    {
+        var method = typeof(ModelLoader).GetMethod("HasMeaningfulTextureTransparency", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var texture = new TextureData
+        {
+            Width = 16,
+            Height = 16,
+            Data = BuildTextureAlphaData(16, 16, 255)
+        };
+
         SetAlpha(texture.Data, pixelIndex: 10, alpha: 252);
         SetAlpha(texture.Data, pixelIndex: 50, alpha: 252);
         SetAlpha(texture.Data, pixelIndex: 90, alpha: 252);
 
         var result = (bool)method!.Invoke(null, new object?[] { texture })!;
 
-        Assert.True(result);
+        Assert.False(result);
     }
 
     [Fact]
@@ -185,7 +208,7 @@ public sealed class MaterialAlphaAndLoaderTests
 
 
     [Fact]
-    public void LoadModels_TransmissionBlend_FallsBackToOpaqueForCurrentPipeline()
+    public void LoadModels_TransmissionBlend_PreservesBlendWhenAlphaSignalExists()
     {
         var path = Path.Combine(Path.GetTempPath(), $"mat-loader-transmission-{Guid.NewGuid():N}.gltf");
         File.WriteAllText(path, GetTransmissionBlendGltfJson());
@@ -197,8 +220,8 @@ public sealed class MaterialAlphaAndLoaderTests
 
         Assert.NotNull(material);
         Assert.True(material!.HasTransmission);
-        Assert.Equal(MaterialAlphaMode.Opaque, material.AlphaMode);
-        Assert.False(material.IsTransparent);
+        Assert.Equal(MaterialAlphaMode.Blend, material.AlphaMode);
+        Assert.True(material.IsTransparent);
     }
 
     [Fact]
