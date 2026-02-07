@@ -84,7 +84,7 @@ namespace Avalonia3D.Rendering
 
             foreach (var obj in visibleObjects)
             {
-                if (IsTransparent(obj))
+                if (IsTransparent(obj, renderContext.Scene.RenderMode))
                 {
                     transparentObjects.Add(obj);
                 }
@@ -241,8 +241,13 @@ namespace Avalonia3D.Rendering
             };
         }
 
-        private static bool IsTransparent(MeshObject obj)
+        private static bool IsTransparent(MeshObject obj, ShaderRenderMode renderMode)
         {
+            if (renderMode == ShaderRenderMode.NormalsDebug)
+            {
+                return false;
+            }
+
             var material = obj.Material;
             return material != null
                 ? material.AlphaMode == MaterialAlphaMode.Blend || material.IsTransparent

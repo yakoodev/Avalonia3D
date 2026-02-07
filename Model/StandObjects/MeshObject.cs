@@ -111,14 +111,14 @@ namespace Avalonia3D.Model.StandObjects
                 return;
             }
 
-            ApplyMaterialState(Material);
+            ApplyMaterialState(Material, renderContext.Scene.RenderMode);
 
             shader.Use();
             shader.BindMaterial(_resources, Material, renderContext.FrameState.ShadowMapId);
             shader.SetUniforms(renderContext, this, renderContext.FrameState.LightSpaceMatrix);
             RenderModel(renderContext);
 
-            ResetMaterialState(Material);
+            ResetMaterialState(Material, renderContext.Scene.RenderMode);
         }
 
         public unsafe void RenderModel(IRenderContext? renderContext = null)
@@ -168,6 +168,17 @@ namespace Avalonia3D.Model.StandObjects
             _gl = null;
         }
 
+
+        public static MaterialAlphaMode ResolveAlphaMode(Material? material, float opacity, ShaderRenderMode renderMode)
+        {
+            if (renderMode == ShaderRenderMode.NormalsDebug)
+            {
+                return MaterialAlphaMode.Opaque;
+            }
+
+            return ResolveAlphaMode(material, opacity);
+        }
+
         public static MaterialAlphaMode ResolveAlphaMode(Material? material, float opacity)
         {
             if (material != null)
@@ -178,14 +189,14 @@ namespace Avalonia3D.Model.StandObjects
             return opacity < 0.999f ? MaterialAlphaMode.Blend : MaterialAlphaMode.Opaque;
         }
 
-        private void ApplyMaterialState(Material? material)
+        private void ApplyMaterialState(Material? material, ShaderRenderMode renderMode)
         {
             if (_gl == null)
             {
                 return;
             }
 
-            var alphaMode = ResolveAlphaMode(material, Opacity);
+            var alphaMode = ResolveAlphaMode(material, Opacity, renderMode);
             if (alphaMode == MaterialAlphaMode.Blend)
             {
                 _gl.Enable(EnableCap.Blend);
@@ -208,14 +219,14 @@ namespace Avalonia3D.Model.StandObjects
             }
         }
 
-        private void ResetMaterialState(Material? material)
+        private void ResetMaterialState(Material? material, ShaderRenderMode renderMode)
         {
             if (_gl == null)
             {
                 return;
             }
 
-            if (ResolveAlphaMode(material, Opacity) == MaterialAlphaMode.Blend)
+            if (ResolveAlphaMode(material, Opacity, renderMode) == MaterialAlphaMode.Blend)
             {
                 _gl.DepthMask(true);
             }

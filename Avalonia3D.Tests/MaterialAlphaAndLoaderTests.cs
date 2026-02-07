@@ -3,6 +3,7 @@ using System.IO;
 using Avalonia3D.Loaders;
 using Avalonia3D.Model;
 using Avalonia3D.Model.StandObjects;
+using Avalonia3D.Rendering;
 using Xunit;
 
 namespace Avalonia3D.Tests;
@@ -10,6 +11,17 @@ namespace Avalonia3D.Tests;
 [Trait("TestTarget", "DomainLogic")]
 public sealed class MaterialAlphaAndLoaderTests
 {
+
+    [Fact]
+    public void ResolveAlphaMode_NormalsDebug_AlwaysOpaque()
+    {
+        var material = new Avalonia3D.Model.Material { AlphaMode = MaterialAlphaMode.Blend };
+
+        var mode = MeshObject.ResolveAlphaMode(material, opacity: 0.3f, ShaderRenderMode.NormalsDebug);
+
+        Assert.Equal(MaterialAlphaMode.Opaque, mode);
+    }
+
     [Fact]
     public void ResolveAlphaMode_UsesExplicitMaterialMode()
     {
