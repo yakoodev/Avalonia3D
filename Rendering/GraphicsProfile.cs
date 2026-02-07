@@ -51,7 +51,7 @@ namespace Avalonia3D.Rendering
 
     public sealed record GraphicsProfile
     {
-        public const string DefaultEnvironmentMapPath = "Assets/TestScenes/textures/wheel_baseColor.png";
+        public const string DefaultEnvironmentMapPath = "Assets/TestScenes/car/textures/wheel_baseColor.png";
 
         private static readonly JsonSerializerOptions JsonOptions = new()
         {

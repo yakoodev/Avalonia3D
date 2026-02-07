@@ -280,6 +280,8 @@ namespace Avalonia3D.Loaders
                 result.OcclusionStrength = GetChannelStrength(occlusionChannel, result.OcclusionStrength);
             }
 
+            result.EmissiveFactor = ReadEmissiveFactor(material, result.EmissiveFactor);
+
             var emissiveChannel = material.FindChannel("Emissive");
             result.EmissiveTexture = LoadTextureFromChannel(emissiveChannel);
             if (emissiveChannel != null)
@@ -814,6 +816,30 @@ namespace Avalonia3D.Loaders
 
             return fallback;
         }
+
+        private static Vector3 ReadEmissiveFactor(SharpGLTF.Schema2.Material material, Vector3 fallback)
+        {
+            if (material == null)
+            {
+                return fallback;
+            }
+
+            try
+            {
+                var emissiveFactorProperty = material.GetType().GetProperty("EmissiveFactor");
+                if (emissiveFactorProperty?.GetValue(material) is Vector3 emissiveFactor)
+                {
+                    return emissiveFactor;
+                }
+            }
+            catch
+            {
+                // ignore reflection errors and keep fallback
+            }
+
+            return fallback;
+        }
+
 
         private static void ApplyPbrFactors(SharpGLTF.Schema2.Material material, Avalonia3D.Model.Material target)
         {
