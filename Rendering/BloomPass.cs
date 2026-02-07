@@ -108,7 +108,8 @@ namespace Avalonia3D.Rendering
                 gl.ActiveTexture(TextureUnit.Texture0);
                 gl.BindTexture(TextureTarget.Texture2D, _levelTextures[level]);
                 gl.Uniform1(gl.GetUniformLocation(_compositeProgram, "uBloomTexture"), 0);
-                gl.Uniform1(gl.GetUniformLocation(_compositeProgram, "uIntensity"), intensity / _levelTextures.Count);
+                var levelWeight = 1f / (1f + (level * 0.5f));
+                gl.Uniform1(gl.GetUniformLocation(_compositeProgram, "uIntensity"), intensity * levelWeight);
                 gl.DrawArrays(PrimitiveType.Triangles, 0, 6);
             }
 
@@ -198,11 +199,11 @@ void main()
 {
     vec3 color = texture(uSceneTexture, vUv).rgb;
     float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
-    float knee = max(uThreshold * 0.5, 0.0001);
+    float knee = max(uThreshold * 0.75, 0.0001);
     float soft = clamp((luminance - uThreshold + knee) / (2.0 * knee), 0.0, 1.0);
     float contribution = max(luminance - uThreshold, 0.0) + soft * soft * knee;
     float normalization = contribution / max(luminance, 0.0001);
-    FragColor = vec4(color * normalization, 1.0);
+    FragColor = vec4(color * normalization * 1.8, 1.0);
 }";
 
             const string blurFragment = @"#version 300 es

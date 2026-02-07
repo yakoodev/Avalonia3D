@@ -13,8 +13,8 @@ namespace Avalonia3D.Rendering
     public sealed record BloomProfile
     {
         public bool Enabled { get; init; } = true;
-        public float Threshold { get; init; } = 0.7f;
-        public float Intensity { get; init; } = 0.8f;
+        public float Threshold { get; init; } = 0.3f;
+        public float Intensity { get; init; } = 1.5f;
         public float Radius { get; init; } = 1.0f;
         public int Iterations { get; init; } = 4;
     }
@@ -83,8 +83,8 @@ namespace Avalonia3D.Rendering
                 Bloom = new BloomProfile
                 {
                     Enabled = false,
-                    Threshold = 0.95f,
-                    Intensity = 0.35f,
+                    Threshold = 0.25f,
+                    Intensity = 0.8f,
                     Radius = 0.75f,
                     Iterations = 2
                 }
@@ -120,8 +120,8 @@ namespace Avalonia3D.Rendering
                 Bloom = new BloomProfile
                 {
                     Enabled = true,
-                    Threshold = 0.72f,
-                    Intensity = 0.75f,
+                    Threshold = 0.35f,
+                    Intensity = 1.6f,
                     Radius = 1.0f,
                     Iterations = 4
                 }
@@ -157,8 +157,8 @@ namespace Avalonia3D.Rendering
                 Bloom = new BloomProfile
                 {
                     Enabled = true,
-                    Threshold = 0.6f,
-                    Intensity = 1.0f,
+                    Threshold = 0.25f,
+                    Intensity = 2.2f,
                     Radius = 1.2f,
                     Iterations = 5
                 }
