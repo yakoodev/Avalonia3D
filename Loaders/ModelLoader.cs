@@ -508,10 +508,10 @@ namespace Avalonia3D.Loaders
             }
 
             var hasFactorTransparency = material.BaseColorFactor.W < 0.999f;
-            if (!hasFactorTransparency && !material.HasTextureTransparency)
+            if (!hasFactorTransparency)
             {
-                // Fallback: BLEND без реальной прозрачности даёт артефакты сортировки/глубины,
-                // поэтому принудительно интерпретируем как OPAQUE до реализации transmission/refraction.
+                // В текущем рендерере texture-alpha для BLEND часто даёт ложные self-overlap артефакты
+                // (atlas/unused area), поэтому BLEND оставляем только при явной factor-прозрачности.
                 material.AlphaMode = MaterialAlphaMode.Opaque;
             }
         }
