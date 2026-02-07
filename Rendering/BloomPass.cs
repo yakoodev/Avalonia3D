@@ -1,6 +1,7 @@
 using Silk.NET.OpenGL;
 using System;
 using System.Collections.Generic;
+using Serilog;
 
 namespace Avalonia3D.Rendering
 {
@@ -19,6 +20,7 @@ namespace Avalonia3D.Rendering
         private int _cachedWidth;
         private int _cachedHeight;
         private bool _failed;
+        private bool _diagnosticsLogged;
 
         public BloomPass(GraphicsProfile settings)
         {
@@ -40,15 +42,7 @@ namespace Avalonia3D.Rendering
                 return;
             }
 
-            var threshold = bloom.Threshold;
-            var intensity = bloom.Intensity;
-            if (context.Scene.RenderMode == ShaderRenderMode.Unlit)
-            {
-                // В unlit-сценарии luminance часто ниже из-за отсутствия PBR lighting,
-                // поэтому адаптивно усиливаем Bloom без изменения глобального профиля.
-                threshold *= 0.25f;
-                intensity *= 2.5f;
-            }
+            var runtimeSettings = ResolveRuntimeSettings(bloom, context.Scene.RenderMode);
 
             var gl = context.Gl;
             if (!EnsurePrograms(gl) || !EnsureQuad(gl) || !EnsureTargets(gl, context.Width, context.Height, bloom.Iterations))
@@ -65,16 +59,18 @@ namespace Avalonia3D.Rendering
             gl.Disable(EnableCap.Blend);
             gl.BindVertexArray(_vao);
 
-            RenderBrightPass(gl, context.Width, context.Height, threshold);
+            RenderBrightPass(gl, context.Width, context.Height, runtimeSettings.Threshold, runtimeSettings.MinContribution);
             RenderDownsampleBlurChain(gl, bloom.Radius);
-            RenderComposite(gl, context.RenderContext.FrameState.OutputFramebufferId, intensity);
+            RenderComposite(gl, context.RenderContext.FrameState.OutputFramebufferId, runtimeSettings.Intensity);
+
+            LogDiagnosticsOnce(context, runtimeSettings);
 
             gl.BindVertexArray(0);
             gl.UseProgram(0);
             gl.Viewport(0, 0, (uint)context.Width, (uint)context.Height);
         }
 
-        private void RenderBrightPass(GL gl, int fullWidth, int fullHeight, float threshold)
+        private void RenderBrightPass(GL gl, int fullWidth, int fullHeight, float threshold, float minContribution)
         {
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, _levelFramebuffers[0]);
             gl.Viewport(0, 0, (uint)Math.Max(1, fullWidth / 2), (uint)Math.Max(1, fullHeight / 2));
@@ -84,6 +80,7 @@ namespace Avalonia3D.Rendering
             gl.BindTexture(TextureTarget.Texture2D, _sceneCopyTexture);
             gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uSceneTexture"), 0);
             gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uThreshold"), threshold);
+            gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uMinContribution"), minContribution);
             gl.DrawArrays(PrimitiveType.Triangles, 0, 6);
         }
 
@@ -214,13 +211,15 @@ in vec2 vUv;
 out vec4 FragColor;
 uniform sampler2D uSceneTexture;
 uniform float uThreshold;
+uniform float uMinContribution;
 void main()
 {
     vec3 color = texture(uSceneTexture, vUv).rgb;
-    float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
+    float luminance = max(max(color.r, color.g), color.b);
     float knee = max(uThreshold * 0.75, 0.0001);
     float soft = clamp((luminance - uThreshold + knee) / (2.0 * knee), 0.0, 1.0);
     float contribution = max(luminance - uThreshold, 0.0) + soft * soft * knee;
+    contribution = max(contribution, luminance * max(uMinContribution, 0.0));
     float normalization = contribution / max(luminance, 0.0001);
     FragColor = vec4(color * normalization * 1.8, 1.0);
 }";
@@ -316,7 +315,13 @@ void main()
             gl.DeleteShader(vertex);
             gl.DeleteShader(fragment);
 
-            return linked == 0 ? 0u : program;
+            if (linked == 0)
+            {
+                Log.Warning("BloomPass shader program link failed. Bloom pass is disabled for this session.");
+                return 0;
+            }
+
+            return program;
         }
 
         private static uint CompileShader(GL gl, ShaderType type, string source)
@@ -325,7 +330,45 @@ void main()
             gl.ShaderSource(shader, source);
             gl.CompileShader(shader);
             gl.GetShader(shader, ShaderParameterName.CompileStatus, out var status);
-            return status == 0 ? 0u : shader;
+            if (status == 0)
+            {
+                Log.Warning("BloomPass {ShaderType} compilation failed. Bloom pass is disabled for this session.", type);
+                return 0;
+            }
+
+            return shader;
+        }
+
+        private (float Threshold, float Intensity, float MinContribution) ResolveRuntimeSettings(BloomProfile bloom, ShaderRenderMode renderMode)
+        {
+            if (renderMode != ShaderRenderMode.Unlit)
+            {
+                return (bloom.Threshold, bloom.Intensity, 0f);
+            }
+
+            // Для unlit-сцен добавляем минимальный вклад, чтобы glow оставался заметным даже
+            // когда модель не содержит HDR-яркости и основная маска получается почти пустой.
+            return (bloom.Threshold * 0.25f, bloom.Intensity * 2.5f, 0.035f);
+        }
+
+        private void LogDiagnosticsOnce(RenderPipelineContext context, (float Threshold, float Intensity, float MinContribution) runtimeSettings)
+        {
+            if (_diagnosticsLogged)
+            {
+                return;
+            }
+
+            _diagnosticsLogged = true;
+            Log.Information(
+                "BloomPass active. Mode={Mode}, SourceFbo={SourceFbo}, Size={Width}x{Height}, Threshold={Threshold:0.###}, Intensity={Intensity:0.###}, MinContribution={MinContribution:0.###}, Levels={Levels}",
+                context.Scene.RenderMode,
+                context.RenderContext.FrameState.OutputFramebufferId,
+                context.Width,
+                context.Height,
+                runtimeSettings.Threshold,
+                runtimeSettings.Intensity,
+                runtimeSettings.MinContribution,
+                _levelTextures.Count);
         }
     }
 }
