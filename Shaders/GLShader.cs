@@ -52,6 +52,12 @@ namespace Avalonia3D.Shaders
         private int _environmentMapLocation = -1;
         private int _reflectionIntensityLocation = -1;
         private int _hasEnvironmentMapLocation = -1;
+        private int _transmissionFactorLocation = -1;
+        private int _transmissionThicknessLocation = -1;
+        private int _transmissionIorLocation = -1;
+        private int _transmissionAttenuationDistanceLocation = -1;
+        private int _transmissionAttenuationColorLocation = -1;
+        private int _hasTransmissionLocation = -1;
 
         public uint Handle => _shaderProgram;
         private GL _gl;
@@ -195,6 +201,12 @@ namespace Avalonia3D.Shaders
             _environmentMapLocation = _gl.GetUniformLocation(_shaderProgram, "uEnvironmentMap");
             _reflectionIntensityLocation = _gl.GetUniformLocation(_shaderProgram, "uReflectionIntensity");
             _hasEnvironmentMapLocation = _gl.GetUniformLocation(_shaderProgram, "uHasEnvironmentMap");
+            _transmissionFactorLocation = _gl.GetUniformLocation(_shaderProgram, "uTransmissionFactor");
+            _transmissionThicknessLocation = _gl.GetUniformLocation(_shaderProgram, "uTransmissionThickness");
+            _transmissionIorLocation = _gl.GetUniformLocation(_shaderProgram, "uTransmissionIor");
+            _transmissionAttenuationDistanceLocation = _gl.GetUniformLocation(_shaderProgram, "uTransmissionAttenuationDistance");
+            _transmissionAttenuationColorLocation = _gl.GetUniformLocation(_shaderProgram, "uTransmissionAttenuationColor");
+            _hasTransmissionLocation = _gl.GetUniformLocation(_shaderProgram, "uHasTransmission");
         }
 
         public unsafe void SetUniforms(IRenderContext renderContext, SceneObject sceneObject, Matrix4x4 lightSpaceMatrix = default)
@@ -321,6 +333,31 @@ namespace Avalonia3D.Shaders
 
             if (_hasEnvironmentMapLocation != -1)
                 _gl.Uniform1(_hasEnvironmentMapLocation, frameState.ReflectionsEnabled && frameState.EnvironmentReflectionTextureId.HasValue ? 1 : 0);
+
+            var hasTransmission = material?.HasTransmission == true && material.TransmissionFactor > 0.001f;
+            var transmissionFactor = material?.TransmissionFactor ?? 0f;
+            var transmissionThickness = material?.TransmissionThickness ?? 0f;
+            var transmissionIor = material?.TransmissionIor ?? 1.5f;
+            var transmissionAttenuationDistance = material?.TransmissionAttenuationDistance ?? float.PositiveInfinity;
+            var transmissionAttenuationColor = material?.TransmissionAttenuationColor ?? Vector3.One;
+
+            if (_transmissionFactorLocation != -1)
+                _gl.Uniform1(_transmissionFactorLocation, transmissionFactor);
+
+            if (_transmissionThicknessLocation != -1)
+                _gl.Uniform1(_transmissionThicknessLocation, transmissionThickness);
+
+            if (_transmissionIorLocation != -1)
+                _gl.Uniform1(_transmissionIorLocation, transmissionIor);
+
+            if (_transmissionAttenuationDistanceLocation != -1)
+                _gl.Uniform1(_transmissionAttenuationDistanceLocation, float.IsPositiveInfinity(transmissionAttenuationDistance) ? 1_000_000f : transmissionAttenuationDistance);
+
+            if (_transmissionAttenuationColorLocation != -1)
+                _gl.Uniform3(_transmissionAttenuationColorLocation, transmissionAttenuationColor.X, transmissionAttenuationColor.Y, transmissionAttenuationColor.Z);
+
+            if (_hasTransmissionLocation != -1)
+                _gl.Uniform1(_hasTransmissionLocation, hasTransmission ? 1 : 0);
         }
 
         public void BindMaterial(RenderResources resources, Material? material, uint? shadowMapId)

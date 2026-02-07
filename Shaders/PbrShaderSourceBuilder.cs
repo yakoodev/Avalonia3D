@@ -125,6 +125,13 @@ void main()
         sb.AppendLine("uniform int uAlphaMode;");
         sb.AppendLine("uniform float uEmissiveIntensity;");
         sb.AppendLine();
+        sb.AppendLine("uniform float uTransmissionFactor;");
+        sb.AppendLine("uniform float uTransmissionThickness;");
+        sb.AppendLine("uniform float uTransmissionIor;");
+        sb.AppendLine("uniform float uTransmissionAttenuationDistance;");
+        sb.AppendLine("uniform vec3 uTransmissionAttenuationColor;");
+        sb.AppendLine("uniform int uHasTransmission;");
+        sb.AppendLine();
     }
 
     private static void AppendShadowFunction(StringBuilder sb)
@@ -278,7 +285,7 @@ void main()
 
     vec3 reflection = ComputeEnvironmentReflection(norm, viewDir, roughness);
     vec3 totalEmissive = emissive + uEmissionColor;
-    vec3 result = resultLight * ao + totalEmissive + reflection;
+    vec3 surfaceResult = resultLight * ao + totalEmissive + reflection;
     float sampledAlpha = baseColor.a * uAlpha;
 
     if (uAlphaMode == 1 && sampledAlpha < uAlphaCutoff)
@@ -286,7 +293,23 @@ void main()
         discard;
     }}
 
-    float alpha = uAlphaMode == 2 ? sampledAlpha : 1.0;
+    vec3 transmittedLight = vec3(0.0);
+    if (uHasTransmission == 1)
+    {{
+        float transmission = clamp(uTransmissionFactor, 0.0, 1.0);
+        vec3 refractedDir = refract(-viewDir, norm, 1.0 / max(uTransmissionIor, 1.0));
+        float frontLighting = clamp(dot(-refractedDir, norm), 0.0, 1.0);
+        float thicknessFade = exp(-max(uTransmissionThickness, 0.0));
+        float attenuationDistance = max(uTransmissionAttenuationDistance, 0.0001);
+        vec3 attenuation = exp(-uTransmissionAttenuationColor * (uTransmissionThickness / attenuationDistance));
+        vec3 backgroundEstimate = vec3(0.5 + 0.5 * frontLighting) * attenuation * thicknessFade;
+        transmittedLight = backgroundEstimate * transmission;
+    }}
+
+    vec3 result = mix(surfaceResult, transmittedLight + totalEmissive, uHasTransmission == 1 ? clamp(uTransmissionFactor, 0.0, 1.0) : 0.0);
+    float alphaBase = uAlphaMode == 2 ? sampledAlpha : 1.0;
+    float transmissionAlpha = max(alphaBase, sampledAlpha);
+    float alpha = mix(alphaBase, transmissionAlpha, float(uHasTransmission));
 
     FragColor = vec4(result, alpha);
     EmissiveColor = vec4(max(totalEmissive, vec3(0.0)), alpha);

@@ -25,6 +25,8 @@ public sealed class DefaultSceneBootstrap : ISceneBootstrap
         scene.ShaderRegistry.Register(ShaderIds.PbrBaseColorNormalMetallicRoughness, glContext => GLShader.Create(glContext, PbrFeatures.BaseColorMap | PbrFeatures.NormalMap | PbrFeatures.MetallicRoughnessMap, validatedProfile.MaxLights));
         scene.ShaderRegistry.Register(ShaderIds.PbrBaseColorNormalMetallicRoughnessAoEmissive, glContext => GLShader.Create(glContext, PbrFeatures.BaseColorMap | PbrFeatures.NormalMap | PbrFeatures.MetallicRoughnessMap | PbrFeatures.OcclusionMap | PbrFeatures.EmissiveMap, validatedProfile.MaxLights));
         scene.ShaderRegistry.Register(ShaderIds.PbrFull, glContext => GLShader.Create(glContext, PbrFeatures.BaseColorMap | PbrFeatures.NormalMap | PbrFeatures.MetallicRoughnessMap | PbrFeatures.OcclusionMap | PbrFeatures.EmissiveMap | PbrFeatures.ReflectionsIbl, validatedProfile.MaxLights));
+        scene.ShaderRegistry.Register(ShaderIds.PbrTransmission, glContext => GLShader.Create(glContext, PbrFeatures.Transmission, validatedProfile.MaxLights));
+        scene.ShaderRegistry.Register(ShaderIds.PbrFullTransmission, glContext => GLShader.Create(glContext, PbrFeatures.BaseColorMap | PbrFeatures.NormalMap | PbrFeatures.MetallicRoughnessMap | PbrFeatures.OcclusionMap | PbrFeatures.EmissiveMap | PbrFeatures.ReflectionsIbl | PbrFeatures.Transmission, validatedProfile.MaxLights));
         scene.ShaderRegistry.Register(ShaderIds.Unlit, UnlitShader.Create);
         scene.ShaderRegistry.Register(ShaderIds.NormalsDebug, NormalsDebugShader.Create);
         scene.ShaderRegistry.SetDefault(ShaderIds.Pbr);

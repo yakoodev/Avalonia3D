@@ -56,6 +56,24 @@ namespace Avalonia3D.Loaders
             }
         }
 
+        private sealed record MaterialExtensionPayload(
+            float EmissiveStrength,
+            float TransmissionFactor,
+            float TransmissionThickness,
+            float TransmissionIor,
+            float TransmissionAttenuationDistance,
+            Vector3 TransmissionAttenuationColor)
+        {
+            public static MaterialExtensionPayload Default { get; } = new(
+                EmissiveStrength: 1f,
+                TransmissionFactor: 0f,
+                TransmissionThickness: 0f,
+                TransmissionIor: 1.5f,
+                TransmissionAttenuationDistance: float.PositiveInfinity,
+                TransmissionAttenuationColor: Vector3.One);
+        }
+
+
         private unsafe static long EstimateModelMemory(Model.Model m)
         {
             long v = (m.Vertices?.LongLength ?? 0) * sizeof(Vertex);
@@ -287,11 +305,17 @@ namespace Avalonia3D.Loaders
                 return;
             }
 
+            var extensionPayload = ReadMaterialExtensionPayload(material);
+
             target.AlphaMode = ParseAlphaMode(material.Alpha);
             target.AlphaCutoff = material.AlphaCutoff;
             target.DoubleSided = material.DoubleSided;
-            target.EmissiveIntensity = ReadEmissiveStrength(material);
-            target.TransmissionFactor = ReadTransmissionFactor(material);
+            target.EmissiveIntensity = extensionPayload.EmissiveStrength;
+            target.TransmissionFactor = extensionPayload.TransmissionFactor;
+            target.TransmissionThickness = extensionPayload.TransmissionThickness;
+            target.TransmissionIor = extensionPayload.TransmissionIor;
+            target.TransmissionAttenuationDistance = extensionPayload.TransmissionAttenuationDistance;
+            target.TransmissionAttenuationColor = extensionPayload.TransmissionAttenuationColor;
             target.HasTransmission = target.TransmissionFactor > 0.001f;
         }
 
@@ -305,19 +329,17 @@ namespace Avalonia3D.Loaders
             };
         }
 
-        private static float ReadEmissiveStrength(SharpGLTF.Schema2.Material material)
+        private static MaterialExtensionPayload ReadMaterialExtensionPayload(SharpGLTF.Schema2.Material material)
         {
-            const float fallback = 1f;
-
             if (material == null)
             {
-                return fallback;
+                return MaterialExtensionPayload.Default;
             }
 
-            if (TryReadEmissiveStrengthFromObject(material, out var directStrength))
-            {
-                return directStrength;
-            }
+            var payload = MaterialExtensionPayload.Default;
+            var context = new ExtensionReadContext();
+            TryReadExtensionValues(material, context, depth: 0);
+            payload = context.ToPayload(payload);
 
             try
             {
@@ -325,37 +347,79 @@ namespace Avalonia3D.Loaders
                 if (!string.IsNullOrWhiteSpace(extrasJson))
                 {
                     using var doc = JsonDocument.Parse(extrasJson);
-                    if (TryReadEmissiveStrengthFromJson(doc.RootElement, out var extrasStrength))
-                    {
-                        return extrasStrength;
-                    }
+                    payload = MergePayload(payload, ParseMaterialExtensions(doc.RootElement));
                 }
             }
             catch
             {
-                // ignored, fallback below
+                // ignored, fall through to defaults
             }
 
-            return fallback;
+            return payload;
         }
 
-        private static bool TryReadEmissiveStrengthFromObject(object source, out float strength)
+        private sealed class ExtensionReadContext
         {
-            strength = 1f;
-            if (source == null)
+            public float? EmissiveStrength { get; set; }
+            public float? TransmissionFactor { get; set; }
+            public float? TransmissionThickness { get; set; }
+            public float? TransmissionIor { get; set; }
+            public float? TransmissionAttenuationDistance { get; set; }
+            public Vector3? TransmissionAttenuationColor { get; set; }
+
+            public MaterialExtensionPayload ToPayload(MaterialExtensionPayload defaults)
             {
-                return false;
+                return defaults with
+                {
+                    EmissiveStrength = Math.Max(0f, EmissiveStrength ?? defaults.EmissiveStrength),
+                    TransmissionFactor = Math.Clamp(TransmissionFactor ?? defaults.TransmissionFactor, 0f, 1f),
+                    TransmissionThickness = Math.Max(0f, TransmissionThickness ?? defaults.TransmissionThickness),
+                    TransmissionIor = Math.Clamp(TransmissionIor ?? defaults.TransmissionIor, 1f, 3f),
+                    TransmissionAttenuationDistance = (TransmissionAttenuationDistance ?? defaults.TransmissionAttenuationDistance) > 0f
+                        ? (TransmissionAttenuationDistance ?? defaults.TransmissionAttenuationDistance)
+                        : float.PositiveInfinity,
+                    TransmissionAttenuationColor = TransmissionAttenuationColor ?? defaults.TransmissionAttenuationColor
+                };
+            }
+        }
+
+        private static void TryReadExtensionValues(object source, ExtensionReadContext context, int depth)
+        {
+            if (source == null || depth > 6)
+            {
+                return;
             }
 
-            var type = source.GetType();
-            foreach (var prop in type.GetProperties())
+            if (source is JsonElement jsonElement)
             {
-                var name = prop.Name;
-                object value;
+                MergeExtensionContext(context, ParseMaterialExtensions(jsonElement));
+                return;
+            }
 
+            if (source is string)
+            {
+                return;
+            }
+
+            if (source is System.Collections.IEnumerable enumerable)
+            {
+                foreach (var item in enumerable)
+                {
+                    if (item != null)
+                    {
+                        TryReadExtensionValues(item, context, depth + 1);
+                    }
+                }
+
+                return;
+            }
+
+            foreach (var property in source.GetType().GetProperties())
+            {
+                object value;
                 try
                 {
-                    value = prop.GetValue(source);
+                    value = property.GetValue(source);
                 }
                 catch
                 {
@@ -367,75 +431,99 @@ namespace Avalonia3D.Loaders
                     continue;
                 }
 
-                if (name.Contains("EmissiveStrength", StringComparison.OrdinalIgnoreCase) ||
-                    (name.Contains("Strength", StringComparison.OrdinalIgnoreCase) && name.Contains("Emissive", StringComparison.OrdinalIgnoreCase)))
+                var name = property.Name;
+                if (TryConvertToFloat(value, out var scalar))
                 {
-                    if (value is float f)
+                    if (name.Contains("EmissiveStrength", StringComparison.OrdinalIgnoreCase))
                     {
-                        strength = Math.Max(0f, f);
-                        return true;
+                        context.EmissiveStrength = scalar;
                     }
-
-                    if (value is double d)
+                    else if (name.Contains("TransmissionFactor", StringComparison.OrdinalIgnoreCase))
                     {
-                        strength = Math.Max(0f, (float)d);
-                        return true;
+                        context.TransmissionFactor = scalar;
+                    }
+                    else if (name.Contains("ThicknessFactor", StringComparison.OrdinalIgnoreCase) || name.Equals("Thickness", StringComparison.OrdinalIgnoreCase))
+                    {
+                        context.TransmissionThickness = scalar;
+                    }
+                    else if (name.Equals("Ior", StringComparison.OrdinalIgnoreCase) || name.Contains("Ior", StringComparison.OrdinalIgnoreCase) || name.Contains("Refraction", StringComparison.OrdinalIgnoreCase))
+                    {
+                        context.TransmissionIor = scalar;
+                    }
+                    else if (name.Contains("AttenuationDistance", StringComparison.OrdinalIgnoreCase))
+                    {
+                        context.TransmissionAttenuationDistance = scalar;
                     }
                 }
-
-                if (value is string)
+                else if ((name.Contains("AttenuationColor", StringComparison.OrdinalIgnoreCase) || name.Equals("Color", StringComparison.OrdinalIgnoreCase)) &&
+                         TryConvertToVector3(value, out var attenuationColor))
                 {
-                    continue;
-                }
-
-                if (value is System.Collections.IEnumerable sequence)
-                {
-                    foreach (var item in sequence)
-                    {
-                        if (item != null && TryReadEmissiveStrengthFromObject(item, out strength))
-                        {
-                            return true;
-                        }
-                    }
-
-                    continue;
+                    context.TransmissionAttenuationColor = attenuationColor;
                 }
 
                 if (name.Contains("Extension", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("Transmission", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("Volume", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("Ior", StringComparison.OrdinalIgnoreCase) ||
                     name.Contains("Emissive", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (TryReadEmissiveStrengthFromObject(value, out strength))
-                    {
-                        return true;
-                    }
+                    TryReadExtensionValues(value, context, depth + 1);
                 }
             }
-
-            return false;
         }
 
-        private static bool TryReadEmissiveStrengthFromJson(JsonElement element, out float strength)
+        private static bool TryConvertToFloat(object value, out float result)
         {
-            strength = 1f;
-            if (element.ValueKind != JsonValueKind.Object)
+            switch (value)
             {
-                return false;
+                case float f:
+                    result = f;
+                    return true;
+                case double d:
+                    result = (float)d;
+                    return true;
+                case decimal m:
+                    result = (float)m;
+                    return true;
+                case int i:
+                    result = i;
+                    return true;
+                case uint ui:
+                    result = ui;
+                    return true;
+                default:
+                    result = 0f;
+                    return false;
             }
+        }
 
-            if (element.TryGetProperty("KHR_materials_emissive_strength", out var ext) &&
-                ext.TryGetProperty("emissiveStrength", out var emissiveStrength) &&
-                emissiveStrength.ValueKind == JsonValueKind.Number &&
-                emissiveStrength.TryGetSingle(out var extValue))
+        private static bool TryConvertToVector3(object value, out Vector3 result)
+        {
+            result = default;
+
+            if (value is Vector3 v3)
             {
-                strength = Math.Max(0f, extValue);
+                result = v3;
                 return true;
             }
 
-            foreach (var property in element.EnumerateObject())
+            if (value is System.Collections.IEnumerable enumerable)
             {
-                if (property.Value.ValueKind == JsonValueKind.Object &&
-                    TryReadEmissiveStrengthFromJson(property.Value, out strength))
+                var values = new float[3];
+                var index = 0;
+                foreach (var item in enumerable)
                 {
+                    if (index >= 3 || item == null || !TryConvertToFloat(item, out values[index]))
+                    {
+                        break;
+                    }
+
+                    index++;
+                }
+
+                if (index == 3)
+                {
+                    result = new Vector3(values[0], values[1], values[2]);
                     return true;
                 }
             }
@@ -443,90 +531,137 @@ namespace Avalonia3D.Loaders
             return false;
         }
 
-
-        private static float ReadTransmissionFactor(SharpGLTF.Schema2.Material material)
+        private static void MergeExtensionContext(ExtensionReadContext context, MaterialExtensionPayload payload)
         {
-            if (material == null)
-            {
-                return 0f;
-            }
-
-            if (TryReadTransmissionFactorFromObject(material, out var factor))
-            {
-                return Math.Clamp(factor, 0f, 1f);
-            }
-
-            return 0f;
+            context.EmissiveStrength = payload.EmissiveStrength;
+            context.TransmissionFactor = payload.TransmissionFactor;
+            context.TransmissionThickness = payload.TransmissionThickness;
+            context.TransmissionIor = payload.TransmissionIor;
+            context.TransmissionAttenuationDistance = payload.TransmissionAttenuationDistance;
+            context.TransmissionAttenuationColor = payload.TransmissionAttenuationColor;
         }
 
-        private static bool TryReadTransmissionFactorFromObject(object source, out float factor)
+        private static MaterialExtensionPayload ParseMaterialExtensions(JsonElement root)
         {
-            factor = 0f;
-            if (source == null)
+            if (root.ValueKind != JsonValueKind.Object)
             {
-                return false;
+                return MaterialExtensionPayload.Default;
             }
 
-            foreach (var prop in source.GetType().GetProperties())
+            var payload = MaterialExtensionPayload.Default;
+            var extensionsNode = root;
+            if (root.TryGetProperty("extensions", out var explicitExtensions) && explicitExtensions.ValueKind == JsonValueKind.Object)
             {
-                object value;
-                try
-                {
-                    value = prop.GetValue(source);
-                }
-                catch
-                {
-                    continue;
-                }
-
-                if (value == null)
-                {
-                    continue;
-                }
-
-                if (prop.Name.Contains("TransmissionFactor", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (value is float f)
-                    {
-                        factor = f;
-                        return true;
-                    }
-
-                    if (value is double d)
-                    {
-                        factor = (float)d;
-                        return true;
-                    }
-                }
-
-                if (value is string)
-                {
-                    continue;
-                }
-
-                if (value is System.Collections.IEnumerable seq)
-                {
-                    foreach (var item in seq)
-                    {
-                        if (item != null && TryReadTransmissionFactorFromObject(item, out factor))
-                        {
-                            return true;
-                        }
-                    }
-
-                    continue;
-                }
-
-                if (prop.Name.Contains("Transmission", StringComparison.OrdinalIgnoreCase) || prop.Name.Contains("Extension", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (TryReadTransmissionFactorFromObject(value, out factor))
-                    {
-                        return true;
-                    }
-                }
+                extensionsNode = explicitExtensions;
             }
 
-            return false;
+            if (extensionsNode.TryGetProperty("KHR_materials_emissive_strength", out var emissiveStrengthExtension) &&
+                emissiveStrengthExtension.ValueKind == JsonValueKind.Object &&
+                emissiveStrengthExtension.TryGetProperty("emissiveStrength", out var emissiveStrengthNode) &&
+                emissiveStrengthNode.ValueKind == JsonValueKind.Number &&
+                emissiveStrengthNode.TryGetSingle(out var emissiveStrength))
+            {
+                payload = payload with { EmissiveStrength = Math.Max(0f, emissiveStrength) };
+            }
+
+            if (extensionsNode.TryGetProperty("KHR_materials_transmission", out var transmissionExtension) &&
+                transmissionExtension.ValueKind == JsonValueKind.Object)
+            {
+                var transmissionFactor = payload.TransmissionFactor;
+                if (transmissionExtension.TryGetProperty("transmissionFactor", out var transmissionFactorNode) &&
+                    transmissionFactorNode.ValueKind == JsonValueKind.Number &&
+                    transmissionFactorNode.TryGetSingle(out var parsedTransmissionFactor))
+                {
+                    transmissionFactor = Math.Clamp(parsedTransmissionFactor, 0f, 1f);
+                }
+
+                payload = payload with { TransmissionFactor = transmissionFactor };
+            }
+
+            if (extensionsNode.TryGetProperty("KHR_materials_volume", out var volumeExtension) &&
+                volumeExtension.ValueKind == JsonValueKind.Object)
+            {
+                var thickness = payload.TransmissionThickness;
+                if (volumeExtension.TryGetProperty("thicknessFactor", out var thicknessNode) &&
+                    thicknessNode.ValueKind == JsonValueKind.Number &&
+                    thicknessNode.TryGetSingle(out var parsedThickness))
+                {
+                    thickness = Math.Max(0f, parsedThickness);
+                }
+
+                var attenuationDistance = payload.TransmissionAttenuationDistance;
+                if (volumeExtension.TryGetProperty("attenuationDistance", out var attenuationDistanceNode) &&
+                    attenuationDistanceNode.ValueKind == JsonValueKind.Number &&
+                    attenuationDistanceNode.TryGetSingle(out var parsedDistance))
+                {
+                    attenuationDistance = parsedDistance > 0f ? parsedDistance : float.PositiveInfinity;
+                }
+
+                var attenuationColor = payload.TransmissionAttenuationColor;
+                if (volumeExtension.TryGetProperty("attenuationColor", out var attenuationColorNode) &&
+                    attenuationColorNode.ValueKind == JsonValueKind.Array)
+                {
+                    attenuationColor = ReadVector3(attenuationColorNode, attenuationColor);
+                }
+
+                payload = payload with
+                {
+                    TransmissionThickness = thickness,
+                    TransmissionAttenuationDistance = attenuationDistance,
+                    TransmissionAttenuationColor = attenuationColor
+                };
+            }
+
+            if (extensionsNode.TryGetProperty("KHR_materials_ior", out var iorExtension) &&
+                iorExtension.ValueKind == JsonValueKind.Object &&
+                iorExtension.TryGetProperty("ior", out var iorNode) &&
+                iorNode.ValueKind == JsonValueKind.Number &&
+                iorNode.TryGetSingle(out var ior))
+            {
+                payload = payload with { TransmissionIor = Math.Clamp(ior, 1f, 3f) };
+            }
+
+            return payload;
+        }
+
+        private static MaterialExtensionPayload MergePayload(MaterialExtensionPayload baseline, MaterialExtensionPayload parsed)
+        {
+            return baseline with
+            {
+                EmissiveStrength = parsed.EmissiveStrength,
+                TransmissionFactor = parsed.TransmissionFactor,
+                TransmissionThickness = parsed.TransmissionThickness,
+                TransmissionIor = parsed.TransmissionIor,
+                TransmissionAttenuationDistance = parsed.TransmissionAttenuationDistance,
+                TransmissionAttenuationColor = parsed.TransmissionAttenuationColor
+            };
+        }
+
+        private static Vector3 ReadVector3(JsonElement arrayNode, Vector3 fallback)
+        {
+            var values = new float[3];
+            var index = 0;
+            foreach (var item in arrayNode.EnumerateArray())
+            {
+                if (index >= 3)
+                {
+                    break;
+                }
+
+                if (item.ValueKind != JsonValueKind.Number || !item.TryGetSingle(out values[index]))
+                {
+                    return fallback;
+                }
+
+                index++;
+            }
+
+            if (index < 3)
+            {
+                return fallback;
+            }
+
+            return new Vector3(values[0], values[1], values[2]);
         }
 
         private static void ApplyAlphaFallbackForUnsupportedBlend(Avalonia3D.Model.Material material)

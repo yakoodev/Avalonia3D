@@ -18,8 +18,29 @@ namespace Avalonia3D.Model
         public bool DoubleSided { get; set; }
         public float EmissiveIntensity { get; set; } = 1f;
         public bool HasTextureTransparency { get; set; }
-        public bool HasTransmission { get; set; }
-        public float TransmissionFactor { get; set; }
+        public MaterialTransmissionSettings Transmission { get; set; } = new();
+
+        public bool HasTransmission
+        {
+            get => Transmission.Enabled;
+            set => Transmission.Enabled = value;
+        }
+
+        public float TransmissionFactor
+        {
+            get => Transmission.Factor;
+            set => Transmission.Factor = value;
+        }
+    }
+
+    public sealed class MaterialTransmissionSettings
+    {
+        public bool Enabled { get; set; }
+        public float Factor { get; set; }
+        public float Thickness { get; set; }
+        public float Ior { get; set; } = 1.5f;
+        public float AttenuationDistance { get; set; } = float.PositiveInfinity;
+        public Vector3 AttenuationColor { get; set; } = Vector3.One;
     }
 
     public class Material
@@ -73,6 +94,30 @@ namespace Avalonia3D.Model
         {
             get => Surface.TransmissionFactor;
             set => Surface.TransmissionFactor = value;
+        }
+
+        public float TransmissionThickness
+        {
+            get => Surface.Transmission.Thickness;
+            set => Surface.Transmission.Thickness = value;
+        }
+
+        public float TransmissionIor
+        {
+            get => Surface.Transmission.Ior;
+            set => Surface.Transmission.Ior = value;
+        }
+
+        public float TransmissionAttenuationDistance
+        {
+            get => Surface.Transmission.AttenuationDistance;
+            set => Surface.Transmission.AttenuationDistance = value;
+        }
+
+        public Vector3 TransmissionAttenuationColor
+        {
+            get => Surface.Transmission.AttenuationColor;
+            set => Surface.Transmission.AttenuationColor = value;
         }
 
         public TextureData? BaseColorTexture { get; set; }

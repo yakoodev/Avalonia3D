@@ -11,6 +11,7 @@ public enum PbrFeatures
     MetallicRoughnessMap = 1 << 2,
     OcclusionMap = 1 << 3,
     EmissiveMap = 1 << 4,
-    ReflectionsIbl = 1 << 5
+    ReflectionsIbl = 1 << 5,
+    Transmission = 1 << 6
 }
 
