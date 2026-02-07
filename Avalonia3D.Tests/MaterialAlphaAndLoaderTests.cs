@@ -105,6 +105,31 @@ public sealed class MaterialAlphaAndLoaderTests
     }
 
     [Fact]
+    public void TextureTransparencyHeuristic_PreservesTransparentLayer_WhenDenseDeepAndLowOpaque()
+    {
+        var method = typeof(ModelLoader).GetMethod("HasMeaningfulTextureTransparency", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var texture = new TextureData
+        {
+            Width = 16,
+            Height = 16,
+            Data = BuildTextureAlphaData(16, 16, 0)
+        };
+
+        // 10% пикселей делаем полностью непрозрачными: остаётся плотная прозрачность,
+        // но без масочного паттерна «много deep + много opaque».
+        for (var i = 0; i < 26; i++)
+        {
+            SetAlpha(texture.Data, pixelIndex: i, alpha: 255);
+        }
+
+        var result = (bool)method!.Invoke(null, new object?[] { texture })!;
+
+        Assert.True(result);
+    }
+
+    [Fact]
     public void TextureTransparencyHeuristic_IgnoresSparseNearOpaqueAlphaNoise()
     {
         var method = typeof(ModelLoader).GetMethod("HasMeaningfulTextureTransparency", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);

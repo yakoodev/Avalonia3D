@@ -18,6 +18,13 @@ namespace Avalonia3D.Loaders
 {
     public static class ModelLoader
     {
+        private enum TextureAlphaHeuristicProfile
+        {
+            Strict,
+            Balanced,
+            Permissive
+        }
+
         private static class TextureAlphaHeuristics
         {
             public const byte SoftTransparentAlphaThreshold = 253;
@@ -28,9 +35,25 @@ namespace Avalonia3D.Loaders
             public const int MaxSamples = 8192;
             public const float MinOpaqueRatio = 0.05f;
             public const float MinDeepTransparentRatio = 0.001f;
-            public const float MaxDeepTransparentRatio = 0.20f;
             public const float MinRegularTransparentRatio = 0.01f;
             public const float MinSoftTransparentRatio = 0.15f;
+
+            public const float DenseDeepMaskOpaqueRatio = 0.35f;
+            public const float StrictDenseDeepMaskRatio = 0.15f;
+            public const float BalancedDenseDeepMaskRatio = 0.20f;
+            public const float PermissiveDenseDeepMaskRatio = 0.35f;
+
+            public static TextureAlphaHeuristicProfile ActiveProfile { get; set; } = TextureAlphaHeuristicProfile.Balanced;
+
+            public static float GetDenseDeepMaskRatioThreshold()
+            {
+                return ActiveProfile switch
+                {
+                    TextureAlphaHeuristicProfile.Strict => StrictDenseDeepMaskRatio,
+                    TextureAlphaHeuristicProfile.Permissive => PermissiveDenseDeepMaskRatio,
+                    _ => BalancedDenseDeepMaskRatio,
+                };
+            }
         }
 
         private unsafe static long EstimateModelMemory(Model.Model m)
@@ -584,10 +607,12 @@ namespace Avalonia3D.Loaders
             }
 
             var deepTransparentRatio = deepTransparent / (float)sampled;
-            if (deepTransparentRatio > TextureAlphaHeuristics.MaxDeepTransparentRatio)
+            var denseDeepMaskThreshold = TextureAlphaHeuristics.GetDenseDeepMaskRatioThreshold();
+            if (deepTransparentRatio > denseDeepMaskThreshold &&
+                opaqueRatio >= TextureAlphaHeuristics.DenseDeepMaskOpaqueRatio)
             {
-                // Плотная глубокая alpha часто используется как служебный канал/маска экспорта,
-                // а не как физическая полупрозрачность материала.
+                // Плотная глубокая alpha вместе с заметной долей полностью непрозрачных пикселей
+                // обычно означает маску экспорта/вырез, а не полупрозрачную поверхность.
                 return false;
             }
 
