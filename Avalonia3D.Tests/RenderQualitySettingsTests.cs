@@ -74,6 +74,46 @@ public class RenderQualitySettingsTests
         Assert.False(string.IsNullOrWhiteSpace(high.EnvironmentMapPath));
     }
 
+
+    [Fact]
+    public void FromPreset_MediumAndHigh_HaveVisibleBloomDefaultsForLdrPipeline()
+    {
+        var medium = GraphicsProfile.Medium;
+        var high = GraphicsProfile.High;
+
+        Assert.True(medium.PostFx.Effects.HasFlag(PostEffectsFlags.Bloom));
+        Assert.True(high.PostFx.Effects.HasFlag(PostEffectsFlags.Bloom));
+        Assert.True(medium.PostFx.Bloom.Threshold < 1.0f);
+        Assert.True(high.PostFx.Bloom.Threshold < 1.0f);
+    }
+
+    [Fact]
+    public void Validate_ClampsBloomParameters()
+    {
+        var profile = GraphicsProfile.Medium with
+        {
+            PostFx = GraphicsProfile.Medium.PostFx with
+            {
+                Effects = PostEffectsFlags.Bloom,
+                Bloom = GraphicsProfile.Medium.PostFx.Bloom with
+                {
+                    Enabled = true,
+                    Threshold = -2f,
+                    Intensity = 99f,
+                    Radius = -1f,
+                    Iterations = 99
+                }
+            }
+        };
+
+        var validated = profile.Validate();
+
+        Assert.Equal(0f, validated.PostFx.Bloom.Threshold);
+        Assert.Equal(8f, validated.PostFx.Bloom.Intensity);
+        Assert.Equal(0.1f, validated.PostFx.Bloom.Radius);
+        Assert.Equal(8, validated.PostFx.Bloom.Iterations);
+    }
+
     [Fact]
     public void GraphicsProfile_JsonRoundTrip_KeepsQualityData()
     {

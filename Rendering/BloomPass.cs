@@ -198,7 +198,11 @@ void main()
 {
     vec3 color = texture(uSceneTexture, vUv).rgb;
     float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
-    FragColor = luminance > uThreshold ? vec4(color, 1.0) : vec4(0.0);
+    float knee = max(uThreshold * 0.5, 0.0001);
+    float soft = clamp((luminance - uThreshold + knee) / (2.0 * knee), 0.0, 1.0);
+    float contribution = max(luminance - uThreshold, 0.0) + soft * soft * knee;
+    float normalization = contribution / max(luminance, 0.0001);
+    FragColor = vec4(color * normalization, 1.0);
 }";
 
             const string blurFragment = @"#version 300 es

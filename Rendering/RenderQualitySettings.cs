@@ -56,7 +56,7 @@ namespace Avalonia3D.Rendering
         public ToneMappingOperator ToneMapping { get; init; } = ToneMappingOperator.Reinhard;
         public float Gamma { get; init; } = 2.2f;
         public bool BloomEnabled { get; init; } = true;
-        public float BloomThreshold { get; init; } = 1.0f;
+        public float BloomThreshold { get; init; } = 0.7f;
         public float BloomIntensity { get; init; } = 0.8f;
         public float BloomRadius { get; init; } = 1.0f;
         public int BloomIterations { get; init; } = 4;
