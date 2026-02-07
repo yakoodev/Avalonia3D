@@ -81,6 +81,47 @@ public class ShaderSelectionTests
         Assert.Same(scene.ShaderRegistry.Get(ShaderIds.PbrFull), selected);
     }
 
+
+    [Fact]
+    public void Select_UsesTransmissionShader_WhenMaterialHasTransmission()
+    {
+        var scene = CreateScene();
+        scene.BindRenderMode(ShaderRenderMode.Pbr, ShaderIds.Pbr);
+        scene.RenderMode = ShaderRenderMode.Pbr;
+
+        var material = new Material
+        {
+            HasTransmission = true,
+            TransmissionFactor = 0.9f
+        };
+
+        var selected = scene.ShaderSelectionPolicy.Select(material, scene, gl: null);
+
+        Assert.Same(scene.ShaderRegistry.Get(ShaderIds.PbrTransmission), selected);
+    }
+
+    [Fact]
+    public void Select_UsesFullTransmissionShader_WhenMaterialHasTransmissionAndFullFeatureSet()
+    {
+        var scene = CreateScene();
+        scene.EnvironmentLighting = scene.EnvironmentLighting with { ReflectionsEnabled = true, ReflectionMode = ReflectionMode.IBL };
+
+        var material = new Material
+        {
+            BaseColorTexture = new TextureData(),
+            NormalTexture = new TextureData(),
+            MetallicRoughnessTexture = new TextureData(),
+            OcclusionTexture = new TextureData(),
+            EmissiveTexture = new TextureData(),
+            HasTransmission = true,
+            TransmissionFactor = 1f
+        };
+
+        var selected = scene.ShaderSelectionPolicy.Select(material, scene, gl: null);
+
+        Assert.Same(scene.ShaderRegistry.Get(ShaderIds.PbrFullTransmission), selected);
+    }
+
     [Fact]
     public void Select_FallsBackToSceneDefault_WhenFeatureShaderMissing()
     {
@@ -126,6 +167,8 @@ public class ShaderSelectionTests
         scene.ShaderRegistry.RegisterInstance(ShaderIds.PbrBaseColorNormalMetallicRoughness, new StubShader());
         scene.ShaderRegistry.RegisterInstance(ShaderIds.PbrBaseColorNormalMetallicRoughnessAoEmissive, new StubShader());
         scene.ShaderRegistry.RegisterInstance(ShaderIds.PbrFull, new StubShader());
+        scene.ShaderRegistry.RegisterInstance(ShaderIds.PbrTransmission, new StubShader());
+        scene.ShaderRegistry.RegisterInstance(ShaderIds.PbrFullTransmission, new StubShader());
         scene.ShaderRegistry.RegisterInstance(ShaderIds.Unlit, new StubShader());
         scene.ShaderRegistry.SetDefault("fallback");
         scene.ActiveShaderId = ShaderIds.Pbr;

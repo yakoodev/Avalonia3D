@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Numerics;
 using Avalonia3D.Loaders;
 using Avalonia3D.Model;
 using Avalonia3D.Model.StandObjects;
@@ -274,6 +275,27 @@ public sealed class MaterialAlphaAndLoaderTests
         Assert.True(material.IsTransparent);
     }
 
+
+    [Fact]
+    public void LoadModels_TransmissionVolumeAndIor_ReadsExtendedTransmissionSettings()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"mat-loader-transmission-volume-{Guid.NewGuid():N}.gltf");
+        File.WriteAllText(path, GetTransmissionVolumeIorGltfJson());
+
+        var gltf = SharpGLTF.Schema2.ModelRoot.Load(path);
+        var models = ModelLoader.LoadModels(gltf);
+        File.Delete(path);
+        var material = Assert.Single(models).Material;
+
+        Assert.NotNull(material);
+        Assert.True(material!.HasTransmission);
+        Assert.InRange(material.TransmissionFactor, 0.799f, 0.801f);
+        Assert.InRange(material.TransmissionThickness, 0.299f, 0.301f);
+        Assert.InRange(material.TransmissionIor, 1.699f, 1.701f);
+        Assert.InRange(material.TransmissionAttenuationDistance, 1.999f, 2.001f);
+        Assert.Equal(new Vector3(0.9f, 0.8f, 0.7f), material.TransmissionAttenuationColor);
+    }
+
     [Fact]
     public void OpaqueMaterialDefaults_DoNotRegress()
     {
@@ -501,6 +523,64 @@ public sealed class MaterialAlphaAndLoaderTests
                 "baseColorFactor": [1,1,1,0.25],
                 "metallicFactor": 0,
                 "roughnessFactor": 0
+              }
+            }
+          ],
+          "buffers": [
+            {
+              "uri": "data:application/octet-stream;base64,AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAABAAIA",
+              "byteLength": 42
+            }
+          ],
+          "bufferViews": [
+            { "buffer": 0, "byteOffset": 0, "byteLength": 36, "target": 34962 },
+            { "buffer": 0, "byteOffset": 36, "byteLength": 6, "target": 34963 }
+          ],
+          "accessors": [
+            { "bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3", "min": [0,0,0], "max": [1,1,0] },
+            { "bufferView": 1, "componentType": 5123, "count": 3, "type": "SCALAR" }
+          ]
+        }
+        """;
+
+    private static string GetTransmissionVolumeIorGltfJson() =>
+        """
+        {
+          "asset": { "version": "2.0" },
+          "extensionsUsed": ["KHR_materials_transmission", "KHR_materials_volume", "KHR_materials_ior"],
+          "scenes": [ { "nodes": [0] } ],
+          "nodes": [ { "mesh": 0, "name": "n" } ],
+          "meshes": [
+            {
+              "primitives": [
+                {
+                  "attributes": { "POSITION": 0 },
+                  "indices": 1,
+                  "material": 0
+                }
+              ]
+            }
+          ],
+          "materials": [
+            {
+              "alphaMode": "OPAQUE",
+              "extensions": {
+                "KHR_materials_transmission": {
+                  "transmissionFactor": 0.8
+                },
+                "KHR_materials_volume": {
+                  "thicknessFactor": 0.3,
+                  "attenuationDistance": 2.0,
+                  "attenuationColor": [0.9, 0.8, 0.7]
+                },
+                "KHR_materials_ior": {
+                  "ior": 1.7
+                }
+              },
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [1,1,1,1],
+                "metallicFactor": 0,
+                "roughnessFactor": 0.4
               }
             }
           ],

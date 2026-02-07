@@ -43,6 +43,8 @@ public sealed class SandboxRenderer3D : IRenderContext
         Scene.Init(gl);
         Scene.ApplyGraphicsProfile(_renderPipeline.Profile);
         Scene.ShaderRegistry.Register(ShaderIds.Pbr, glContext => GLShader.Create(glContext, PbrFeatures.None, _renderPipeline.Profile.MaxLights));
+        Scene.ShaderRegistry.Register(ShaderIds.PbrTransmission, glContext => GLShader.Create(glContext, PbrFeatures.Transmission, _renderPipeline.Profile.MaxLights));
+        Scene.ShaderRegistry.Register(ShaderIds.PbrFullTransmission, glContext => GLShader.Create(glContext, PbrFeatures.BaseColorMap | PbrFeatures.NormalMap | PbrFeatures.MetallicRoughnessMap | PbrFeatures.OcclusionMap | PbrFeatures.EmissiveMap | PbrFeatures.ReflectionsIbl | PbrFeatures.Transmission, _renderPipeline.Profile.MaxLights));
         Scene.ShaderRegistry.Register(ShaderIds.Unlit, UnlitShader.Create);
         Scene.ShaderRegistry.Register(ShaderIds.NormalsDebug, NormalsDebugShader.Create);
         Scene.ShaderRegistry.SetDefault(ShaderIds.Pbr);

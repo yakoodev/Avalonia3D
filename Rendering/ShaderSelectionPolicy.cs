@@ -60,6 +60,22 @@ public sealed class ShaderSelectionPolicy
     public static string ResolvePbrShaderId(Material material, Scene3D scene)
     {
         var features = BuildPbrFeatures(material, scene);
+
+        var isTransmission = features.HasFlag(PbrFeatures.Transmission);
+        var hasCoreMaps = HasAll(features, PbrFeatures.BaseColorMap, PbrFeatures.NormalMap, PbrFeatures.MetallicRoughnessMap);
+        var hasAoEmissive = HasAll(features, PbrFeatures.OcclusionMap, PbrFeatures.EmissiveMap);
+        var hasIbl = features.HasFlag(PbrFeatures.ReflectionsIbl);
+
+        if (isTransmission && hasCoreMaps && hasAoEmissive && hasIbl)
+        {
+            return ShaderIds.PbrFullTransmission;
+        }
+
+        if (isTransmission)
+        {
+            return ShaderIds.PbrTransmission;
+        }
+
         return features switch
         {
             PbrFeatures.BaseColorMap => ShaderIds.PbrBaseColor,
@@ -105,6 +121,11 @@ public sealed class ShaderSelectionPolicy
             features |= PbrFeatures.ReflectionsIbl;
         }
 
+        if (material.HasTransmission && material.TransmissionFactor > 0.001f)
+        {
+            features |= PbrFeatures.Transmission;
+        }
+
         return features;
     }
 
@@ -121,5 +142,18 @@ public sealed class ShaderSelectionPolicy
     private static bool IsPbrShaderId(string shaderId)
     {
         return shaderId.StartsWith(ShaderIds.Pbr, StringComparison.Ordinal);
+    }
+
+    private static bool HasAll(PbrFeatures value, params PbrFeatures[] flags)
+    {
+        foreach (var flag in flags)
+        {
+            if (!value.HasFlag(flag))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
