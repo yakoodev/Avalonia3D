@@ -307,14 +307,9 @@ void main()
     }}
 
     vec3 result = mix(surfaceResult, transmittedLight + totalEmissive, uHasTransmission == 1 ? clamp(uTransmissionFactor, 0.0, 1.0) : 0.0);
-    float alpha = uAlphaMode == 2 ? sampledAlpha : 1.0;
-    if (uHasTransmission == 1)
-    {{
-        // Transmission-путь отделен от обычного alpha-освещения,
-        // но сохраняет прозрачность геометрии (например, стекла),
-        // чтобы при приближении камера не теряла видимость сцены через материал.
-        alpha = max(alpha, sampledAlpha);
-    }}
+    float alphaBase = uAlphaMode == 2 ? sampledAlpha : 1.0;
+    float transmissionAlpha = max(alphaBase, sampledAlpha);
+    float alpha = mix(alphaBase, transmissionAlpha, float(uHasTransmission));
 
     FragColor = vec4(result, alpha);
     EmissiveColor = vec4(max(totalEmissive, vec3(0.0)), alpha);
