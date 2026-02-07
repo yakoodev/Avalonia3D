@@ -279,12 +279,14 @@ void main()
     vec3 reflection = ComputeEnvironmentReflection(norm, viewDir, roughness);
     vec3 totalEmissive = emissive + uEmissionColor;
     vec3 result = resultLight * ao + totalEmissive + reflection;
-    float alpha = baseColor.a * uAlpha;
+    float sampledAlpha = baseColor.a * uAlpha;
 
-    if (uAlphaMode == 1 && alpha < uAlphaCutoff)
+    if (uAlphaMode == 1 && sampledAlpha < uAlphaCutoff)
     {{
         discard;
     }}
+
+    float alpha = uAlphaMode == 2 ? sampledAlpha : 1.0;
 
     FragColor = vec4(result, alpha);
     EmissiveColor = vec4(max(totalEmissive, vec3(0.0)), alpha);

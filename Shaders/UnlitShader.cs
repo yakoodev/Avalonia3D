@@ -17,6 +17,8 @@ public sealed class UnlitShader : IShader3D
     private int _baseColorMapLocation = -1;
     private int _hasBaseColorMapLocation = -1;
     private int _alphaLocation = -1;
+    private int _alphaModeLocation = -1;
+    private int _alphaCutoffLocation = -1;
 
     public uint Handle => _program;
 
@@ -45,7 +47,9 @@ public sealed class UnlitShader : IShader3D
 
         var material = (sceneObject as IMaterialProvider)?.Material;
         var baseColorFactor = material?.BaseColorFactor ?? new Vector4(sceneObject.BaseColor, 1f);
-        var alpha = material?.Opacity ?? sceneObject.Opacity;
+        var alpha = sceneObject.Opacity;
+        var alphaMode = material?.AlphaMode ?? (alpha < 0.999f ? MaterialAlphaMode.Blend : MaterialAlphaMode.Opaque);
+        var alphaCutoff = material?.AlphaCutoff ?? 0.5f;
 
         if (_baseColorFactorLocation != -1)
         {
@@ -55,6 +59,16 @@ public sealed class UnlitShader : IShader3D
         if (_alphaLocation != -1)
         {
             _gl.Uniform1(_alphaLocation, alpha);
+        }
+
+        if (_alphaModeLocation != -1)
+        {
+            _gl.Uniform1(_alphaModeLocation, (int)alphaMode);
+        }
+
+        if (_alphaCutoffLocation != -1)
+        {
+            _gl.Uniform1(_alphaCutoffLocation, alphaCutoff);
         }
     }
 
@@ -107,6 +121,8 @@ uniform vec4 uBaseColorFactor;
 uniform sampler2D uBaseColorMap;
 uniform int uHasBaseColorMap;
 uniform float uAlpha;
+uniform int uAlphaMode;
+uniform float uAlphaCutoff;
 void main()
 {
     vec4 color = uBaseColorFactor;
@@ -115,7 +131,14 @@ void main()
         color *= texture(uBaseColorMap, TexCoord);
     }
 
-    FragColor = vec4(color.rgb, color.a * uAlpha);
+    float sampledAlpha = color.a * uAlpha;
+    if (uAlphaMode == 1 && sampledAlpha < uAlphaCutoff)
+    {
+        discard;
+    }
+
+    float alpha = uAlphaMode == 2 ? sampledAlpha : 1.0;
+    FragColor = vec4(color.rgb, alpha);
 }";
 
         uint vertex = Compile(ShaderType.VertexShader, vert);
@@ -146,5 +169,7 @@ void main()
         _baseColorMapLocation = _gl.GetUniformLocation(_program, "uBaseColorMap");
         _hasBaseColorMapLocation = _gl.GetUniformLocation(_program, "uHasBaseColorMap");
         _alphaLocation = _gl.GetUniformLocation(_program, "uAlpha");
+        _alphaModeLocation = _gl.GetUniformLocation(_program, "uAlphaMode");
+        _alphaCutoffLocation = _gl.GetUniformLocation(_program, "uAlphaCutoff");
     }
 }
