@@ -79,6 +79,31 @@ public sealed class MaterialAlphaAndLoaderTests
     }
 
 
+
+    [Fact]
+    public void TextureTransparencyHeuristic_IgnoresDenseDeepTransparencyMasks()
+    {
+        var method = typeof(ModelLoader).GetMethod("HasMeaningfulTextureTransparency", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var texture = new TextureData
+        {
+            Width = 16,
+            Height = 16,
+            Data = BuildTextureAlphaData(16, 16, 255)
+        };
+
+        // Эмулируем плотную маску: 25% пикселей с глубокой прозрачностью.
+        for (var i = 0; i < 64; i++)
+        {
+            SetAlpha(texture.Data, pixelIndex: i, alpha: 0);
+        }
+
+        var result = (bool)method!.Invoke(null, new object?[] { texture })!;
+
+        Assert.False(result);
+    }
+
     [Fact]
     public void TextureTransparencyHeuristic_IgnoresSparseNearOpaqueAlphaNoise()
     {

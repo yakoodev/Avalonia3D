@@ -28,6 +28,7 @@ namespace Avalonia3D.Loaders
             public const int MaxSamples = 8192;
             public const float MinOpaqueRatio = 0.05f;
             public const float MinDeepTransparentRatio = 0.001f;
+            public const float MaxDeepTransparentRatio = 0.20f;
             public const float MinRegularTransparentRatio = 0.01f;
             public const float MinSoftTransparentRatio = 0.15f;
         }
@@ -583,6 +584,13 @@ namespace Avalonia3D.Loaders
             }
 
             var deepTransparentRatio = deepTransparent / (float)sampled;
+            if (deepTransparentRatio > TextureAlphaHeuristics.MaxDeepTransparentRatio)
+            {
+                // Плотная глубокая alpha часто используется как служебный канал/маска экспорта,
+                // а не как физическая полупрозрачность материала.
+                return false;
+            }
+
             if (deepTransparentRatio >= TextureAlphaHeuristics.MinDeepTransparentRatio)
             {
                 return true;
