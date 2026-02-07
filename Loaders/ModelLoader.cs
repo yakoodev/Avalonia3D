@@ -254,6 +254,8 @@ namespace Avalonia3D.Loaders
             target.AlphaCutoff = material.AlphaCutoff;
             target.DoubleSided = material.DoubleSided;
             target.EmissiveIntensity = ReadEmissiveStrength(material);
+            target.TransmissionFactor = ReadTransmissionFactor(material);
+            target.HasTransmission = target.TransmissionFactor > 0.001f;
         }
 
         private static MaterialAlphaMode ParseAlphaMode(AlphaMode alphaMode)
@@ -404,10 +406,104 @@ namespace Avalonia3D.Loaders
             return false;
         }
 
+
+        private static float ReadTransmissionFactor(SharpGLTF.Schema2.Material material)
+        {
+            if (material == null)
+            {
+                return 0f;
+            }
+
+            if (TryReadTransmissionFactorFromObject(material, out var factor))
+            {
+                return Math.Clamp(factor, 0f, 1f);
+            }
+
+            return 0f;
+        }
+
+        private static bool TryReadTransmissionFactorFromObject(object source, out float factor)
+        {
+            factor = 0f;
+            if (source == null)
+            {
+                return false;
+            }
+
+            foreach (var prop in source.GetType().GetProperties())
+            {
+                object value;
+                try
+                {
+                    value = prop.GetValue(source);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (value == null)
+                {
+                    continue;
+                }
+
+                if (prop.Name.Contains("TransmissionFactor", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (value is float f)
+                    {
+                        factor = f;
+                        return true;
+                    }
+
+                    if (value is double d)
+                    {
+                        factor = (float)d;
+                        return true;
+                    }
+                }
+
+                if (value is string)
+                {
+                    continue;
+                }
+
+                if (value is System.Collections.IEnumerable seq)
+                {
+                    foreach (var item in seq)
+                    {
+                        if (item != null && TryReadTransmissionFactorFromObject(item, out factor))
+                        {
+                            return true;
+                        }
+                    }
+
+                    continue;
+                }
+
+                if (prop.Name.Contains("Transmission", StringComparison.OrdinalIgnoreCase) || prop.Name.Contains("Extension", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (TryReadTransmissionFactorFromObject(value, out factor))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
         private static void ApplyAlphaFallbackForUnsupportedBlend(Avalonia3D.Model.Material material)
         {
             if (material == null || material.AlphaMode != MaterialAlphaMode.Blend)
             {
+                return;
+            }
+
+            if (material.HasTransmission)
+            {
+                // transmission extension пока не реализовано физически корректно;
+                // в текущем пайплайне BLEND делает такие части почти невидимыми.
+                material.AlphaMode = MaterialAlphaMode.Opaque;
                 return;
             }
 
@@ -442,7 +538,7 @@ namespace Avalonia3D.Loaders
             for (int i = 3; i < data.Length; i += step)
             {
                 sampled++;
-                if (data[i] < 245)
+                if (data[i] < 240)
                 {
                     transparent++;
                 }
@@ -454,7 +550,7 @@ namespace Avalonia3D.Loaders
             }
 
             var transparencyRatio = transparent / (float)sampled;
-            return transparencyRatio > 0.005f;
+            return transparencyRatio > 0.05f;
         }
 
         private static TextureData? LoadTextureFromChannel(MaterialChannel? channel)

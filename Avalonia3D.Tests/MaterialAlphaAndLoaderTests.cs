@@ -108,6 +108,24 @@ public sealed class MaterialAlphaAndLoaderTests
         Assert.False(material.IsTransparent);
     }
 
+
+    [Fact]
+    public void LoadModels_TransmissionBlend_FallsBackToOpaqueForCurrentPipeline()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"mat-loader-transmission-{Guid.NewGuid():N}.gltf");
+        File.WriteAllText(path, GetTransmissionBlendGltfJson());
+
+        var gltf = SharpGLTF.Schema2.ModelRoot.Load(path);
+        var models = ModelLoader.LoadModels(gltf);
+        File.Delete(path);
+        var material = Assert.Single(models).Material;
+
+        Assert.NotNull(material);
+        Assert.True(material!.HasTransmission);
+        Assert.Equal(MaterialAlphaMode.Opaque, material.AlphaMode);
+        Assert.False(material.IsTransparent);
+    }
+
     [Fact]
     public void OpaqueMaterialDefaults_DoNotRegress()
     {
@@ -240,6 +258,56 @@ public sealed class MaterialAlphaAndLoaderTests
                 "baseColorFactor": [1,1,1,1],
                 "metallicFactor": 0,
                 "roughnessFactor": 1
+              }
+            }
+          ],
+          "buffers": [
+            {
+              "uri": "data:application/octet-stream;base64,AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAABAAIA",
+              "byteLength": 42
+            }
+          ],
+          "bufferViews": [
+            { "buffer": 0, "byteOffset": 0, "byteLength": 36, "target": 34962 },
+            { "buffer": 0, "byteOffset": 36, "byteLength": 6, "target": 34963 }
+          ],
+          "accessors": [
+            { "bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3", "min": [0,0,0], "max": [1,1,0] },
+            { "bufferView": 1, "componentType": 5123, "count": 3, "type": "SCALAR" }
+          ]
+        }
+        """;
+
+    private static string GetTransmissionBlendGltfJson() =>
+        """
+        {
+          "asset": { "version": "2.0" },
+          "extensionsUsed": ["KHR_materials_transmission"],
+          "scenes": [ { "nodes": [0] } ],
+          "nodes": [ { "mesh": 0, "name": "n" } ],
+          "meshes": [
+            {
+              "primitives": [
+                {
+                  "attributes": { "POSITION": 0 },
+                  "indices": 1,
+                  "material": 0
+                }
+              ]
+            }
+          ],
+          "materials": [
+            {
+              "alphaMode": "BLEND",
+              "extensions": {
+                "KHR_materials_transmission": {
+                  "transmissionFactor": 1.0
+                }
+              },
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [1,1,1,0.25],
+                "metallicFactor": 0,
+                "roughnessFactor": 0
               }
             }
           ],

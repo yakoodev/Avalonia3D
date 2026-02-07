@@ -18,6 +18,8 @@ namespace Avalonia3D.Model
         public bool DoubleSided { get; set; }
         public float EmissiveIntensity { get; set; } = 1f;
         public bool HasTextureTransparency { get; set; }
+        public bool HasTransmission { get; set; }
+        public float TransmissionFactor { get; set; }
     }
 
     public class Material
@@ -59,6 +61,18 @@ namespace Avalonia3D.Model
         {
             get => Surface.HasTextureTransparency;
             set => Surface.HasTextureTransparency = value;
+        }
+
+        public bool HasTransmission
+        {
+            get => Surface.HasTransmission;
+            set => Surface.HasTransmission = value;
+        }
+
+        public float TransmissionFactor
+        {
+            get => Surface.TransmissionFactor;
+            set => Surface.TransmissionFactor = value;
         }
 
         public TextureData? BaseColorTexture { get; set; }
