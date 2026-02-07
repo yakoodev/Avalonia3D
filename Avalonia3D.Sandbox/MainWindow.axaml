@@ -44,6 +44,17 @@
                         <StackPanel Spacing="6">
                           <TextBlock Text="{Binding Title}" FontWeight="Bold" Foreground="White" />
                           <TextBlock Text="{Binding Description}" Foreground="#CFCFCF" TextWrapping="Wrap" />
+                          <WrapPanel Orientation="Horizontal" Margin="0,2,0,0">
+                            <Border Background="#3E4454" CornerRadius="12" Padding="8,2" Margin="0,0,6,4">
+                              <TextBlock Text="{Binding FileNameBadge}" Foreground="#EAF1FF" FontSize="11" />
+                            </Border>
+                            <Border Background="#2F4A3A" CornerRadius="12" Padding="8,2" Margin="0,0,6,4">
+                              <TextBlock Text="{Binding DirectoryBadge}" Foreground="#D5F7E1" FontSize="11" />
+                            </Border>
+                            <Border Background="#4D344D" CornerRadius="12" Padding="8,2" Margin="0,0,6,4">
+                              <TextBlock Text="{Binding ExtensionBadge}" Foreground="#F8D7FF" FontSize="11" />
+                            </Border>
+                          </WrapPanel>
                           <Button Content="Открыть сцену" Command="{Binding LoadCommand}" HorizontalAlignment="Left" />
                         </StackPanel>
                       </Border>

@@ -65,6 +65,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 new SceneItemViewModel(
                     sceneInfo.Title,
                     sceneInfo.Description,
+                    sceneInfo is GltfFileScene gltfScene ? gltfScene.FileName : sceneInfo.Title,
+                    sceneInfo is GltfFileScene gltfSceneDir ? gltfSceneDir.Directory : "n/a",
+                    sceneInfo is GltfFileScene gltfSceneExt ? gltfSceneExt.Extension : "internal",
                     new RelayCommand(_ => _sceneLoader.Load(sceneInfo)))));
 
         ShaderModes = new ObservableCollection<ShaderRenderMode>(new[]
@@ -80,6 +83,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             RenderQualityPreset.Low,
             RenderQualityPreset.Medium,
             RenderQualityPreset.High,
+            RenderQualityPreset.Ultra,
             RenderQualityPreset.Custom
         });
 

@@ -56,6 +56,7 @@ public class RenderQualitySettingsTests
         Assert.Equal(ReflectionMode.IBL, RenderQualitySettings.FromPreset(RenderQualityPreset.High).ReflectionMode);
         Assert.Equal(2, RenderQualitySettings.FromPreset(RenderQualityPreset.Low).MaxLights);
         Assert.Equal(8, RenderQualitySettings.FromPreset(RenderQualityPreset.High).MaxLights);
+        Assert.Equal(RenderQualitySettings.MaxSupportedLights, RenderQualitySettings.FromPreset(RenderQualityPreset.Ultra).MaxLights);
 
         var custom = new RenderQualitySettings { ShadowMapSize = 777, MaxLights = 7 };
         var fromCustom = RenderQualitySettings.FromPreset(RenderQualityPreset.Custom, custom);
@@ -69,9 +70,53 @@ public class RenderQualitySettingsTests
     {
         var medium = RenderQualitySettings.FromPreset(RenderQualityPreset.Medium);
         var high = RenderQualitySettings.FromPreset(RenderQualityPreset.High);
+        var ultra = RenderQualitySettings.FromPreset(RenderQualityPreset.Ultra);
 
         Assert.False(string.IsNullOrWhiteSpace(medium.EnvironmentMapPath));
         Assert.False(string.IsNullOrWhiteSpace(high.EnvironmentMapPath));
+        Assert.False(string.IsNullOrWhiteSpace(ultra.EnvironmentMapPath));
+    }
+
+
+    [Fact]
+    public void FromPreset_MediumAndHigh_HaveVisibleBloomDefaultsForLdrPipeline()
+    {
+        var medium = GraphicsProfile.Medium;
+        var high = GraphicsProfile.High;
+
+        Assert.True(medium.PostFx.Effects.HasFlag(PostEffectsFlags.Bloom));
+        Assert.True(high.PostFx.Effects.HasFlag(PostEffectsFlags.Bloom));
+        Assert.True(GraphicsProfile.Ultra.PostFx.Effects.HasFlag(PostEffectsFlags.Bloom));
+        Assert.True(medium.PostFx.Bloom.Threshold < 1.0f);
+        Assert.True(high.PostFx.Bloom.Threshold < 1.0f);
+        Assert.True(GraphicsProfile.Ultra.PostFx.Bloom.Intensity >= high.PostFx.Bloom.Intensity);
+    }
+
+    [Fact]
+    public void Validate_ClampsBloomParameters()
+    {
+        var profile = GraphicsProfile.Medium with
+        {
+            PostFx = GraphicsProfile.Medium.PostFx with
+            {
+                Effects = PostEffectsFlags.Bloom,
+                Bloom = GraphicsProfile.Medium.PostFx.Bloom with
+                {
+                    Enabled = true,
+                    Threshold = -2f,
+                    Intensity = 99f,
+                    Radius = -1f,
+                    Iterations = 99
+                }
+            }
+        };
+
+        var validated = profile.Validate();
+
+        Assert.Equal(0f, validated.PostFx.Bloom.Threshold);
+        Assert.Equal(8f, validated.PostFx.Bloom.Intensity);
+        Assert.Equal(0.1f, validated.PostFx.Bloom.Radius);
+        Assert.Equal(8, validated.PostFx.Bloom.Iterations);
     }
 
     [Fact]

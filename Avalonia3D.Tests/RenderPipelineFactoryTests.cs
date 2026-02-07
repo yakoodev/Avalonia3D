@@ -16,17 +16,18 @@ public class RenderPipelineFactoryTests
 
         Assert.DoesNotContain("ShadowPass", names);
         Assert.DoesNotContain("EnvironmentLightingPass", names);
+        Assert.DoesNotContain("BloomPass", names);
         Assert.Contains("ForwardPass", names);
         Assert.Contains("PostEffectsPass", names);
     }
 
     [Fact]
-    public void CreatePasses_HighPreset_IncludesShadowEnvironmentForwardAndPostEffects()
+    public void CreatePasses_HighPreset_IncludesBloomBeforePostEffects()
     {
         var passes = _factory.CreatePasses(GraphicsProfile.High);
         var names = passes.Select(p => p.Name).ToArray();
 
-        Assert.Equal(new[] { "ShadowPass", "EnvironmentLightingPass", "ForwardPass", "PostEffectsPass" }, names);
+        Assert.Equal(new[] { "ShadowPass", "EnvironmentLightingPass", "ForwardPass", "BloomPass", "PostEffectsPass" }, names);
     }
 
     [Theory]
@@ -62,6 +63,27 @@ public class RenderPipelineFactoryTests
         var names = passes.Select(p => p.Name).ToArray();
 
         Assert.DoesNotContain("PostEffectsPass", names);
+        Assert.DoesNotContain("BloomPass", names);
         Assert.Equal(new[] { "ShadowPass", "EnvironmentLightingPass", "ForwardPass" }, names);
+    }
+
+    [Fact]
+    public void CreatePasses_OnlyBloom_KeepsPipelineModularWithoutToneGammaPass()
+    {
+        var settings = GraphicsProfile.Medium with
+        {
+            PostFx = GraphicsProfile.Medium.PostFx with
+            {
+                Effects = PostEffectsFlags.Bloom,
+                ToneMapping = ToneMappingOperator.None,
+                Bloom = GraphicsProfile.Medium.PostFx.Bloom with { Enabled = true }
+            }
+        };
+
+        var passes = _factory.CreatePasses(settings);
+        var names = passes.Select(p => p.Name).ToArray();
+
+        Assert.Contains("BloomPass", names);
+        Assert.DoesNotContain("PostEffectsPass", names);
     }
 }
