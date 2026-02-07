@@ -180,6 +180,45 @@ namespace Avalonia3D.Rendering
             MaxLights = 8
         };
 
+
+
+        public static GraphicsProfile Ultra => new()
+        {
+            Name = "Ultra",
+            QualityPreset = RenderQualityPreset.Ultra,
+            MsaaPolicy = MsaaPolicy.X8,
+            Shadows = new ShadowProfile { Enabled = true, MapSize = 8192 },
+            PostFx = new PostFxProfile
+            {
+                Effects = PostEffectsFlags.ToneMapping | PostEffectsFlags.GammaCorrection | PostEffectsFlags.Bloom,
+                ToneMapping = ToneMappingOperator.Reinhard,
+                Gamma = 2.2f,
+                Bloom = new BloomProfile
+                {
+                    Enabled = true,
+                    Threshold = 0.02f,
+                    Intensity = 8.0f,
+                    Radius = 2.0f,
+                    Iterations = 8
+                }
+            },
+            Reflections = new ReflectionProfile
+            {
+                Enabled = true,
+                Mode = ReflectionMode.IBL,
+                Intensity = 1.0f,
+                EnvironmentMapPath = DefaultEnvironmentMapPath
+            },
+            PbrTuning = new PbrTuningProfile
+            {
+                Exposure = 1.2f,
+                IblIntensity = 1.5f,
+                AmbientOcclusionStrength = 1.3f
+            },
+            Background = new BackgroundProfile { Red = 0.02f, Green = 0.03f, Blue = 0.05f },
+            MaxLights = RenderQualitySettings.MaxSupportedLights
+        };
+
         public GraphicsProfile Validate()
         {
             var validatedShadows = (Shadows ?? new ShadowProfile()) with
@@ -259,6 +298,7 @@ namespace Avalonia3D.Rendering
                 RenderQualityPreset.Low => Low,
                 RenderQualityPreset.Medium => Medium,
                 RenderQualityPreset.High => High,
+                RenderQualityPreset.Ultra => Ultra,
                 RenderQualityPreset.Custom => current ?? Medium,
                 _ => Medium
             };

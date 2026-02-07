@@ -38,6 +38,7 @@ namespace Avalonia3D.Rendering
         Low,
         Medium,
         High,
+        Ultra,
         Custom
     }
 
@@ -70,6 +71,7 @@ namespace Avalonia3D.Rendering
         public static RenderQualitySettings Low => FromProfile(GraphicsProfile.Low);
         public static RenderQualitySettings Medium => FromProfile(GraphicsProfile.Medium);
         public static RenderQualitySettings High => FromProfile(GraphicsProfile.High);
+        public static RenderQualitySettings Ultra => FromProfile(GraphicsProfile.Ultra);
 
         public GraphicsProfile ToProfile(string profileName = "LegacySettings")
         {

@@ -56,6 +56,7 @@ public class RenderQualitySettingsTests
         Assert.Equal(ReflectionMode.IBL, RenderQualitySettings.FromPreset(RenderQualityPreset.High).ReflectionMode);
         Assert.Equal(2, RenderQualitySettings.FromPreset(RenderQualityPreset.Low).MaxLights);
         Assert.Equal(8, RenderQualitySettings.FromPreset(RenderQualityPreset.High).MaxLights);
+        Assert.Equal(RenderQualitySettings.MaxSupportedLights, RenderQualitySettings.FromPreset(RenderQualityPreset.Ultra).MaxLights);
 
         var custom = new RenderQualitySettings { ShadowMapSize = 777, MaxLights = 7 };
         var fromCustom = RenderQualitySettings.FromPreset(RenderQualityPreset.Custom, custom);
@@ -69,9 +70,11 @@ public class RenderQualitySettingsTests
     {
         var medium = RenderQualitySettings.FromPreset(RenderQualityPreset.Medium);
         var high = RenderQualitySettings.FromPreset(RenderQualityPreset.High);
+        var ultra = RenderQualitySettings.FromPreset(RenderQualityPreset.Ultra);
 
         Assert.False(string.IsNullOrWhiteSpace(medium.EnvironmentMapPath));
         Assert.False(string.IsNullOrWhiteSpace(high.EnvironmentMapPath));
+        Assert.False(string.IsNullOrWhiteSpace(ultra.EnvironmentMapPath));
     }
 
 
@@ -83,8 +86,10 @@ public class RenderQualitySettingsTests
 
         Assert.True(medium.PostFx.Effects.HasFlag(PostEffectsFlags.Bloom));
         Assert.True(high.PostFx.Effects.HasFlag(PostEffectsFlags.Bloom));
+        Assert.True(GraphicsProfile.Ultra.PostFx.Effects.HasFlag(PostEffectsFlags.Bloom));
         Assert.True(medium.PostFx.Bloom.Threshold < 1.0f);
         Assert.True(high.PostFx.Bloom.Threshold < 1.0f);
+        Assert.True(GraphicsProfile.Ultra.PostFx.Bloom.Intensity >= high.PostFx.Bloom.Intensity);
     }
 
     [Fact]
