@@ -23,6 +23,8 @@ namespace Avalonia3D.Model.StandObjects
         private bool _loggedMorphWeightsApplied;
         private bool _loggedMorphFallbackApplied;
         private readonly MorphSignalNormalizer _morphActivationSignal = new();
+        private readonly MorphDrivenEmissionComposer _morphEmissionComposer = new();
+        private Vector3 _baseSceneEmissionColor = Vector3.Zero;
 
         public Vector3 LocalBoundsMin { get; private set; } = Vector3.Zero;
         public Vector3 LocalBoundsMax { get; private set; } = Vector3.Zero;
@@ -56,6 +58,7 @@ namespace Avalonia3D.Model.StandObjects
             {
                 BaseColor = new Vector3(model.Material.BaseColorFactor.X, model.Material.BaseColorFactor.Y, model.Material.BaseColorFactor.Z);
                 EmissionColor = model.Material.EmissiveFactor;
+                _baseSceneEmissionColor = EmissionColor;
                 _baseEmissiveFactor = model.Material.EmissiveFactor;
                 _baseEmissiveIntensity = model.Material.EmissiveIntensity;
                 // Opacity сцены — это runtime override; alpha материала учитывается в shader через baseColor.a
@@ -310,22 +313,26 @@ namespace Avalonia3D.Model.StandObjects
 
             var rawActivation = ResolveMorphActivationSignal(weights);
             var redSignal = _morphActivationSignal.Normalize(rawActivation);
-            var dim = 1f - redSignal;
-            _model.Material.EmissiveFactor = new Vector3(
-                MathF.Max(_baseEmissiveFactor.X, redSignal),
-                _baseEmissiveFactor.Y * dim,
-                _baseEmissiveFactor.Z * dim);
-            _model.Material.EmissiveIntensity = MathF.Max(_baseEmissiveIntensity, _baseEmissiveIntensity + (redSignal * 4f));
+            var composed = _morphEmissionComposer.Compose(
+                _baseEmissiveFactor,
+                _baseEmissiveIntensity,
+                _baseSceneEmissionColor,
+                redSignal);
+
+            _model.Material.EmissiveFactor = composed.EmissiveFactor;
+            _model.Material.EmissiveIntensity = composed.EmissiveIntensity;
+            EmissionColor = composed.SceneEmissionColor;
 
             if (!_loggedMorphFallbackApplied)
             {
                 _loggedMorphFallbackApplied = true;
-                Log.Debug("Morph emissive fallback active for mesh '{MeshId}': rawActivation={RawActivation}, normalizedActivation={RedSignal}, emissiveFactor={EmissiveFactor}, emissiveIntensity={EmissiveIntensity}",
+                Log.Debug("Morph emissive fallback active for mesh '{MeshId}': rawActivation={RawActivation}, normalizedActivation={RedSignal}, emissiveFactor={EmissiveFactor}, emissiveIntensity={EmissiveIntensity}, sceneEmission={SceneEmission}",
                     Name ?? Node.Name ?? "$mesh",
                     rawActivation,
                     redSignal,
                     _model.Material.EmissiveFactor,
-                    _model.Material.EmissiveIntensity);
+                    _model.Material.EmissiveIntensity,
+                    EmissionColor);
             }
         }
 
@@ -355,6 +362,7 @@ namespace Avalonia3D.Model.StandObjects
 
             _model.Material.EmissiveFactor = _baseEmissiveFactor;
             _model.Material.EmissiveIntensity = _baseEmissiveIntensity;
+            EmissionColor = _baseSceneEmissionColor;
             _loggedMorphFallbackApplied = false;
         }
 
