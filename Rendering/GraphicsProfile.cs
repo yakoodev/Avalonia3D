@@ -17,6 +17,11 @@ namespace Avalonia3D.Rendering
         public float Intensity { get; init; } = 1.5f;
         public float Radius { get; init; } = 1.0f;
         public int Iterations { get; init; } = 4;
+        public float SoftKnee { get; init; } = 0.75f;
+        public float NormalizationBoost { get; init; } = 1.8f;
+        public float EmissiveMinContribution { get; init; } = 0.035f;
+        public float UnlitIntensityBoost { get; init; } = 2.5f;
+        public float ColorAdditiveContribution { get; init; } = 0.2f;
     }
 
     public sealed record PostFxProfile
@@ -86,7 +91,12 @@ namespace Avalonia3D.Rendering
                     Threshold = 0.25f,
                     Intensity = 0.8f,
                     Radius = 0.75f,
-                    Iterations = 2
+                    Iterations = 2,
+                    SoftKnee = 0.75f,
+                    NormalizationBoost = 1.6f,
+                    EmissiveMinContribution = 0.02f,
+                    UnlitIntensityBoost = 2.0f,
+                    ColorAdditiveContribution = 0.2f
                 }
             },
             Reflections = new ReflectionProfile
@@ -123,7 +133,12 @@ namespace Avalonia3D.Rendering
                     Threshold = 0.42f,
                     Intensity = 1.25f,
                     Radius = 0.9f,
-                    Iterations = 3
+                    Iterations = 3,
+                    SoftKnee = 0.75f,
+                    NormalizationBoost = 1.8f,
+                    EmissiveMinContribution = 0.03f,
+                    UnlitIntensityBoost = 2.3f,
+                    ColorAdditiveContribution = 0.35f
                 }
             },
             Reflections = new ReflectionProfile
@@ -160,7 +175,12 @@ namespace Avalonia3D.Rendering
                     Threshold = 0.28f,
                     Intensity = 1.7f,
                     Radius = 1.1f,
-                    Iterations = 4
+                    Iterations = 4,
+                    SoftKnee = 0.75f,
+                    NormalizationBoost = 1.9f,
+                    EmissiveMinContribution = 0.035f,
+                    UnlitIntensityBoost = 2.5f,
+                    ColorAdditiveContribution = 0.45f
                 }
             },
             Reflections = new ReflectionProfile
@@ -199,7 +219,12 @@ namespace Avalonia3D.Rendering
                     Threshold = 0.18f,
                     Intensity = 2.6f,
                     Radius = 1.4f,
-                    Iterations = 6
+                    Iterations = 6,
+                    SoftKnee = 0.75f,
+                    NormalizationBoost = 2.0f,
+                    EmissiveMinContribution = 0.04f,
+                    UnlitIntensityBoost = 2.5f,
+                    ColorAdditiveContribution = 0.55f
                 }
             },
             Reflections = new ReflectionProfile
@@ -243,7 +268,12 @@ namespace Avalonia3D.Rendering
                     Threshold = Math.Clamp(bloom.Threshold, 0f, 16f),
                     Intensity = Math.Clamp(bloom.Intensity, 0f, 8f),
                     Radius = Math.Clamp(bloom.Radius, 0.1f, 4f),
-                    Iterations = Math.Clamp(bloom.Iterations, 1, 8)
+                    Iterations = Math.Clamp(bloom.Iterations, 1, 8),
+                    SoftKnee = Math.Clamp(bloom.SoftKnee, 0f, 2f),
+                    NormalizationBoost = Math.Clamp(bloom.NormalizationBoost, 0f, 4f),
+                    EmissiveMinContribution = Math.Clamp(bloom.EmissiveMinContribution, 0f, 1f),
+                    UnlitIntensityBoost = Math.Clamp(bloom.UnlitIntensityBoost, 0f, 8f),
+                    ColorAdditiveContribution = Math.Clamp(bloom.ColorAdditiveContribution, 0f, 1f)
                 }
             };
 
