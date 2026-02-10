@@ -154,14 +154,19 @@ namespace Avalonia3D.Model.StandObjects
             if (_hasAdditiveSceneEmissionOverride && !_loggedMorphPipelineSnapshot && _resources != null)
             {
                 _loggedMorphPipelineSnapshot = true;
-                Log.Debug("Morph pipeline snapshot for mesh '{MeshId}': hasOverride={HasOverride}, emissionColor={EmissionColor}, materialEmissiveFactor={EmissiveFactor}, materialEmissiveIntensity={EmissiveIntensity}, emissiveTextureBound={HasEmissiveTexture}, emissiveTextureId={EmissiveTextureId}",
+                Log.Debug("Morph pipeline snapshot for mesh '{MeshId}': path={NodePath}, hasOverride={HasOverride}, emissionColor={EmissionColor}, materialEmissiveFactor={EmissiveFactor}, materialEmissiveIntensity={EmissiveIntensity}, emissiveTextureBound={HasEmissiveTexture}, emissiveTextureId={EmissiveTextureId}, alphaMode={AlphaMode}, alphaCutoff={AlphaCutoff}, materialOpacity={MaterialOpacity}, sceneOpacity={SceneOpacity}",
                     Name ?? Node.Name ?? "$mesh",
+                    Node.GetPath(),
                     _hasAdditiveSceneEmissionOverride,
                     EmissionColor,
                     _model?.Material?.EmissiveFactor,
                     _model?.Material?.EmissiveIntensity,
                     _resources.EmissiveTextureId != 0,
-                    _resources.EmissiveTextureId);
+                    _resources.EmissiveTextureId,
+                    _model?.Material?.AlphaMode,
+                    _model?.Material?.AlphaCutoff,
+                    _model?.Material?.Opacity,
+                    Opacity);
             }
 
             var shader = renderContext.Scene.ShaderSelectionPolicy.Select(Material, renderContext.Scene, _gl);

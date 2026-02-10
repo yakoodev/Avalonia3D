@@ -5,6 +5,7 @@ using Avalonia3D.Rendering;
 using Serilog;
 using Silk.NET.OpenGL;
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
@@ -16,6 +17,7 @@ namespace Avalonia3D.Shaders
         private readonly PbrFeatures _features;
         private readonly PbrShaderSourceBuilder _sourceBuilder;
         private readonly int _maxLights;
+        private readonly HashSet<string> _loggedEmissionOverrideMeshes = new(StringComparer.Ordinal);
         // Кэшированные uniform-локации
         private int _mvpLocation = -1;
         private int _modelLocation = -1;
@@ -368,6 +370,25 @@ namespace Avalonia3D.Shaders
             var alphaMode = material?.AlphaMode ?? (alpha < 0.999f ? MaterialAlphaMode.Blend : MaterialAlphaMode.Opaque);
             var emissiveIntensity = material?.EmissiveIntensity ?? 1f;
             var emissionColor = EmissionUniformResolver.ResolveSceneEmissionColor(material, sceneObject);
+
+            if (material != null && emissionColor.LengthSquared() > 0.0001f)
+            {
+                var key = (sceneObject.Name ?? sceneObject.Node.Name ?? "$mesh") + "|" + renderContext.Scene.RenderMode;
+                if (!_loggedEmissionOverrideMeshes.Contains(key))
+                {
+                    _loggedEmissionOverrideMeshes.Add(key);
+                    Log.Debug("GLShader emissive uniforms for mesh '{MeshId}': shaderProgram={Program}, renderMode={RenderMode}, emissiveFactor={EmissiveFactor}, emissiveIntensity={EmissiveIntensity}, sceneEmission={SceneEmission}, alphaMode={AlphaMode}, alpha={Alpha}, hasEmissiveTexture={HasEmissiveTexture}",
+                        sceneObject.Name ?? sceneObject.Node.Name ?? "$mesh",
+                        _shaderProgram,
+                        renderContext.Scene.RenderMode,
+                        emissiveFactor,
+                        emissiveIntensity,
+                        emissionColor,
+                        alphaMode,
+                        alpha,
+                        material?.EmissiveTexture != null);
+                }
+            }
 
             if (_modelColorLocation != -1)
                 _gl.Uniform3(_modelColorLocation, sceneObject.BaseColor.X, sceneObject.BaseColor.Y, sceneObject.BaseColor.Z);
