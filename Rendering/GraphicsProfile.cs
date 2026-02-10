@@ -96,7 +96,7 @@ namespace Avalonia3D.Rendering
                     NormalizationBoost = 1.6f,
                     EmissiveMinContribution = 0.02f,
                     UnlitIntensityBoost = 2.0f,
-                    ColorAdditiveContribution = 0.1f
+                    ColorAdditiveContribution = 0.2f
                 }
             },
             Reflections = new ReflectionProfile
@@ -138,7 +138,7 @@ namespace Avalonia3D.Rendering
                     NormalizationBoost = 1.8f,
                     EmissiveMinContribution = 0.03f,
                     UnlitIntensityBoost = 2.3f,
-                    ColorAdditiveContribution = 0.2f
+                    ColorAdditiveContribution = 0.35f
                 }
             },
             Reflections = new ReflectionProfile
@@ -180,7 +180,7 @@ namespace Avalonia3D.Rendering
                     NormalizationBoost = 1.9f,
                     EmissiveMinContribution = 0.035f,
                     UnlitIntensityBoost = 2.5f,
-                    ColorAdditiveContribution = 0.25f
+                    ColorAdditiveContribution = 0.45f
                 }
             },
             Reflections = new ReflectionProfile
@@ -224,7 +224,7 @@ namespace Avalonia3D.Rendering
                     NormalizationBoost = 2.0f,
                     EmissiveMinContribution = 0.04f,
                     UnlitIntensityBoost = 2.5f,
-                    ColorAdditiveContribution = 0.3f
+                    ColorAdditiveContribution = 0.55f
                 }
             },
             Reflections = new ReflectionProfile

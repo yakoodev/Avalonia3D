@@ -32,9 +32,15 @@ namespace Avalonia3D.Rendering
 
             if (emissiveTextureId != 0)
             {
-                var secondaryContribution = colorTextureId != 0
-                    ? Math.Clamp(bloomProfile.ColorAdditiveContribution, 0f, 1f)
-                    : 0f;
+                var secondaryContribution = 0f;
+                if (colorTextureId != 0)
+                {
+                    secondaryContribution = Math.Clamp(bloomProfile.ColorAdditiveContribution, 0f, 1f);
+                    if (context.Scene.RenderMode is ShaderRenderMode.Default or ShaderRenderMode.Pbr)
+                    {
+                        secondaryContribution = Math.Max(secondaryContribution, 0.35f);
+                    }
+                }
                 return new BloomSourceResolution(emissiveTextureId, colorTextureId, secondaryContribution, secondaryContribution > 0f ? "emissive+color" : "emissive");
             }
 
@@ -123,12 +129,20 @@ namespace Avalonia3D.Rendering
                     return (bloom.Threshold, bloom.Intensity, 0f);
                 }
 
-                var exposure = graphicsProfile.PbrTuning.Exposure;
-                var reflection = graphicsProfile.Reflections.Enabled ? graphicsProfile.Reflections.Intensity : 0f;
-                var normalizedExposure = Math.Clamp(exposure, 0.1f, 4f);
-                var threshold = bloom.Threshold / MathF.Sqrt(normalizedExposure);
-                var intensity = bloom.Intensity * (0.85f + (0.3f * normalizedExposure) + (0.25f * reflection));
-                var minContribution = bloom.EmissiveMinContribution * Math.Clamp(0.5f + reflection, 0.25f, 1.5f);
+                var exposure = Math.Clamp(graphicsProfile.PbrTuning.Exposure, 0.1f, 4f);
+                var reflection = graphicsProfile.Reflections.Enabled ? Math.Clamp(graphicsProfile.Reflections.Intensity, 0f, 2f) : 0f;
+                var exposureWeight = Math.Clamp((exposure - 0.8f) / 1.2f, 0f, 1.5f);
+                var reflectionWeight = Math.Clamp(reflection, 0f, 1.5f);
+
+                var thresholdScale = Math.Clamp(1f - (0.22f * exposureWeight) - (0.12f * reflectionWeight), 0.55f, 1.1f);
+                var threshold = bloom.Threshold * thresholdScale;
+
+                var intensityScale = 1f + (0.55f * exposureWeight) + (0.35f * reflectionWeight);
+                var intensity = bloom.Intensity * intensityScale;
+
+                var baseContribution = Math.Max(bloom.EmissiveMinContribution, bloom.ColorAdditiveContribution * 0.12f);
+                var minContribution = baseContribution * (1f + (0.3f * reflectionWeight));
+
                 return (Math.Clamp(threshold, 0f, 16f), Math.Clamp(intensity, 0f, 8f), Math.Clamp(minContribution, 0f, 1f));
             }
 
