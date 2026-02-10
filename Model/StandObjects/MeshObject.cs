@@ -22,6 +22,7 @@ namespace Avalonia3D.Model.StandObjects
         private float _baseEmissiveIntensity = 1f;
         private bool _loggedMorphWeightsApplied;
         private bool _loggedMorphFallbackApplied;
+        private readonly MorphSignalNormalizer _morphActivationSignal = new();
 
         public Vector3 LocalBoundsMin { get; private set; } = Vector3.Zero;
         public Vector3 LocalBoundsMax { get; private set; } = Vector3.Zero;
@@ -36,6 +37,7 @@ namespace Avalonia3D.Model.StandObjects
             _currentMorphWeights = [];
             _loggedMorphWeightsApplied = false;
             _loggedMorphFallbackApplied = false;
+            _morphActivationSignal.Reset();
 
             if (model?.Vertices == null || model.Vertices.Length == 0)
             {
@@ -232,6 +234,7 @@ namespace Avalonia3D.Model.StandObjects
                 Array.Copy(_baseVertices, _morphedVertices, _baseVertices.Length);
                 _resourceManager.UpdateVertexBuffer(_resources, _morphedVertices);
                 _lastAppliedMorphWeights = [];
+                _morphActivationSignal.Reset();
                 RestoreMorphDrivenEmissiveFallback();
                 return;
             }
@@ -305,23 +308,42 @@ namespace Avalonia3D.Model.StandObjects
                 return;
             }
 
-            var redSignal = Math.Clamp(weights[0], 0f, 1f);
+            var rawActivation = ResolveMorphActivationSignal(weights);
+            var redSignal = _morphActivationSignal.Normalize(rawActivation);
             var dim = 1f - redSignal;
             _model.Material.EmissiveFactor = new Vector3(
                 MathF.Max(_baseEmissiveFactor.X, redSignal),
                 _baseEmissiveFactor.Y * dim,
                 _baseEmissiveFactor.Z * dim);
-            _model.Material.EmissiveIntensity = MathF.Max(_baseEmissiveIntensity, _baseEmissiveIntensity + (redSignal * 3f));
+            _model.Material.EmissiveIntensity = MathF.Max(_baseEmissiveIntensity, _baseEmissiveIntensity + (redSignal * 4f));
 
             if (!_loggedMorphFallbackApplied)
             {
                 _loggedMorphFallbackApplied = true;
-                Log.Debug("Morph emissive fallback active for mesh '{MeshId}': redSignal={RedSignal}, emissiveFactor={EmissiveFactor}, emissiveIntensity={EmissiveIntensity}",
+                Log.Debug("Morph emissive fallback active for mesh '{MeshId}': rawActivation={RawActivation}, normalizedActivation={RedSignal}, emissiveFactor={EmissiveFactor}, emissiveIntensity={EmissiveIntensity}",
                     Name ?? Node.Name ?? "$mesh",
+                    rawActivation,
                     redSignal,
                     _model.Material.EmissiveFactor,
                     _model.Material.EmissiveIntensity);
             }
+        }
+
+
+        private static float ResolveMorphActivationSignal(float[] weights)
+        {
+            if (weights == null || weights.Length == 0)
+            {
+                return 0f;
+            }
+
+            var signal = 0f;
+            for (var i = 0; i < weights.Length; i++)
+            {
+                signal = MathF.Max(signal, weights[i]);
+            }
+
+            return signal;
         }
 
         private void RestoreMorphDrivenEmissiveFallback()
