@@ -29,6 +29,19 @@ public class TextureSemanticTests
         Assert.Equal(expected, actual);
     }
 
+
+    [Theory]
+    [InlineData(TextureSemantic.BaseColor, InternalFormat.Rgba)]
+    [InlineData(TextureSemantic.Emissive, InternalFormat.Rgba)]
+    [InlineData(TextureSemantic.Normal, InternalFormat.Rgba)]
+    [InlineData(TextureSemantic.MetallicRoughness, InternalFormat.Rgba)]
+    public void ResolveFallbackInternalFormat_ReturnsExpectedFormat(TextureSemantic semantic, InternalFormat expected)
+    {
+        var actual = RenderResourceManager.ResolveFallbackInternalFormat(semantic);
+
+        Assert.Equal(expected, actual);
+    }
+
     [Theory]
     [InlineData(TextureSemantic.BaseColor, true)]
     [InlineData(TextureSemantic.Emissive, true)]

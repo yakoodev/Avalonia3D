@@ -430,6 +430,12 @@ namespace Avalonia3D.Rendering
             return semantic == TextureSemantic.BaseColor || semantic == TextureSemantic.Emissive;
         }
 
+
+        internal static InternalFormat ResolveFallbackInternalFormat(TextureSemantic semantic)
+        {
+            return IsSrgbSemantic(semantic) ? InternalFormat.Rgba : ResolveInternalFormat(semantic);
+        }
+
         private unsafe uint SetupTexture(TextureData? textureData, TextureSemantic semantic)
         {
             if (textureData == null || textureData.Data == null)
@@ -450,25 +456,46 @@ namespace Avalonia3D.Rendering
             {
             }
 
-            var internalFormat = ResolveInternalFormat(semantic);
+            var preferredInternalFormat = ResolveInternalFormat(semantic);
+            var usedInternalFormat = preferredInternalFormat;
+            GLEnum glError;
 
             fixed (byte* dataPtr = textureData.Data)
             {
-                Gl.TexImage2D(TextureTarget.Texture2D, 0, (int)internalFormat,
+                Gl.TexImage2D(TextureTarget.Texture2D, 0, (int)preferredInternalFormat,
                     (uint)textureData.Width, (uint)textureData.Height, 0,
                     PixelFormat.Rgba, PixelType.UnsignedByte, dataPtr);
+
+                glError = Gl.GetError();
+
+                if (glError != GLEnum.NoError && IsSrgbSemantic(semantic))
+                {
+                    while (Gl.GetError() != GLEnum.NoError)
+                    {
+                    }
+
+                    usedInternalFormat = ResolveFallbackInternalFormat(semantic);
+                    Gl.TexImage2D(TextureTarget.Texture2D, 0, (int)usedInternalFormat,
+                        (uint)textureData.Width, (uint)textureData.Height, 0,
+                        PixelFormat.Rgba, PixelType.UnsignedByte, dataPtr);
+
+                    glError = Gl.GetError();
+                }
             }
 
-            SetTextureParameters();
-            var glError = Gl.GetError();
+            if (glError == GLEnum.NoError)
+            {
+                SetTextureParameters();
+                glError = Gl.GetError();
+            }
 
             if (glError != GLEnum.NoError)
             {
-                Log.Warning("Texture upload GL error {GlError} for {Width}x{Height}, texture {TextureId}, semantic {Semantic}, internal format {InternalFormat}", glError, textureData.Width, textureData.Height, textureId, semantic, internalFormat);
+                Log.Warning("Texture upload GL error {GlError} for {Width}x{Height}, texture {TextureId}, semantic {Semantic}, preferred format {PreferredInternalFormat}, used format {UsedInternalFormat}", glError, textureData.Width, textureData.Height, textureId, semantic, preferredInternalFormat, usedInternalFormat);
             }
             else
             {
-                Log.Information("Texture loaded: {Width}x{Height}, ID: {TextureId}, semantic {Semantic}, sRGB {IsSrgb}", textureData.Width, textureData.Height, textureId, semantic, IsSrgbSemantic(semantic));
+                Log.Information("Texture loaded: {Width}x{Height}, ID: {TextureId}, semantic {Semantic}, preferred format {PreferredInternalFormat}, used format {UsedInternalFormat}", textureData.Width, textureData.Height, textureId, semantic, preferredInternalFormat, usedInternalFormat);
             }
 
             return textureId;
