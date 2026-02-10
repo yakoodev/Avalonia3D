@@ -57,7 +57,7 @@ public sealed class UnlitShader : IShader3D
         var alphaCutoff = material?.AlphaCutoff ?? 0.5f;
         var emissiveFactor = material?.EmissiveFactor ?? Vector3.Zero;
         var emissiveIntensity = material?.EmissiveIntensity ?? 1f;
-        var emissionColor = material != null ? Vector3.Zero : sceneObject.EmissionColor;
+        var emissionColor = EmissionUniformResolver.ResolveSceneEmissionColor(material, sceneObject);
 
         if (_baseColorFactorLocation != -1)
         {

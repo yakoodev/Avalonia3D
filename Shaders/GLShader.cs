@@ -367,7 +367,7 @@ namespace Avalonia3D.Shaders
             var alphaCutoff = material?.AlphaCutoff ?? 0.5f;
             var alphaMode = material?.AlphaMode ?? (alpha < 0.999f ? MaterialAlphaMode.Blend : MaterialAlphaMode.Opaque);
             var emissiveIntensity = material?.EmissiveIntensity ?? 1f;
-            var emissionColor = material != null ? Vector3.Zero : sceneObject.EmissionColor;
+            var emissionColor = EmissionUniformResolver.ResolveSceneEmissionColor(material, sceneObject);
 
             if (_modelColorLocation != -1)
                 _gl.Uniform3(_modelColorLocation, sceneObject.BaseColor.X, sceneObject.BaseColor.Y, sceneObject.BaseColor.Z);
