@@ -13,6 +13,7 @@ namespace Avalonia3D.Controls
         private GL? _gl;
         private IFramePresenter? _framePresenter;
         private readonly RenderPipeline _renderPipeline = new();
+        private readonly EmissiveRenderTargetManager _emissiveTargetManager = new();
         private readonly ISceneBootstrap _sceneBootstrap;
 
         public Scene3D Scene { get; } = new();
@@ -43,6 +44,7 @@ namespace Avalonia3D.Controls
             Scene.Camera.Width = (int)width;
             Scene.Camera.Height = (int)height;
             _framePresenter?.Resize((int)width, (int)height);
+            _emissiveTargetManager.Ensure(_gl, FrameState, (int)width, (int)height);
         }
 
         public void RenderFrame(int w, int h)
@@ -62,6 +64,11 @@ namespace Avalonia3D.Controls
                 disposable.Dispose();
             }
             _framePresenter = null;
+            if (_gl != null)
+            {
+                _emissiveTargetManager.Release(_gl);
+            }
+            FrameState.ResetForwardTargets();
         }
 
         private void InitializeFramePresenter()

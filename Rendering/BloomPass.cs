@@ -1,7 +1,7 @@
+using Serilog;
 using Silk.NET.OpenGL;
 using System;
 using System.Collections.Generic;
-using Serilog;
 
 namespace Avalonia3D.Rendering
 {
@@ -51,33 +51,56 @@ namespace Avalonia3D.Rendering
                 return;
             }
 
-            gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, context.RenderContext.FrameState.OutputFramebufferId);
-            gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, _sceneCopyFramebuffer);
-            gl.BlitFramebuffer(0, 0, context.Width, context.Height, 0, 0, context.Width, context.Height, (uint)ClearBufferMask.ColorBufferBit, GLEnum.Linear);
+            var sourceTextureId = ResolveBrightPassSource(gl, context);
+            if (sourceTextureId == 0)
+            {
+                return;
+            }
 
             gl.Disable(EnableCap.DepthTest);
             gl.Disable(EnableCap.Blend);
             gl.BindVertexArray(_vao);
 
-            RenderBrightPass(gl, context.Width, context.Height, runtimeSettings.Threshold, runtimeSettings.MinContribution);
+            RenderBrightPass(gl, context.Width, context.Height, runtimeSettings.Threshold, runtimeSettings.MinContribution, sourceTextureId);
             RenderDownsampleBlurChain(gl, bloom.Radius);
             RenderComposite(gl, context.RenderContext.FrameState.OutputFramebufferId, runtimeSettings.Intensity);
 
-            LogDiagnosticsOnce(context, runtimeSettings);
+            LogDiagnosticsOnce(context, runtimeSettings, sourceTextureId == context.RenderContext.FrameState.EmissiveTextureId ? "emissive" : "color-fallback");
 
             gl.BindVertexArray(0);
             gl.UseProgram(0);
             gl.Viewport(0, 0, (uint)context.Width, (uint)context.Height);
         }
 
-        private void RenderBrightPass(GL gl, int fullWidth, int fullHeight, float threshold, float minContribution)
+        private uint ResolveBrightPassSource(GL gl, RenderPipelineContext context)
+        {
+            var emissiveTextureId = context.RenderContext.FrameState.EmissiveTextureId;
+            if (emissiveTextureId != 0)
+            {
+                return emissiveTextureId;
+            }
+
+            if (!EnsureSceneCopyTarget(gl, context.Width, context.Height))
+            {
+                return 0;
+            }
+
+            gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, context.RenderContext.FrameState.OutputFramebufferId);
+            gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, _sceneCopyFramebuffer);
+            gl.BlitFramebuffer(0, 0, context.Width, context.Height, 0, 0, context.Width, context.Height, (uint)ClearBufferMask.ColorBufferBit, GLEnum.Linear);
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, context.RenderContext.FrameState.OutputFramebufferId);
+
+            return _sceneCopyTexture;
+        }
+
+        private void RenderBrightPass(GL gl, int fullWidth, int fullHeight, float threshold, float minContribution, uint sourceTextureId)
         {
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, _levelFramebuffers[0]);
             gl.Viewport(0, 0, (uint)Math.Max(1, fullWidth / 2), (uint)Math.Max(1, fullHeight / 2));
 
             gl.UseProgram(_extractProgram);
             gl.ActiveTexture(TextureUnit.Texture0);
-            gl.BindTexture(TextureTarget.Texture2D, _sceneCopyTexture);
+            gl.BindTexture(TextureTarget.Texture2D, sourceTextureId);
             gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uSceneTexture"), 0);
             gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uThreshold"), threshold);
             gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uMinContribution"), minContribution);
@@ -124,23 +147,12 @@ namespace Avalonia3D.Rendering
             gl.Disable(EnableCap.Blend);
         }
 
-        private unsafe bool EnsureTargets(GL gl, int width, int height, int iterations)
+        private unsafe bool EnsureSceneCopyTarget(GL gl, int width, int height)
         {
             if (width <= 0 || height <= 0)
             {
                 return false;
             }
-
-            var levels = Math.Clamp(iterations, 1, 8);
-            if (_cachedWidth == width && _cachedHeight == height && _levelTextures.Count == levels)
-            {
-                return true;
-            }
-
-            _cachedWidth = width;
-            _cachedHeight = height;
-            _levelTextures.Clear();
-            _levelFramebuffers.Clear();
 
             if (_sceneCopyTexture == 0)
             {
@@ -161,6 +173,27 @@ namespace Avalonia3D.Rendering
 
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, _sceneCopyFramebuffer);
             gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, TextureTarget.Texture2D, _sceneCopyTexture, 0);
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+            return true;
+        }
+
+        private unsafe bool EnsureTargets(GL gl, int width, int height, int iterations)
+        {
+            if (width <= 0 || height <= 0)
+            {
+                return false;
+            }
+
+            var levels = Math.Clamp(iterations, 1, 8);
+            if (_cachedWidth == width && _cachedHeight == height && _levelTextures.Count == levels)
+            {
+                return true;
+            }
+
+            _cachedWidth = width;
+            _cachedHeight = height;
+            _levelTextures.Clear();
+            _levelFramebuffers.Clear();
 
             for (var level = 0; level < levels; level++)
             {
@@ -346,12 +379,10 @@ void main()
                 return (bloom.Threshold, bloom.Intensity, 0f);
             }
 
-            // Для unlit-сцен добавляем минимальный вклад, чтобы glow оставался заметным даже
-            // когда модель не содержит HDR-яркости и основная маска получается почти пустой.
             return (bloom.Threshold * 0.25f, bloom.Intensity * 2.5f, 0.035f);
         }
 
-        private void LogDiagnosticsOnce(RenderPipelineContext context, (float Threshold, float Intensity, float MinContribution) runtimeSettings)
+        private void LogDiagnosticsOnce(RenderPipelineContext context, (float Threshold, float Intensity, float MinContribution) runtimeSettings, string source)
         {
             if (_diagnosticsLogged)
             {
@@ -360,8 +391,9 @@ void main()
 
             _diagnosticsLogged = true;
             Log.Information(
-                "BloomPass active. Mode={Mode}, SourceFbo={SourceFbo}, Size={Width}x{Height}, Threshold={Threshold:0.###}, Intensity={Intensity:0.###}, MinContribution={MinContribution:0.###}, Levels={Levels}",
+                "BloomPass active. Mode={Mode}, Source={Source}, SourceFbo={SourceFbo}, Size={Width}x{Height}, Threshold={Threshold:0.###}, Intensity={Intensity:0.###}, MinContribution={MinContribution:0.###}, Levels={Levels}",
                 context.Scene.RenderMode,
+                source,
                 context.RenderContext.FrameState.OutputFramebufferId,
                 context.Width,
                 context.Height,

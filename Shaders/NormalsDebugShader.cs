@@ -77,11 +77,13 @@ void main()
         const string frag = @"#version 300 es
 precision mediump float;
 in vec3 Normal;
-out vec4 FragColor;
+layout(location = 0) out vec4 FragColor;
+layout(location = 1) out vec4 EmissiveColor;
 void main()
 {
     vec3 n = normalize(Normal) * 0.5 + 0.5;
     FragColor = vec4(n, 1.0);
+    EmissiveColor = vec4(0.0, 0.0, 0.0, 1.0);
 }";
 
         uint vertex = Compile(ShaderType.VertexShader, vert);

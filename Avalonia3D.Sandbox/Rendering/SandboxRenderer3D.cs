@@ -17,6 +17,7 @@ public sealed class SandboxRenderer3D : IRenderContext
     private GL? _gl;
     private IFramePresenter? _framePresenter;
     private readonly RenderPipeline _renderPipeline = new(GraphicsProfile.Medium);
+    private readonly EmissiveRenderTargetManager _emissiveTargetManager = new();
     private DateTime _nextMetricsLogUtc = DateTime.MinValue;
     private int _lastLoggedDrawCalls = -1;
     private int _lastLoggedCulledObjects = -1;
@@ -66,6 +67,7 @@ public sealed class SandboxRenderer3D : IRenderContext
         Scene.Camera.Width = (int)width;
         Scene.Camera.Height = (int)height;
         _framePresenter?.Resize((int)width, (int)height);
+        _emissiveTargetManager.Ensure(_gl, FrameState, (int)width, (int)height);
     }
 
     public void RenderFrame(int width, int height)
@@ -84,6 +86,11 @@ public sealed class SandboxRenderer3D : IRenderContext
             disposable.Dispose();
         }
         _framePresenter = null;
+        if (_gl != null)
+        {
+            _emissiveTargetManager.Release(_gl);
+        }
+        FrameState.ResetForwardTargets();
     }
 
     private void InitializeFramePresenter()

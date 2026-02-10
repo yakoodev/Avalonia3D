@@ -6,12 +6,26 @@ namespace Avalonia3D.Rendering
     {
         public FrameMetrics Metrics { get; } = new();
         public uint OutputFramebufferId { get; set; }
+        public uint ForwardFramebufferId { get; set; }
+        public uint ForwardColorTextureId { get; set; }
+        public uint EmissiveFramebufferId { get; set; }
+        public uint EmissiveTextureId { get; set; }
         public uint? ShadowMapId { get; set; }
         public Matrix4x4 LightSpaceMatrix { get; set; } = Matrix4x4.Identity;
         public uint? EnvironmentReflectionTextureId { get; set; }
         public float ReflectionIntensity { get; set; }
         public bool ReflectionsEnabled { get; set; }
         public ReflectionMode ReflectionMode { get; set; } = ReflectionMode.Off;
+
+        public bool HasEmissiveTarget => EmissiveFramebufferId != 0 && EmissiveTextureId != 0;
+
+        public void ResetForwardTargets()
+        {
+            ForwardFramebufferId = 0;
+            ForwardColorTextureId = 0;
+            EmissiveFramebufferId = 0;
+            EmissiveTextureId = 0;
+        }
     }
 
     public sealed class FrameMetrics
