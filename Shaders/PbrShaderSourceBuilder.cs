@@ -45,8 +45,9 @@ void main()
         sb.AppendLine("layout(location = 0) out vec4 FragColor; layout(location = 1) out vec4 EmissiveColor;");
         AppendUniforms(sb, maxLights);
         AppendShadowFunction(sb);
-        sb.AppendLine("const highp float kMaxHdrColor = 64.0;");
-        sb.AppendLine("highp vec3 SanitizeHdrColor(highp vec3 color){ return clamp(max(color, vec3(0.0)), vec3(0.0), vec3(kMaxHdrColor)); }");
+        sb.AppendLine("const highp float kMaxHdrColor = 8.0;");
+        sb.AppendLine("highp vec3 CompressHighlights(highp vec3 color){ highp vec3 under = min(color, vec3(1.0)); highp vec3 over = max(color - vec3(1.0), vec3(0.0)); return under + (over / (vec3(1.0) + over)); }");
+        sb.AppendLine("highp vec3 SanitizeHdrColor(highp vec3 color){ highp vec3 safe = CompressHighlights(max(color, vec3(0.0))); return clamp(safe, vec3(0.0), vec3(kMaxHdrColor)); }");
         sb.AppendLine(features.HasFlag(PbrFeatures.NormalMap)
             ? @"vec3 GetNormal(){ vec3 norm=normalize(Normal); if(uHasNormalMap==0) return norm; vec3 t=texture(uNormalMap, TexCoord).xyz*2.0-1.0; vec3 Q1=dFdx(FragPos); vec3 Q2=dFdy(FragPos); vec2 st1=dFdx(TexCoord); vec2 st2=dFdy(TexCoord); vec3 T=normalize(Q1*st2.t-Q2*st1.t); vec3 B=-normalize(cross(norm,T)); return normalize(mat3(T,B,norm)*t);}"
             : "vec3 GetNormal(){ return normalize(Normal); }");

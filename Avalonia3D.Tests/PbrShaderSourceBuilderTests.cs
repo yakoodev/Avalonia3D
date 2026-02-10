@@ -15,4 +15,15 @@ public class PbrShaderSourceBuilderTests
 
         Assert.Contains("precision highp float;", fragmentSource);
     }
+    [Fact]
+    public void Build_IncludesHdrSanitizationForOutputSafety()
+    {
+        var builder = new PbrShaderSourceBuilder();
+
+        var (_, fragmentSource) = builder.Build(PbrFeatures.None, maxLights: 4);
+
+        Assert.Contains("CompressHighlights", fragmentSource);
+        Assert.Contains("SanitizeHdrColor", fragmentSource);
+    }
+
 }
