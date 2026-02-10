@@ -2,6 +2,7 @@ using Avalonia3D.Interfaces;
 using Avalonia3D.Model;
 using Avalonia3D.Rendering;
 using Silk.NET.OpenGL;
+using Serilog;
 using System;
 using System.Numerics;
 
@@ -19,6 +20,8 @@ namespace Avalonia3D.Model.StandObjects
         private float[] _currentMorphWeights = [];
         private Vector3 _baseEmissiveFactor = Vector3.Zero;
         private float _baseEmissiveIntensity = 1f;
+        private bool _loggedMorphWeightsApplied;
+        private bool _loggedMorphFallbackApplied;
 
         public Vector3 LocalBoundsMin { get; private set; } = Vector3.Zero;
         public Vector3 LocalBoundsMax { get; private set; } = Vector3.Zero;
@@ -31,6 +34,8 @@ namespace Avalonia3D.Model.StandObjects
             _morphedVertices = _baseVertices == null ? null : (Vertex[])_baseVertices.Clone();
             _lastAppliedMorphWeights = [];
             _currentMorphWeights = [];
+            _loggedMorphWeightsApplied = false;
+            _loggedMorphFallbackApplied = false;
 
             if (model?.Vertices == null || model.Vertices.Length == 0)
             {
@@ -84,6 +89,12 @@ namespace Avalonia3D.Model.StandObjects
         public void SetMorphWeights(float[] weights)
         {
             _currentMorphWeights = weights == null ? [] : (float[])weights.Clone();
+
+            if (!SupportsMorphTargets && _currentMorphWeights.Length > 0)
+            {
+                Log.Warning("Morph weights provided for mesh '{MeshId}' that has no morph targets.", Name ?? Node.Name ?? "$mesh");
+            }
+
             ApplyMorphTargetsIfNeeded();
         }
 
@@ -274,6 +285,16 @@ namespace Avalonia3D.Model.StandObjects
 
             _resourceManager.UpdateVertexBuffer(_resources, _morphedVertices);
             _lastAppliedMorphWeights = (float[])weights.Clone();
+
+            if (!_loggedMorphWeightsApplied)
+            {
+                _loggedMorphWeightsApplied = true;
+                Log.Debug("Morph weights applied to mesh '{MeshId}': morphTargets={MorphTargetCount}, weights={WeightCount}, firstWeight={FirstWeight}",
+                    Name ?? Node.Name ?? "$mesh",
+                    _model.MorphTargets.Length,
+                    weights.Length,
+                    weights.Length > 0 ? weights[0] : 0f);
+            }
         }
 
 
@@ -291,6 +312,16 @@ namespace Avalonia3D.Model.StandObjects
                 _baseEmissiveFactor.Y * dim,
                 _baseEmissiveFactor.Z * dim);
             _model.Material.EmissiveIntensity = MathF.Max(_baseEmissiveIntensity, _baseEmissiveIntensity + (redSignal * 3f));
+
+            if (!_loggedMorphFallbackApplied)
+            {
+                _loggedMorphFallbackApplied = true;
+                Log.Debug("Morph emissive fallback active for mesh '{MeshId}': redSignal={RedSignal}, emissiveFactor={EmissiveFactor}, emissiveIntensity={EmissiveIntensity}",
+                    Name ?? Node.Name ?? "$mesh",
+                    redSignal,
+                    _model.Material.EmissiveFactor,
+                    _model.Material.EmissiveIntensity);
+            }
         }
 
         private void RestoreMorphDrivenEmissiveFallback()
@@ -302,6 +333,7 @@ namespace Avalonia3D.Model.StandObjects
 
             _model.Material.EmissiveFactor = _baseEmissiveFactor;
             _model.Material.EmissiveIntensity = _baseEmissiveIntensity;
+            _loggedMorphFallbackApplied = false;
         }
 
         private static bool AreWeightsEqual(float[] left, float[] right)

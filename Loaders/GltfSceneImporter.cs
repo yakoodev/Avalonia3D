@@ -397,6 +397,11 @@ namespace Avalonia3D.Loaders
                     var extraction = ResolveExtractionTarget(channel);
                     if (extraction == null)
                     {
+                        Log.Debug("Skipping unsupported GLTF animation channel '{PointerPath}' in clip '{Clip}'. NodePath='{NodePath}' PointerPath='{TargetPointerPath}'",
+                            channel.TargetPointerPath,
+                            clipName,
+                            channel.TargetNodePath,
+                            channel.TargetPointerPath);
                         continue;
                     }
 
@@ -412,7 +417,22 @@ namespace Avalonia3D.Loaders
                                 resolvedExtraction.TargetProperty);
                         }
 
+                        if (resolvedExtraction.TargetProperty == AnimationTargetProperty.MorphWeights)
+                        {
+                            Log.Warning("GLTF morph channel '{PointerPath}' in clip '{Clip}' has no bindable scene node target.",
+                                channel.TargetPointerPath,
+                                clipName);
+                        }
+
                         continue;
+                    }
+
+                    if (resolvedExtraction.TargetProperty == AnimationTargetProperty.MorphWeights)
+                    {
+                        Log.Debug("GLTF morph channel '{PointerPath}' in clip '{Clip}' bound to node key(s): {TargetNodeKeys}",
+                            channel.TargetPointerPath,
+                            clipName,
+                            string.Join(", ", targetNodeKeys));
                     }
 
                     foreach (var targetNodeKey in targetNodeKeys)
@@ -423,6 +443,14 @@ namespace Avalonia3D.Loaders
                         if (animChannel.HasData)
                         {
                             clip.Channels.Add(animChannel);
+
+                            if (resolvedExtraction.TargetProperty == AnimationTargetProperty.MorphWeights)
+                            {
+                                Log.Debug("Extracted morph keyframes for clip '{Clip}', node '{NodeKey}': {KeyframeCount} keyframes.",
+                                    clipName,
+                                    targetNodeKey,
+                                    animChannel.FloatArrayKeyframes.Count);
+                            }
                         }
                         else if (resolvedExtraction.IsMaterialTarget)
                         {

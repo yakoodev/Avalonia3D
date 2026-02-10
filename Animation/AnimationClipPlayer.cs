@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Avalonia3D.Model;
 using Avalonia3D.Model.StandObjects;
+using Serilog;
 
 namespace Avalonia3D.Animation
 {
@@ -10,6 +11,8 @@ namespace Avalonia3D.Animation
         private readonly Dictionary<AnimationChannel, SceneNode?> _channelNodes = new();
         private readonly Dictionary<AnimationChannel, MeshObject?> _channelMaterialTargets = new();
         private readonly Dictionary<AnimationChannel, IReadOnlyList<MeshObject>> _channelMorphTargets = new();
+        private readonly HashSet<AnimationChannel> _loggedMorphChannelBindings = new();
+        private readonly HashSet<AnimationChannel> _loggedMorphChannelMissingTargets = new();
         private bool _isStopped;
         private AnimationMaterialTargetResolver _materialTargetResolver;
         private AnimationMorphTargetResolver _morphTargetResolver;
@@ -196,8 +199,23 @@ namespace Avalonia3D.Animation
                 var weights = channel.SampleFloatArray(time);
                 node.MorphWeights = weights;
 
+                if (!_loggedMorphChannelBindings.Contains(channel))
+                {
+                    _loggedMorphChannelBindings.Add(channel);
+                    Log.Debug("Applying morph channel for node '{NodeKey}': weights={WeightCount}, keyframes={KeyframeCount}",
+                        channel.TargetNodeKey,
+                        weights?.Length ?? 0,
+                        channel.FloatArrayKeyframes.Count);
+                }
+
                 if (_channelMorphTargets.TryGetValue(channel, out var targets))
                 {
+                    if (targets.Count == 0 && !_loggedMorphChannelMissingTargets.Contains(channel))
+                    {
+                        _loggedMorphChannelMissingTargets.Add(channel);
+                        Log.Warning("Morph channel for node '{NodeKey}' resolved no mesh targets at runtime.", channel.TargetNodeKey);
+                    }
+
                     foreach (var target in targets)
                     {
                         target.SetMorphWeights(weights);
@@ -211,6 +229,8 @@ namespace Avalonia3D.Animation
             _channelNodes.Clear();
             _channelMaterialTargets.Clear();
             _channelMorphTargets.Clear();
+            _loggedMorphChannelBindings.Clear();
+            _loggedMorphChannelMissingTargets.Clear();
 
             foreach (var channel in Clip.Channels)
             {
