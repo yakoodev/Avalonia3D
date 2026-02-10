@@ -1,4 +1,5 @@
 using System.Numerics;
+using Avalonia3D.Interfaces;
 using Avalonia3D.Model;
 using Avalonia3D.Model.StandObjects;
 
@@ -12,9 +13,13 @@ public static class EmissionUniformResolver
 {
     public static Vector3 ResolveSceneEmissionColor(Material? material, SceneObject sceneObject)
     {
-        // Scene emission is an additive runtime channel and should remain active
-        // even when a material exists (e.g. morph-driven emissive fallback).
-        _ = material;
-        return sceneObject.EmissionColor;
+        if (sceneObject is IAdditiveSceneEmissionProvider provider && provider.HasAdditiveSceneEmission)
+        {
+            return provider.AdditiveSceneEmissionColor;
+        }
+
+        return material == null
+            ? sceneObject.EmissionColor
+            : Vector3.Zero;
     }
 }

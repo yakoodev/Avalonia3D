@@ -8,7 +8,7 @@ using System.Numerics;
 
 namespace Avalonia3D.Model.StandObjects
 {
-    public class MeshObject : SceneObject, IMaterialProvider
+    public class MeshObject : SceneObject, IMaterialProvider, IAdditiveSceneEmissionProvider
     {
         private RenderResources? _resources;
         private RenderResourceManager? _resourceManager;
@@ -25,6 +25,7 @@ namespace Avalonia3D.Model.StandObjects
         private readonly MorphSignalNormalizer _morphActivationSignal = new();
         private readonly MorphDrivenEmissionComposer _morphEmissionComposer = new();
         private Vector3 _baseSceneEmissionColor = Vector3.Zero;
+        private bool _hasAdditiveSceneEmissionOverride;
 
         public Vector3 LocalBoundsMin { get; private set; } = Vector3.Zero;
         public Vector3 LocalBoundsMax { get; private set; } = Vector3.Zero;
@@ -40,6 +41,7 @@ namespace Avalonia3D.Model.StandObjects
             _loggedMorphWeightsApplied = false;
             _loggedMorphFallbackApplied = false;
             _morphActivationSignal.Reset();
+            _hasAdditiveSceneEmissionOverride = false;
 
             if (model?.Vertices == null || model.Vertices.Length == 0)
             {
@@ -90,6 +92,8 @@ namespace Avalonia3D.Model.StandObjects
 
         public Material? Material => _model?.Material;
         public bool SupportsMorphTargets => _model?.HasMorphTargets == true;
+        public bool HasAdditiveSceneEmission => _hasAdditiveSceneEmissionOverride;
+        public Vector3 AdditiveSceneEmissionColor => EmissionColor;
 
         public void SetMorphWeights(float[] weights)
         {
@@ -322,6 +326,7 @@ namespace Avalonia3D.Model.StandObjects
             _model.Material.EmissiveFactor = composed.EmissiveFactor;
             _model.Material.EmissiveIntensity = composed.EmissiveIntensity;
             EmissionColor = composed.SceneEmissionColor;
+            _hasAdditiveSceneEmissionOverride = true;
 
             if (!_loggedMorphFallbackApplied)
             {
@@ -363,6 +368,7 @@ namespace Avalonia3D.Model.StandObjects
             _model.Material.EmissiveFactor = _baseEmissiveFactor;
             _model.Material.EmissiveIntensity = _baseEmissiveIntensity;
             EmissionColor = _baseSceneEmissionColor;
+            _hasAdditiveSceneEmissionOverride = false;
             _loggedMorphFallbackApplied = false;
         }
 
