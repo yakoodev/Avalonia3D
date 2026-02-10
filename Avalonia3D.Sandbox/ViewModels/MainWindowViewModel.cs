@@ -55,6 +55,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 CurrentSceneTitle = sceneInfo.Title;
                 UpdateImportStatus();
                 RefreshClips();
+                AutoPlayFirstClipIfAvailable();
                 ExecuteOnRenderThread(() => _cameraController.CaptureHomeView());
             });
         };
@@ -545,6 +546,27 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
 
         SelectedClipName = AvailableClips.FirstOrDefault();
+    }
+
+
+    private void AutoPlayFirstClipIfAvailable()
+    {
+        if (string.IsNullOrWhiteSpace(SelectedClipName))
+        {
+            return;
+        }
+
+        ExecuteOnRenderThread(() =>
+        {
+            var started = _scene.AnimatorComponent.PlayClip(SelectedClipName, loop: true, speed: (float)PlaybackSpeed);
+            if (!started)
+            {
+                return;
+            }
+
+            var state = _scene.AnimatorComponent.GetClipState(SelectedClipName);
+            Dispatcher.UIThread.Post(() => SelectedClipState = state);
+        });
     }
 
     private void UpdateSelectedClipState()
