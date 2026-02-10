@@ -11,6 +11,18 @@ namespace Avalonia3D.Shaders;
 /// </summary>
 public static class EmissionUniformResolver
 {
+    public static EmissiveTextureDebugMode EmissiveTextureMode { get; set; } = EmissiveTextureDebugMode.Normal;
+
+    public static bool ShouldSampleEmissiveTexture()
+    {
+        return EmissiveTextureMode != EmissiveTextureDebugMode.IgnoreTexture;
+    }
+
+    public static bool ShouldForceWhiteEmissiveTexture()
+    {
+        return EmissiveTextureMode == EmissiveTextureDebugMode.ForceWhite;
+    }
+
     public static Vector3 ResolveSceneEmissionColor(Material? material, SceneObject sceneObject)
     {
         if (sceneObject is IAdditiveSceneEmissionProvider provider && provider.HasAdditiveSceneEmission)

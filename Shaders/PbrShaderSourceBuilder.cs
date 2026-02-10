@@ -62,7 +62,7 @@ void main()
         sb.AppendLine("float ao=1.0;");
         if (features.HasFlag(PbrFeatures.OcclusionMap)) sb.AppendLine("if(uHasOcclusionMap==1){ float a=texture(uOcclusionMap, TexCoord).r; ao=mix(1.0,a,uOcclusionStrength);} ");
         sb.AppendLine("vec3 emissive=uEmissiveFactor*max(uEmissiveIntensity,0.0);");
-        if (features.HasFlag(PbrFeatures.EmissiveMap)) sb.AppendLine("if(uHasEmissiveMap==1) emissive*=texture(uEmissiveMap, TexCoord).rgb;");
+        if (features.HasFlag(PbrFeatures.EmissiveMap)) sb.AppendLine("if(uHasEmissiveMap==1){ vec3 emissiveSample=uForceWhiteEmissiveMap==1?vec3(1.0):texture(uEmissiveMap, TexCoord).rgb; emissive*=emissiveSample; }");
 
         if (features.HasFlag(PbrFeatures.EmissiveStrength)) sb.AppendLine("emissive*=max(uMaterialEmissiveStrength,0.0);");
         if (features.HasFlag(PbrFeatures.Ior)) sb.AppendLine("float materialIor=max(uMaterialIor,1.0);"); else sb.AppendLine("float materialIor=1.5;");
@@ -104,7 +104,7 @@ void main()
     private static void AppendUniforms(StringBuilder sb, int maxLights)
     {
         sb.AppendLine("uniform sampler2D uBaseColorMap; uniform sampler2D uNormalMap; uniform sampler2D uMetallicRoughnessMap; uniform sampler2D uOcclusionMap; uniform sampler2D uEmissiveMap; uniform sampler2D uClearcoatMap; uniform sampler2D uClearcoatRoughnessMap; uniform sampler2D uClearcoatNormalMap; uniform sampler2D uSheenColorMap; uniform sampler2D uSheenRoughnessMap; uniform sampler2D uSpecularMap; uniform sampler2D uSpecularColorMap; uniform sampler2D uTransmissionMap; uniform sampler2D uVolumeThicknessMap;");
-        sb.AppendLine("uniform int uHasBaseColorMap; uniform int uHasNormalMap; uniform int uHasMetallicRoughnessMap; uniform int uHasOcclusionMap; uniform int uHasEmissiveMap; uniform int uHasClearcoatMap; uniform int uHasClearcoatRoughnessMap; uniform int uHasClearcoatNormalMap; uniform int uHasSheenColorMap; uniform int uHasSheenRoughnessMap; uniform int uHasSpecularMap; uniform int uHasSpecularColorMap; uniform int uHasTransmissionMap; uniform int uHasVolumeThicknessMap;");
+        sb.AppendLine("uniform int uHasBaseColorMap; uniform int uHasNormalMap; uniform int uHasMetallicRoughnessMap; uniform int uHasOcclusionMap; uniform int uHasEmissiveMap; uniform int uForceWhiteEmissiveMap; uniform int uHasClearcoatMap; uniform int uHasClearcoatRoughnessMap; uniform int uHasClearcoatNormalMap; uniform int uHasSheenColorMap; uniform int uHasSheenRoughnessMap; uniform int uHasSpecularMap; uniform int uHasSpecularColorMap; uniform int uHasTransmissionMap; uniform int uHasVolumeThicknessMap;");
         sb.AppendLine($"uniform sampler2D uShadowMap; uniform int uHasShadowMap; uniform vec3 uLightPos[{maxLights}]; uniform vec3 uLightColor[{maxLights}]; uniform float uIntensity[{maxLights}]; uniform int uLightCount;");
         sb.AppendLine("uniform vec3 uViewPos; uniform float uAmbientStrength; uniform float uSpecularStrength; uniform int uShininess;");
         sb.AppendLine("uniform vec3 uModelColor; uniform vec3 uEmissionColor; uniform vec4 uBaseColorFactor; uniform float uMetallicFactor; uniform float uRoughnessFactor; uniform float uOcclusionStrength; uniform vec3 uEmissiveFactor;");

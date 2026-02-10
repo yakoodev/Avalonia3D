@@ -34,6 +34,7 @@ namespace Avalonia3D.Shaders
         private int _hasMetallicRoughnessMapLocation = -1;
         private int _hasOcclusionMapLocation = -1;
         private int _hasEmissiveMapLocation = -1;
+        private int _forceWhiteEmissiveMapLocation = -1;
         private int _clearcoatMapLocation = -1;
         private int _clearcoatRoughnessMapLocation = -1;
         private int _clearcoatNormalMapLocation = -1;
@@ -253,6 +254,7 @@ namespace Avalonia3D.Shaders
             _hasMetallicRoughnessMapLocation = _gl.GetUniformLocation(_shaderProgram, "uHasMetallicRoughnessMap");
             _hasOcclusionMapLocation = _gl.GetUniformLocation(_shaderProgram, "uHasOcclusionMap");
             _hasEmissiveMapLocation = _gl.GetUniformLocation(_shaderProgram, "uHasEmissiveMap");
+            _forceWhiteEmissiveMapLocation = _gl.GetUniformLocation(_shaderProgram, "uForceWhiteEmissiveMap");
             _hasClearcoatMapLocation = _gl.GetUniformLocation(_shaderProgram, "uHasClearcoatMap");
             _hasClearcoatRoughnessMapLocation = _gl.GetUniformLocation(_shaderProgram, "uHasClearcoatRoughnessMap");
             _hasClearcoatNormalMapLocation = _gl.GetUniformLocation(_shaderProgram, "uHasClearcoatNormalMap");
@@ -370,6 +372,7 @@ namespace Avalonia3D.Shaders
             var alphaMode = material?.AlphaMode ?? (alpha < 0.999f ? MaterialAlphaMode.Blend : MaterialAlphaMode.Opaque);
             var emissiveIntensity = material?.EmissiveIntensity ?? 1f;
             var emissionColor = EmissionUniformResolver.ResolveSceneEmissionColor(material, sceneObject);
+            var forceWhiteEmissive = EmissionUniformResolver.ShouldForceWhiteEmissiveTexture();
 
             if (material != null && emissionColor.LengthSquared() > 0.0001f)
             {
@@ -422,6 +425,9 @@ namespace Avalonia3D.Shaders
 
             if (_emissiveIntensityLocation != -1)
                 _gl.Uniform1(_emissiveIntensityLocation, emissiveIntensity);
+
+            if (_forceWhiteEmissiveMapLocation != -1)
+                _gl.Uniform1(_forceWhiteEmissiveMapLocation, forceWhiteEmissive ? 1 : 0);
 
             var primaryLight = lightCount > 0 ? lights[0] : null;
 
@@ -509,7 +515,8 @@ namespace Avalonia3D.Shaders
             BindTextureUnit(resources.NormalTextureId, _normalMapLocation, _hasNormalMapLocation, 1);
             BindTextureUnit(resources.MetallicRoughnessTextureId, _metallicRoughnessMapLocation, _hasMetallicRoughnessMapLocation, 2);
             BindTextureUnit(resources.OcclusionTextureId, _occlusionMapLocation, _hasOcclusionMapLocation, 3);
-            BindTextureUnit(resources.EmissiveTextureId, _emissiveMapLocation, _hasEmissiveMapLocation, 4);
+            var emissiveTextureId = EmissionUniformResolver.ShouldSampleEmissiveTexture() ? resources.EmissiveTextureId : 0;
+            BindTextureUnit(emissiveTextureId, _emissiveMapLocation, _hasEmissiveMapLocation, 4);
             BindTextureUnit(resources.ClearcoatTextureId, _clearcoatMapLocation, _hasClearcoatMapLocation, 7);
             BindTextureUnit(resources.ClearcoatRoughnessTextureId, _clearcoatRoughnessMapLocation, _hasClearcoatRoughnessMapLocation, 8);
             BindTextureUnit(resources.ClearcoatNormalTextureId, _clearcoatNormalMapLocation, _hasClearcoatNormalMapLocation, 9);

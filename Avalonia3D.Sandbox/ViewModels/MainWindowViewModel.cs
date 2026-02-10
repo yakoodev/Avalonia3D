@@ -41,6 +41,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private string _importStatusText = "Import: OK";
     private bool _isImportDegraded;
     private string _behaviorTargetSemanticId = "door.main";
+    private EmissiveTextureDebugMode _selectedEmissiveTextureDebugMode = EmissiveTextureDebugMode.Normal;
 
     public MainWindowViewModel(Scene3D scene, CameraController cameraController, string assetsRoot, IRenderThreadScheduler renderThreadScheduler, Action<GraphicsProfile> applyGraphicsProfile)
     {
@@ -89,6 +90,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             RenderQualityPreset.Custom
         });
 
+        EmissiveTextureDebugModes = new ObservableCollection<EmissiveTextureDebugMode>(new[]
+        {
+            EmissiveTextureDebugMode.Normal,
+            EmissiveTextureDebugMode.IgnoreTexture,
+            EmissiveTextureDebugMode.ForceWhite
+        });
+
         SwitchShaderModeCommand = new RelayCommand(mode =>
         {
             if (mode is ShaderRenderMode renderMode)
@@ -123,6 +131,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _scene.BindRenderMode(ShaderRenderMode.Unlit, ShaderIds.Unlit);
         _scene.BindRenderMode(ShaderRenderMode.NormalsDebug, ShaderIds.NormalsDebug);
         ApplyShaderMode(ShaderRenderMode.Pbr);
+        EmissionUniformResolver.EmissiveTextureMode = _selectedEmissiveTextureDebugMode;
 
         if (scenes.Count > 0)
         {
@@ -134,6 +143,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public ObservableCollection<ShaderRenderMode> ShaderModes { get; }
     public ObservableCollection<string> AvailableClips { get; }
     public ObservableCollection<RenderQualityPreset> QualityPresets { get; }
+    public ObservableCollection<EmissiveTextureDebugMode> EmissiveTextureDebugModes { get; }
     public RelayCommand SwitchShaderModeCommand { get; }
     public RelayCommand PlayClipCommand { get; }
     public RelayCommand PauseClipCommand { get; }
@@ -300,6 +310,23 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
+
+    public EmissiveTextureDebugMode SelectedEmissiveTextureDebugMode
+    {
+        get => _selectedEmissiveTextureDebugMode;
+        set
+        {
+            if (_selectedEmissiveTextureDebugMode == value)
+            {
+                return;
+            }
+
+            _selectedEmissiveTextureDebugMode = value;
+            EmissionUniformResolver.EmissiveTextureMode = value;
+            Log.Information("Emissive texture debug mode changed: {Mode}", value);
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedEmissiveTextureDebugMode)));
+        }
+    }
     public ShaderRenderMode SelectedRenderMode
     {
         get => _selectedRenderMode;

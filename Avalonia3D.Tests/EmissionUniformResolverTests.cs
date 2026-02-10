@@ -53,6 +53,28 @@ public class EmissionUniformResolverTests
         Assert.Equal(mesh.EmissionColor, result);
     }
 
+
+    [Fact]
+    public void EmissiveTextureDebugMode_IgnoreTexture_DisablesTextureSampling()
+    {
+        EmissionUniformResolver.EmissiveTextureMode = EmissiveTextureDebugMode.IgnoreTexture;
+
+        Assert.False(EmissionUniformResolver.ShouldSampleEmissiveTexture());
+        Assert.False(EmissionUniformResolver.ShouldForceWhiteEmissiveTexture());
+
+        EmissionUniformResolver.EmissiveTextureMode = EmissiveTextureDebugMode.Normal;
+    }
+
+    [Fact]
+    public void EmissiveTextureDebugMode_ForceWhite_EnablesWhiteOverride()
+    {
+        EmissionUniformResolver.EmissiveTextureMode = EmissiveTextureDebugMode.ForceWhite;
+
+        Assert.True(EmissionUniformResolver.ShouldSampleEmissiveTexture());
+        Assert.True(EmissionUniformResolver.ShouldForceWhiteEmissiveTexture());
+
+        EmissionUniformResolver.EmissiveTextureMode = EmissiveTextureDebugMode.Normal;
+    }
     private sealed class AdditiveEmissionSceneObject : SceneObject, IAdditiveSceneEmissionProvider
     {
         public bool HasAdditiveSceneEmission { get; set; }
