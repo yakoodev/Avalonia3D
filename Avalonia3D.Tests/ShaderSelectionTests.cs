@@ -3,6 +3,8 @@ using Avalonia3D.Model;
 using Avalonia3D.Model.StandObjects;
 using Avalonia3D.Rendering;
 using Avalonia3D.Shaders;
+using System;
+using System.Collections.Generic;
 using System.Numerics;
 using Xunit;
 
@@ -144,6 +146,32 @@ public class ShaderSelectionTests
     }
 
 
+
+    [Fact]
+    public void Select_ReturnsPbrFallback_WhenRuntimeVariantCompilationThrows()
+    {
+        var scene = new Scene3D();
+        var fallbackShader = new StubShader();
+        scene.ShaderRegistry.RegisterInstance(ShaderIds.Pbr, fallbackShader);
+        scene.ShaderRegistry.RegisterInstance("default", new StubShader());
+        scene.ShaderRegistry.SetDefault("default");
+        scene.ActiveShaderId = ShaderIds.Pbr;
+
+        var material = new Material
+        {
+            BaseColorTexture = new TextureData(),
+            EmissiveTexture = new TextureData()
+        };
+
+        var policy = new ShaderSelectionPolicy(
+            runtimePbrShaderFactory: new ThrowingRuntimePbrShaderFactory(),
+            pbrVariantReducer: new NoOpPbrVariantReducer());
+
+        var selected = policy.Select(material, scene, gl: null);
+
+        Assert.Same(fallbackShader, selected);
+    }
+
     [Fact]
     public void ResolvePbrShaderId_ReturnsDynamicVariant_ForEmissiveAndMetallicWithoutNormalMap()
     {
@@ -226,6 +254,23 @@ public class ShaderSelectionTests
         scene.ShaderRegistry.SetDefault("fallback");
         scene.ActiveShaderId = ShaderIds.Pbr;
         return scene;
+    }
+
+
+    private sealed class ThrowingRuntimePbrShaderFactory : IRuntimePbrShaderFactory
+    {
+        public IShader3D Create(Silk.NET.OpenGL.GL? gl, PbrFeatures features, int maxLights)
+        {
+            throw new InvalidOperationException("Simulated compile failure");
+        }
+    }
+
+    private sealed class NoOpPbrVariantReducer : IPbrVariantReducer
+    {
+        public IEnumerable<PbrFeatures> GetReductionChain(PbrFeatures requestedFeatures)
+        {
+            yield break;
+        }
     }
 
     private sealed class StubShader : IShader3D
