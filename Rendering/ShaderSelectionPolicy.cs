@@ -143,7 +143,7 @@ public sealed class ShaderSelectionPolicy
             features |= PbrFeatures.Ior;
         }
 
-        if (Math.Abs(material.EmissiveIntensity - 1f) > 0.0001f)
+        if (Math.Abs(material.EmissiveStrength - 1f) > 0.0001f)
         {
             features |= PbrFeatures.EmissiveStrength;
         }

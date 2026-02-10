@@ -202,7 +202,8 @@ public sealed class MaterialAlphaAndLoaderTests
         Assert.Equal(MaterialAlphaMode.Mask, material!.AlphaMode);
         Assert.InRange(material.AlphaCutoff, 0.329f, 0.331f);
         Assert.True(material.DoubleSided);
-        Assert.InRange(material.EmissiveIntensity, 2.49f, 2.51f);
+        Assert.InRange(material.EmissiveStrength, 2.49f, 2.51f);
+        Assert.InRange(material.EmissiveIntensity, 0.999f, 1.001f);
     }
 
 
@@ -316,7 +317,8 @@ public sealed class MaterialAlphaAndLoaderTests
         Assert.InRange(material.SpecularFactor, 0.89f, 0.91f);
         Assert.Equal(new Vector3(0.9f, 0.8f, 0.7f), material.SpecularColorFactor);
         Assert.InRange(material.Ior, 1.69f, 1.71f);
-        Assert.InRange(material.EmissiveIntensity, 2.49f, 2.51f);
+        Assert.InRange(material.EmissiveStrength, 2.49f, 2.51f);
+        Assert.InRange(material.EmissiveIntensity, 0.999f, 1.001f);
         Assert.True(material.HasTransmission);
         Assert.InRange(material.TransmissionFactor, 0.79f, 0.81f);
     }
@@ -345,6 +347,7 @@ public sealed class MaterialAlphaAndLoaderTests
         Assert.InRange(material.AlphaCutoff, 0.499f, 0.501f);
         Assert.False(material.DoubleSided);
         Assert.InRange(material.EmissiveIntensity, 0.999f, 1.001f);
+        Assert.InRange(material.EmissiveStrength, 0.999f, 1.001f);
         Assert.False(material.IsTransparent);
     }
 
