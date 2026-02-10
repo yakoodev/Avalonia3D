@@ -17,5 +17,14 @@ public enum PbrFeatures
     Sheen = 1 << 8,
     Specular = 1 << 9,
     Ior = 1 << 10,
-    EmissiveStrength = 1 << 11
+    EmissiveStrength = 1 << 11,
+    ClearcoatMap = 1 << 12,
+    ClearcoatRoughnessMap = 1 << 13,
+    ClearcoatNormalMap = 1 << 14,
+    SheenColorMap = 1 << 15,
+    SheenRoughnessMap = 1 << 16,
+    SpecularMap = 1 << 17,
+    SpecularColorMap = 1 << 18,
+    TransmissionMap = 1 << 19,
+    VolumeThicknessMap = 1 << 20
 }

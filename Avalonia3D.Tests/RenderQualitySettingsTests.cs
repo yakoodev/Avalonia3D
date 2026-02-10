@@ -119,6 +119,43 @@ public class RenderQualitySettingsTests
         Assert.Equal(8, validated.PostFx.Bloom.Iterations);
     }
 
+
+    [Fact]
+    public void Presets_AreProgressiveAndBalanced()
+    {
+        var low = GraphicsProfile.Low;
+        var medium = GraphicsProfile.Medium;
+        var high = GraphicsProfile.High;
+        var ultra = GraphicsProfile.Ultra;
+
+        Assert.True(low.MaxLights < medium.MaxLights);
+        Assert.True(medium.MaxLights < high.MaxLights);
+        Assert.True(high.MaxLights < ultra.MaxLights);
+
+        Assert.False(low.Shadows.Enabled);
+        Assert.True(medium.Shadows.Enabled);
+        Assert.True(high.Shadows.MapSize >= medium.Shadows.MapSize);
+        Assert.True(ultra.Shadows.MapSize >= high.Shadows.MapSize);
+
+        Assert.False(low.Reflections.Enabled);
+        Assert.True(medium.Reflections.Enabled);
+        Assert.True(high.Reflections.Intensity >= medium.Reflections.Intensity);
+        Assert.True(ultra.Reflections.Intensity >= high.Reflections.Intensity);
+
+        Assert.False(low.PostFx.Bloom.Enabled);
+        Assert.True(medium.PostFx.Bloom.Enabled);
+        Assert.True(high.PostFx.Bloom.Enabled);
+        Assert.True(ultra.PostFx.Bloom.Enabled);
+
+        Assert.InRange(medium.PostFx.Bloom.Threshold, 0.2f, 1.0f);
+        Assert.InRange(high.PostFx.Bloom.Threshold, 0.15f, 0.8f);
+        Assert.InRange(ultra.PostFx.Bloom.Threshold, 0.1f, 0.6f);
+
+        Assert.True(ultra.PostFx.Bloom.Intensity >= high.PostFx.Bloom.Intensity);
+        Assert.True(high.PostFx.Bloom.Intensity >= medium.PostFx.Bloom.Intensity);
+        Assert.InRange(ultra.PostFx.Bloom.Intensity, 1.5f, 4.0f);
+    }
+
     [Fact]
     public void GraphicsProfile_JsonRoundTrip_KeepsQualityData()
     {

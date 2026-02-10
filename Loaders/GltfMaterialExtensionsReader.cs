@@ -12,7 +12,8 @@ public sealed record MaterialExtensionData(
     MaterialSpecularData Specular,
     MaterialIorData Ior,
     MaterialEmissiveStrengthData EmissiveStrength,
-    MaterialTransmissionData Transmission)
+    MaterialTransmissionData Transmission,
+    MaterialExtensionTextureChannels TextureChannels)
 {
     public static MaterialExtensionData Default { get; } = new(
         Clearcoat: new MaterialClearcoatData(0f, 0f),
@@ -20,7 +21,8 @@ public sealed record MaterialExtensionData(
         Specular: new MaterialSpecularData(1f, Vector3.One),
         Ior: new MaterialIorData(1.5f),
         EmissiveStrength: new MaterialEmissiveStrengthData(1f),
-        Transmission: new MaterialTransmissionData(0f, 0f, 1.5f, float.PositiveInfinity, Vector3.One));
+        Transmission: new MaterialTransmissionData(0f, 0f, 1.5f, float.PositiveInfinity, Vector3.One),
+        TextureChannels: MaterialExtensionTextureChannels.None);
 }
 
 public readonly record struct MaterialClearcoatData(float Factor, float Roughness);
@@ -29,6 +31,29 @@ public readonly record struct MaterialSpecularData(float Factor, Vector3 ColorFa
 public readonly record struct MaterialIorData(float Value);
 public readonly record struct MaterialEmissiveStrengthData(float Value);
 public readonly record struct MaterialTransmissionData(float Factor, float Thickness, float Ior, float AttenuationDistance, Vector3 AttenuationColor);
+
+public sealed record MaterialExtensionTextureChannels(
+    object? Clearcoat,
+    object? ClearcoatRoughness,
+    object? ClearcoatNormal,
+    object? SheenColor,
+    object? SheenRoughness,
+    object? Specular,
+    object? SpecularColor,
+    object? Transmission,
+    object? VolumeThickness)
+{
+    public static MaterialExtensionTextureChannels None { get; } = new(
+        Clearcoat: null,
+        ClearcoatRoughness: null,
+        ClearcoatNormal: null,
+        SheenColor: null,
+        SheenRoughness: null,
+        Specular: null,
+        SpecularColor: null,
+        Transmission: null,
+        VolumeThickness: null);
+}
 
 public sealed class GltfMaterialExtensionsReader
 {
@@ -52,22 +77,32 @@ public sealed class GltfMaterialExtensionsReader
 
         LogUnknownExtensions(material);
 
-        var emissiveStrength = ReadScalar(material.FindChannel("Emissive"), MaterialExtensionData.Default.EmissiveStrength.Value, min: 0f);
-        var transmissionFactor = ReadScalar(material.FindChannel("Transmission"), MaterialExtensionData.Default.Transmission.Factor, min: 0f, max: 1f);
-        var transmissionThickness = ReadScalar(material.FindChannel("VolumeThickness"), MaterialExtensionData.Default.Transmission.Thickness, min: 0f);
-        var transmissionAttenuationDistance = ReadScalar(material.FindChannel("VolumeAttenuation"), MaterialExtensionData.Default.Transmission.AttenuationDistance, min: float.Epsilon, allowInfinityFallback: true, scalarFromVectorW: true);
-        var transmissionAttenuationColor = ReadVector3(material.FindChannel("VolumeAttenuation"), MaterialExtensionData.Default.Transmission.AttenuationColor);
+        var emissiveStrength = ReadScalar(FindChannel(material, "Emissive"), MaterialExtensionData.Default.EmissiveStrength.Value, min: 0f);
+        var transmissionFactor = ReadScalar(FindChannel(material, "Transmission"), MaterialExtensionData.Default.Transmission.Factor, min: 0f, max: 1f);
+        var transmissionThickness = ReadScalar(FindChannel(material, "VolumeThickness", "Thickness"), MaterialExtensionData.Default.Transmission.Thickness, min: 0f);
+        var transmissionAttenuationDistance = ReadScalar(FindChannel(material, "VolumeAttenuation", "Attenuation"), MaterialExtensionData.Default.Transmission.AttenuationDistance, min: float.Epsilon, allowInfinityFallback: true, scalarFromVectorW: true);
+        var transmissionAttenuationColor = ReadVector3(FindChannel(material, "VolumeAttenuation", "Attenuation"), MaterialExtensionData.Default.Transmission.AttenuationColor);
 
-        var clearcoatFactor = ReadScalar(material.FindChannel("ClearCoat"), MaterialExtensionData.Default.Clearcoat.Factor, min: 0f, max: 1f);
-        var clearcoatRoughness = ReadScalar(material.FindChannel("ClearCoatRoughness"), MaterialExtensionData.Default.Clearcoat.Roughness, min: 0f, max: 1f);
+        var clearcoatFactor = ReadScalar(FindChannel(material, "ClearCoat", "Clearcoat"), MaterialExtensionData.Default.Clearcoat.Factor, min: 0f, max: 1f);
+        var clearcoatRoughness = ReadScalar(FindChannel(material, "ClearCoatRoughness", "ClearcoatRoughness"), MaterialExtensionData.Default.Clearcoat.Roughness, min: 0f, max: 1f);
 
-        var sheenColor = ReadVector3(material.FindChannel("SheenColor"), MaterialExtensionData.Default.Sheen.ColorFactor);
-        var sheenRoughness = ReadScalar(material.FindChannel("SheenRoughness"), MaterialExtensionData.Default.Sheen.RoughnessFactor, min: 0f, max: 1f);
+        var sheenColor = ReadVector3(FindChannel(material, "SheenColor"), MaterialExtensionData.Default.Sheen.ColorFactor);
+        var sheenRoughness = ReadScalar(FindChannel(material, "SheenRoughness"), MaterialExtensionData.Default.Sheen.RoughnessFactor, min: 0f, max: 1f);
 
-        var specularFactor = ReadScalar(material.FindChannel("SpecularFactor"), MaterialExtensionData.Default.Specular.Factor, min: 0f, max: 1f);
-        var specularColor = ReadVector3(material.FindChannel("SpecularColor"), MaterialExtensionData.Default.Specular.ColorFactor);
+        var specularFactor = ReadScalar(FindChannel(material, "SpecularFactor"), MaterialExtensionData.Default.Specular.Factor, min: 0f, max: 1f);
+        var specularColor = ReadVector3(FindChannel(material, "SpecularColor"), MaterialExtensionData.Default.Specular.ColorFactor);
 
         var ior = Math.Clamp(material.IndexOfRefraction, 1f, 3f);
+
+        var clearcoatChannel = FindChannel(material, "ClearCoat", "Clearcoat");
+        var clearcoatRoughnessChannel = FindChannel(material, "ClearCoatRoughness", "ClearcoatRoughness");
+        var clearcoatNormalChannel = FindChannel(material, "ClearCoatNormal", "ClearcoatNormal");
+        var sheenColorChannel = FindChannel(material, "SheenColor");
+        var sheenRoughnessChannel = FindChannel(material, "SheenRoughness");
+        var specularChannel = FindChannel(material, "SpecularFactor");
+        var specularColorChannel = FindChannel(material, "SpecularColor");
+        var transmissionChannel = FindChannel(material, "Transmission");
+        var volumeThicknessChannel = FindChannel(material, "VolumeThickness", "Thickness");
 
         return new MaterialExtensionData(
             Clearcoat: new MaterialClearcoatData(clearcoatFactor, clearcoatRoughness),
@@ -75,7 +110,32 @@ public sealed class GltfMaterialExtensionsReader
             Specular: new MaterialSpecularData(specularFactor, specularColor),
             Ior: new MaterialIorData(ior),
             EmissiveStrength: new MaterialEmissiveStrengthData(emissiveStrength),
-            Transmission: new MaterialTransmissionData(transmissionFactor, transmissionThickness, ior, transmissionAttenuationDistance, transmissionAttenuationColor));
+            Transmission: new MaterialTransmissionData(transmissionFactor, transmissionThickness, ior, transmissionAttenuationDistance, transmissionAttenuationColor),
+            TextureChannels: new MaterialExtensionTextureChannels(
+                Clearcoat: clearcoatChannel,
+                ClearcoatRoughness: clearcoatRoughnessChannel,
+                ClearcoatNormal: clearcoatNormalChannel,
+                SheenColor: sheenColorChannel,
+                SheenRoughness: sheenRoughnessChannel,
+                Specular: specularChannel,
+                SpecularColor: specularColorChannel,
+                Transmission: transmissionChannel,
+                VolumeThickness: volumeThicknessChannel));
+    }
+
+
+    private static object? FindChannel(Material material, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            var channel = material.FindChannel(name);
+            if (channel != null)
+            {
+                return channel;
+            }
+        }
+
+        return null;
     }
 
     private static void LogUnknownExtensions(Material material)

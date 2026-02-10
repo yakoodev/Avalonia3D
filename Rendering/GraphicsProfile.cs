@@ -79,7 +79,7 @@ namespace Avalonia3D.Rendering
             {
                 Effects = PostEffectsFlags.GammaCorrection,
                 ToneMapping = ToneMappingOperator.None,
-                Gamma = 2.0f,
+                Gamma = 2.1f,
                 Bloom = new BloomProfile
                 {
                     Enabled = false,
@@ -111,7 +111,7 @@ namespace Avalonia3D.Rendering
             Name = "Medium",
             QualityPreset = RenderQualityPreset.Medium,
             MsaaPolicy = MsaaPolicy.X2,
-            Shadows = new ShadowProfile { Enabled = true, MapSize = 1536 },
+            Shadows = new ShadowProfile { Enabled = true, MapSize = 2048 },
             PostFx = new PostFxProfile
             {
                 Effects = PostEffectsFlags.ToneMapping | PostEffectsFlags.GammaCorrection | PostEffectsFlags.Bloom,
@@ -120,23 +120,23 @@ namespace Avalonia3D.Rendering
                 Bloom = new BloomProfile
                 {
                     Enabled = true,
-                    Threshold = 0.35f,
-                    Intensity = 1.6f,
-                    Radius = 1.0f,
-                    Iterations = 4
+                    Threshold = 0.42f,
+                    Intensity = 1.25f,
+                    Radius = 0.9f,
+                    Iterations = 3
                 }
             },
             Reflections = new ReflectionProfile
             {
                 Enabled = true,
                 Mode = ReflectionMode.IBL,
-                Intensity = 0.3f,
+                Intensity = 0.35f,
                 EnvironmentMapPath = DefaultEnvironmentMapPath
             },
             PbrTuning = new PbrTuningProfile
             {
                 Exposure = 1.0f,
-                IblIntensity = 1.0f,
+                IblIntensity = 0.75f,
                 AmbientOcclusionStrength = 1.0f
             },
             Background = new BackgroundProfile { Red = 0.06f, Green = 0.06f, Blue = 0.08f },
@@ -157,24 +157,24 @@ namespace Avalonia3D.Rendering
                 Bloom = new BloomProfile
                 {
                     Enabled = true,
-                    Threshold = 0.25f,
-                    Intensity = 2.2f,
-                    Radius = 1.2f,
-                    Iterations = 5
+                    Threshold = 0.28f,
+                    Intensity = 1.7f,
+                    Radius = 1.1f,
+                    Iterations = 4
                 }
             },
             Reflections = new ReflectionProfile
             {
                 Enabled = true,
                 Mode = ReflectionMode.IBL,
-                Intensity = 0.45f,
+                Intensity = 0.5f,
                 EnvironmentMapPath = DefaultEnvironmentMapPath
             },
             PbrTuning = new PbrTuningProfile
             {
-                Exposure = 1.1f,
-                IblIntensity = 1.2f,
-                AmbientOcclusionStrength = 1.1f
+                Exposure = 1.08f,
+                IblIntensity = 1.25f,
+                AmbientOcclusionStrength = 1.05f
             },
             Background = new BackgroundProfile { Red = 0.04f, Green = 0.05f, Blue = 0.07f },
             MaxLights = 8
@@ -196,24 +196,24 @@ namespace Avalonia3D.Rendering
                 Bloom = new BloomProfile
                 {
                     Enabled = true,
-                    Threshold = 0.02f,
-                    Intensity = 8.0f,
-                    Radius = 2.0f,
-                    Iterations = 8
+                    Threshold = 0.18f,
+                    Intensity = 2.6f,
+                    Radius = 1.4f,
+                    Iterations = 6
                 }
             },
             Reflections = new ReflectionProfile
             {
                 Enabled = true,
                 Mode = ReflectionMode.IBL,
-                Intensity = 1.0f,
+                Intensity = 0.75f,
                 EnvironmentMapPath = DefaultEnvironmentMapPath
             },
             PbrTuning = new PbrTuningProfile
             {
-                Exposure = 1.2f,
-                IblIntensity = 1.5f,
-                AmbientOcclusionStrength = 1.3f
+                Exposure = 1.15f,
+                IblIntensity = 1.4f,
+                AmbientOcclusionStrength = 1.2f
             },
             Background = new BackgroundProfile { Red = 0.02f, Green = 0.03f, Blue = 0.05f },
             MaxLights = RenderQualitySettings.MaxSupportedLights

@@ -238,7 +238,8 @@ namespace Avalonia3D.Loaders
 
             var result = new Avalonia3D.Model.Material();
             ApplyPbrFactors(material, result);
-            ApplySurfaceSettings(material, result);
+            var extensionPayload = _materialExtensionsReader.Read(material);
+            ApplySurfaceSettings(material, result, extensionPayload);
             result.Opacity = result.BaseColorFactor.W;
 
             var baseColorChannel = material.FindChannel("BaseColor");
@@ -273,6 +274,18 @@ namespace Avalonia3D.Loaders
                 result.EmissiveFactor = new Vector3(emissiveColor.X, emissiveColor.Y, emissiveColor.Z);
             }
 
+
+            var extensionChannels = extensionPayload.TextureChannels;
+            result.ExtensionTextures.ClearcoatTexture = LoadTextureFromChannel(extensionChannels.Clearcoat);
+            result.ExtensionTextures.ClearcoatRoughnessTexture = LoadTextureFromChannel(extensionChannels.ClearcoatRoughness);
+            result.ExtensionTextures.ClearcoatNormalTexture = LoadTextureFromChannel(extensionChannels.ClearcoatNormal);
+            result.ExtensionTextures.SheenColorTexture = LoadTextureFromChannel(extensionChannels.SheenColor);
+            result.ExtensionTextures.SheenRoughnessTexture = LoadTextureFromChannel(extensionChannels.SheenRoughness);
+            result.ExtensionTextures.SpecularTexture = LoadTextureFromChannel(extensionChannels.Specular);
+            result.ExtensionTextures.SpecularColorTexture = LoadTextureFromChannel(extensionChannels.SpecularColor);
+            result.ExtensionTextures.TransmissionTexture = LoadTextureFromChannel(extensionChannels.Transmission);
+            result.ExtensionTextures.VolumeThicknessTexture = LoadTextureFromChannel(extensionChannels.VolumeThickness);
+
             result.HasTextureTransparency = HasMeaningfulTextureTransparency(result.BaseColorTexture);
             ApplyAlphaFallbackForUnsupportedBlend(result);
 
@@ -283,14 +296,12 @@ namespace Avalonia3D.Loaders
         }
 
 
-        private static void ApplySurfaceSettings(SharpGLTF.Schema2.Material material, Avalonia3D.Model.Material target)
+        private static void ApplySurfaceSettings(SharpGLTF.Schema2.Material material, Avalonia3D.Model.Material target, MaterialExtensionData extensionPayload)
         {
             if (material == null || target == null)
             {
                 return;
             }
-
-            var extensionPayload = _materialExtensionsReader.Read(material);
 
             target.AlphaMode = ParseAlphaMode(material.Alpha);
             target.AlphaCutoff = material.AlphaCutoff;
@@ -432,6 +443,29 @@ namespace Avalonia3D.Loaders
             }
 
             return LoadTextureFromImage(image);
+        }
+
+        private static TextureData? LoadTextureFromChannel(object? channel)
+        {
+            if (channel is MaterialChannel materialChannel)
+            {
+                return LoadTextureFromChannel(materialChannel);
+            }
+
+            if (channel == null)
+            {
+                return null;
+            }
+
+            var textureProperty = channel.GetType().GetProperty("Texture");
+            var texture = textureProperty?.GetValue(channel);
+            var primaryImageProperty = texture?.GetType().GetProperty("PrimaryImage");
+            if (primaryImageProperty?.GetValue(texture) is SharpGLTF.Schema2.Image primaryImage)
+            {
+                return LoadTextureFromImage(primaryImage);
+            }
+
+            return null;
         }
 
         private static TextureData? LoadTextureFromImage(SharpGLTF.Schema2.Image image)

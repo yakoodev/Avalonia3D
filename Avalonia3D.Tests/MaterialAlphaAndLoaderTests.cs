@@ -323,6 +323,30 @@ public sealed class MaterialAlphaAndLoaderTests
         Assert.InRange(material.TransmissionFactor, 0.79f, 0.81f);
     }
 
+
+    [Fact]
+    public void LoadModels_AdvancedExtensions_LoadsExtensionTextureSignals()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"mat-loader-advanced-textures-{Guid.NewGuid():N}.gltf");
+        File.WriteAllText(path, GetAdvancedExtensionsWithTextureSignalsGltfJson());
+
+        var gltf = SharpGLTF.Schema2.ModelRoot.Load(path);
+        var models = ModelLoader.LoadModels(gltf);
+        File.Delete(path);
+        var material = Assert.Single(models).Material;
+
+        Assert.NotNull(material);
+        Assert.InRange(material!.ClearcoatFactor, 0.59f, 0.61f);
+        Assert.InRange(material.ClearcoatRoughness, 0.19f, 0.21f);
+        Assert.Equal(new Vector3(0.1f, 0.2f, 0.3f), material.SheenColorFactor);
+        Assert.InRange(material.SheenRoughnessFactor, 0.39f, 0.41f);
+        Assert.InRange(material.SpecularFactor, 0.89f, 0.91f);
+        Assert.Equal(new Vector3(0.9f, 0.8f, 0.7f), material.SpecularColorFactor);
+        Assert.InRange(material.TransmissionFactor, 0.79f, 0.81f);
+        Assert.InRange(material.TransmissionThickness, 0.19f, 0.21f);
+        Assert.NotNull(material.ExtensionTextures);
+    }
+
     [Fact]
     public void LoadModels_UnknownMaterialExtension_IsIgnoredWithoutCrash()
     {
@@ -677,6 +701,79 @@ public sealed class MaterialAlphaAndLoaderTests
                 "metallicFactor": 0,
                 "roughnessFactor": 1
               }
+            }
+          ],
+          "buffers": [
+            {
+              "uri": "data:application/octet-stream;base64,AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAABAAIA",
+              "byteLength": 42
+            }
+          ],
+          "bufferViews": [
+            { "buffer": 0, "byteOffset": 0, "byteLength": 36, "target": 34962 },
+            { "buffer": 0, "byteOffset": 36, "byteLength": 6, "target": 34963 }
+          ],
+          "accessors": [
+            { "bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3", "min": [0,0,0], "max": [1,1,0] },
+            { "bufferView": 1, "componentType": 5123, "count": 3, "type": "SCALAR" }
+          ]
+        }
+        """;
+
+
+    private static string GetAdvancedExtensionsWithTextureSignalsGltfJson() =>
+        """
+        {
+          "asset": { "version": "2.0" },
+          "extensionsUsed": [
+            "KHR_materials_transmission",
+            "KHR_materials_volume",
+            "KHR_materials_clearcoat",
+            "KHR_materials_sheen",
+            "KHR_materials_specular"
+          ],
+          "scenes": [ { "nodes": [0] } ],
+          "nodes": [ { "mesh": 0, "name": "n" } ],
+          "meshes": [
+            { "primitives": [ { "attributes": { "POSITION": 0 }, "indices": 1, "material": 0 } ] }
+          ],
+          "materials": [
+            {
+              "extensions": {
+                "KHR_materials_transmission": { "transmissionFactor": 0.8, "transmissionTexture": { "index": 0 } },
+                "KHR_materials_volume": { "thicknessFactor": 0.2, "thicknessTexture": { "index": 0 } },
+                "KHR_materials_clearcoat": {
+                  "clearcoatFactor": 0.6,
+                  "clearcoatTexture": { "index": 0 },
+                  "clearcoatRoughnessFactor": 0.2,
+                  "clearcoatRoughnessTexture": { "index": 0 },
+                  "clearcoatNormalTexture": { "index": 0 }
+                },
+                "KHR_materials_sheen": {
+                  "sheenColorFactor": [0.1, 0.2, 0.3],
+                  "sheenColorTexture": { "index": 0 },
+                  "sheenRoughnessFactor": 0.4,
+                  "sheenRoughnessTexture": { "index": 0 }
+                },
+                "KHR_materials_specular": {
+                  "specularFactor": 0.9,
+                  "specularTexture": { "index": 0 },
+                  "specularColorFactor": [0.9, 0.8, 0.7],
+                  "specularColorTexture": { "index": 0 }
+                }
+              },
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [1,1,1,1],
+                "metallicFactor": 0,
+                "roughnessFactor": 1
+              }
+            }
+          ],
+          "textures": [ { "sampler": 0, "source": 0 } ],
+          "samplers": [ { "magFilter": 9729, "minFilter": 9729, "wrapS": 10497, "wrapT": 10497 } ],
+          "images": [
+            {
+              "uri": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR42mP8z8BQDwAFgwJ/lX2NDwAAAABJRU5ErkJggg=="
             }
           ],
           "buffers": [

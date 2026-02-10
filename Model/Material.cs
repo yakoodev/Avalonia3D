@@ -75,6 +75,19 @@ namespace Avalonia3D.Model
 
     public class Material
     {
+        public sealed class MaterialExtensionTextures
+        {
+            public TextureData? ClearcoatTexture { get; set; }
+            public TextureData? ClearcoatRoughnessTexture { get; set; }
+            public TextureData? ClearcoatNormalTexture { get; set; }
+            public TextureData? SheenColorTexture { get; set; }
+            public TextureData? SheenRoughnessTexture { get; set; }
+            public TextureData? SpecularTexture { get; set; }
+            public TextureData? SpecularColorTexture { get; set; }
+            public TextureData? TransmissionTexture { get; set; }
+            public TextureData? VolumeThicknessTexture { get; set; }
+        }
+
         public Vector4 BaseColorFactor { get; set; } = new(1f, 1f, 1f, 1f);
         public float MetallicFactor { get; set; } = 0.0f;
         public float RoughnessFactor { get; set; } = 1.0f;
@@ -204,6 +217,7 @@ namespace Avalonia3D.Model
         public TextureData? MetallicRoughnessTexture { get; set; }
         public TextureData? OcclusionTexture { get; set; }
         public TextureData? EmissiveTexture { get; set; }
+        public MaterialExtensionTextures ExtensionTextures { get; set; } = new();
 
         public IShader? Shader { get; set; }
         public string? ShaderId { get; set; }

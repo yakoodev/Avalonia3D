@@ -28,6 +28,15 @@ namespace Avalonia3D.Rendering
         public uint MetallicRoughnessTextureId { get; internal set; }
         public uint OcclusionTextureId { get; internal set; }
         public uint EmissiveTextureId { get; internal set; }
+        public uint ClearcoatTextureId { get; internal set; }
+        public uint ClearcoatRoughnessTextureId { get; internal set; }
+        public uint ClearcoatNormalTextureId { get; internal set; }
+        public uint SheenColorTextureId { get; internal set; }
+        public uint SheenRoughnessTextureId { get; internal set; }
+        public uint SpecularTextureId { get; internal set; }
+        public uint SpecularColorTextureId { get; internal set; }
+        public uint TransmissionTextureId { get; internal set; }
+        public uint VolumeThicknessTextureId { get; internal set; }
         public int VertexCount { get; internal set; }
         public int IndexCount { get; internal set; }
         public bool IndicesUShort { get; internal set; }
@@ -222,6 +231,15 @@ namespace Avalonia3D.Rendering
             DeleteTextureIfNeeded(resources.MetallicRoughnessTextureId);
             DeleteTextureIfNeeded(resources.OcclusionTextureId);
             DeleteTextureIfNeeded(resources.EmissiveTextureId);
+            DeleteTextureIfNeeded(resources.ClearcoatTextureId);
+            DeleteTextureIfNeeded(resources.ClearcoatRoughnessTextureId);
+            DeleteTextureIfNeeded(resources.ClearcoatNormalTextureId);
+            DeleteTextureIfNeeded(resources.SheenColorTextureId);
+            DeleteTextureIfNeeded(resources.SheenRoughnessTextureId);
+            DeleteTextureIfNeeded(resources.SpecularTextureId);
+            DeleteTextureIfNeeded(resources.SpecularColorTextureId);
+            DeleteTextureIfNeeded(resources.TransmissionTextureId);
+            DeleteTextureIfNeeded(resources.VolumeThicknessTextureId);
         }
 
         private unsafe RenderResources CreateResources(Model3D model)
@@ -277,6 +295,15 @@ namespace Avalonia3D.Rendering
             resources.MetallicRoughnessTextureId = SetupTexture(material.MetallicRoughnessTexture);
             resources.OcclusionTextureId = SetupTexture(material.OcclusionTexture);
             resources.EmissiveTextureId = SetupTexture(material.EmissiveTexture);
+            resources.ClearcoatTextureId = SetupTexture(material.ExtensionTextures.ClearcoatTexture);
+            resources.ClearcoatRoughnessTextureId = SetupTexture(material.ExtensionTextures.ClearcoatRoughnessTexture);
+            resources.ClearcoatNormalTextureId = SetupTexture(material.ExtensionTextures.ClearcoatNormalTexture);
+            resources.SheenColorTextureId = SetupTexture(material.ExtensionTextures.SheenColorTexture);
+            resources.SheenRoughnessTextureId = SetupTexture(material.ExtensionTextures.SheenRoughnessTexture);
+            resources.SpecularTextureId = SetupTexture(material.ExtensionTextures.SpecularTexture);
+            resources.SpecularColorTextureId = SetupTexture(material.ExtensionTextures.SpecularColorTexture);
+            resources.TransmissionTextureId = SetupTexture(material.ExtensionTextures.TransmissionTexture);
+            resources.VolumeThicknessTextureId = SetupTexture(material.ExtensionTextures.VolumeThicknessTexture);
         }
 
         private unsafe void UploadVertexData(Vertex[] vertices, RenderResources resources)
