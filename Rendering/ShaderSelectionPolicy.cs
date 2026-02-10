@@ -1,14 +1,25 @@
 using Avalonia3D.Interfaces;
 using Avalonia3D.Model;
 using Avalonia3D.Shaders;
+using Serilog;
 using Silk.NET.OpenGL;
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 
 namespace Avalonia3D.Rendering;
 
 public sealed class ShaderSelectionPolicy
 {
+    private readonly IPbrVariantReducer _pbrVariantReducer;
+    private readonly IRuntimePbrShaderFactory _runtimePbrShaderFactory;
+
+    public ShaderSelectionPolicy(IPbrVariantReducer? pbrVariantReducer = null, IRuntimePbrShaderFactory? runtimePbrShaderFactory = null)
+    {
+        _pbrVariantReducer = pbrVariantReducer ?? new DefaultPbrVariantReducer();
+        _runtimePbrShaderFactory = runtimePbrShaderFactory ?? new RuntimePbrShaderFactory();
+    }
+
     public IShader3D? Select(Material? material, Scene3D scene, GL? gl)
     {
         if (material?.Shader is IShader3D explicitShader)
@@ -37,7 +48,7 @@ public sealed class ShaderSelectionPolicy
                     return byFeatures;
                 }
 
-                var dynamicPbrShader = TryCreateRuntimePbrVariant(featureShaderId, scene, gl);
+                var dynamicPbrShader = TryCreateRuntimePbrVariant(featureShaderId, scene, gl, _pbrVariantReducer, _runtimePbrShaderFactory);
                 if (dynamicPbrShader != null)
                 {
                     return dynamicPbrShader;
@@ -60,7 +71,7 @@ public sealed class ShaderSelectionPolicy
                 return byFeatures;
             }
 
-            var dynamicPbrShader = TryCreateRuntimePbrVariant(featureShaderId, scene, gl);
+            var dynamicPbrShader = TryCreateRuntimePbrVariant(featureShaderId, scene, gl, _pbrVariantReducer, _runtimePbrShaderFactory);
             if (dynamicPbrShader != null)
             {
                 return dynamicPbrShader;
@@ -247,16 +258,71 @@ public sealed class ShaderSelectionPolicy
         return !string.IsNullOrEmpty(shaderId);
     }
 
-    private static IShader3D? TryCreateRuntimePbrVariant(string shaderId, Scene3D scene, GL? gl)
+    private static IShader3D? TryCreateRuntimePbrVariant(string shaderId, Scene3D scene, GL? gl, IPbrVariantReducer pbrVariantReducer, IRuntimePbrShaderFactory runtimePbrShaderFactory)
     {
-        if (gl == null || !ShaderIds.TryParsePbrVariantId(shaderId, out var features))
+        if (!ShaderIds.TryParsePbrVariantId(shaderId, out var features))
         {
             return null;
         }
 
-        var shader = GLShader.Create(gl, features, scene.ActiveGraphicsProfile.MaxLights);
-        scene.ShaderRegistry.RegisterInstance(shaderId, shader);
-        return shader;
+        var maxLights = scene.ActiveGraphicsProfile.MaxLights;
+
+        foreach (var candidate in EnumerateRuntimeCandidates(features, pbrVariantReducer))
+        {
+            var candidateShaderId = candidate == features ? shaderId : ShaderIds.CreatePbrVariantId(candidate);
+            var cached = scene.ShaderRegistry.Get(candidateShaderId, gl);
+            if (cached != null)
+            {
+                if (candidate != features)
+                {
+                    Log.Warning("Using reduced runtime PBR shader variant '{ShaderId}' instead of requested '{RequestedShaderId}'. requestedFeatures={RequestedFeatures}, reducedFeatures={ReducedFeatures}, maxLights={MaxLights}", candidateShaderId, shaderId, features, candidate, maxLights);
+                }
+
+                return cached;
+            }
+
+            try
+            {
+                var shader = runtimePbrShaderFactory.Create(gl, candidate, maxLights);
+                scene.ShaderRegistry.RegisterInstance(candidateShaderId, shader);
+
+                if (candidate != features)
+                {
+                    Log.Warning("Runtime PBR shader fallback succeeded. requestedShaderId={RequestedShaderId}, fallbackShaderId={FallbackShaderId}, requestedFeatures={RequestedFeatures}, fallbackFeatures={FallbackFeatures}, maxLights={MaxLights}", shaderId, candidateShaderId, features, candidate, maxLights);
+                }
+
+                return shader;
+            }
+            catch (Exception exception)
+            {
+                Log.Warning(exception, "Runtime PBR shader creation failed. shaderId={ShaderId}, features={Features}, maxLights={MaxLights}", candidateShaderId, candidate, maxLights);
+            }
+        }
+
+        var pbrFallback = scene.ShaderRegistry.Get(ShaderIds.Pbr, gl);
+        if (pbrFallback != null)
+        {
+            Log.Warning("Using static PBR fallback after runtime shader compilation failures. requestedShaderId={RequestedShaderId}, features={Features}, maxLights={MaxLights}", shaderId, features, maxLights);
+            return pbrFallback;
+        }
+
+        Log.Warning("Using default shader fallback after runtime shader compilation failures. requestedShaderId={RequestedShaderId}, features={Features}, maxLights={MaxLights}", shaderId, features, maxLights);
+        return scene.ShaderRegistry.GetDefault(gl);
+    }
+
+    private static IEnumerable<PbrFeatures> EnumerateRuntimeCandidates(PbrFeatures features, IPbrVariantReducer reducer)
+    {
+        yield return features;
+
+        foreach (var reduced in reducer.GetReductionChain(features))
+        {
+            if (reduced == features)
+            {
+                continue;
+            }
+
+            yield return reduced;
+        }
     }
 
     private static string? ResolveRequestedShaderId(Scene3D scene)

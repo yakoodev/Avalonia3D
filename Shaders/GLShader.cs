@@ -6,6 +6,8 @@ using Serilog;
 using Silk.NET.OpenGL;
 using System;
 using System.Numerics;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Avalonia3D.Shaders
 {
@@ -122,8 +124,8 @@ namespace Avalonia3D.Shaders
             string vertSource = shaderSource.VertexSource;
             string fragSource = shaderSource.FragmentSource;
 
-            uint vertexShader = CompileShader(ShaderType.VertexShader, vertSource);
-            uint fragmentShader = CompileShader(ShaderType.FragmentShader, fragSource);
+            uint vertexShader = CompileShader(ShaderType.VertexShader, vertSource, fragSource);
+            uint fragmentShader = CompileShader(ShaderType.FragmentShader, fragSource, vertSource);
 
             uint program = _gl.CreateProgram();
             _gl.AttachShader(program, vertexShader);
@@ -147,7 +149,7 @@ namespace Avalonia3D.Shaders
             return program;
         }
 
-        private uint CompileShader(ShaderType type, string source)
+        private uint CompileShader(ShaderType type, string source, string otherSource)
         {
             uint shader = _gl.CreateShader(type);
             _gl.ShaderSource(shader, source);
@@ -156,17 +158,52 @@ namespace Avalonia3D.Shaders
             string infoLog = _gl.GetShaderInfoLog(shader);
             if (!string.IsNullOrEmpty(infoLog))
             {
-                Log.Information($"{type} compile log: {infoLog}");
+                Log.Information("{ShaderType} compile log for features={Features}, maxLights={MaxLights}: {InfoLog}", type, _features, _maxLights, infoLog);
             }
 
             _gl.GetShader(shader, ShaderParameterName.CompileStatus, out int status);
             if (status == 0)
             {
-                Log.Information($"{type} compilation failed: {infoLog}");
-                throw new Exception($"{type} compilation failed");
+                var diagnostic = BuildCompileFailureDiagnostics(type, source, otherSource, infoLog);
+                Log.Information("{ShaderType} compilation failed. {Diagnostic}", type, diagnostic);
+                throw new Exception($"{type} compilation failed. {diagnostic}");
             }
 
             return shader;
+        }
+
+        private string BuildCompileFailureDiagnostics(ShaderType failedType, string failedSource, string otherSource, string compileLog)
+        {
+            var failedPreview = BuildSourcePreview(failedSource);
+            var failedHash = ComputeStableHash(failedSource);
+            var otherHash = ComputeStableHash(otherSource);
+            var otherType = failedType == ShaderType.VertexShader ? ShaderType.FragmentShader : ShaderType.VertexShader;
+
+            return $"features={_features}, maxLights={_maxLights}, failedShader={failedType}, failedShaderHash={failedHash}, {failedType}Log='{compileLog}', {failedType}SourcePreview='{failedPreview}', {otherType}Hash={otherHash}";
+        }
+
+        private static string BuildSourcePreview(string source)
+        {
+            if (string.IsNullOrEmpty(source))
+            {
+                return "<empty>";
+            }
+
+            const int maxLength = 480;
+            var normalized = source.Replace("\r", string.Empty).Trim();
+            if (normalized.Length <= maxLength)
+            {
+                return normalized;
+            }
+
+            return normalized[..maxLength] + " ... <truncated>";
+        }
+
+        private static string ComputeStableHash(string source)
+        {
+            var bytes = Encoding.UTF8.GetBytes(source ?? string.Empty);
+            var hash = SHA256.HashData(bytes);
+            return Convert.ToHexString(hash);
         }
 
         public static IShader3D Create(GL gL)
