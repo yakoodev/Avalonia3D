@@ -394,6 +394,15 @@ namespace Avalonia3D.Loaders
 
                 foreach (var channel in animation.Channels)
                 {
+                    if (IsUnsupportedMorphWeightsChannel(channel))
+                    {
+                        Log.Warning("GLTF animation channel '{PointerPath}' in clip '{Clip}' targets morph weights (node '{NodeName}'). Morph target animation is not supported yet by Avalonia3D runtime renderer, so this channel is skipped.",
+                            channel.TargetPointerPath,
+                            clipName,
+                            channel.TargetNode?.Name ?? $"node:{channel.TargetNode?.LogicalIndex}");
+                        continue;
+                    }
+
                     var extraction = ResolveExtractionTarget(channel);
                     if (extraction == null)
                     {
@@ -542,6 +551,11 @@ namespace Avalonia3D.Loaders
                     }
                     break;
             }
+        }
+
+        private static bool IsUnsupportedMorphWeightsChannel(SharpGLTF.Schema2.AnimationChannel channel)
+        {
+            return channel != null && channel.TargetNodePath == PropertyPath.weights;
         }
 
         private static ChannelExtractionTarget? ResolveExtractionTarget(SharpGLTF.Schema2.AnimationChannel channel)
