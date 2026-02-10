@@ -188,8 +188,9 @@ void main()
     }
 
     float alpha = uAlphaMode == 2 ? sampledAlpha : 1.0;
-    FragColor = vec4(color.rgb + emissive + uEmissionColor, alpha);
-    EmissiveColor = vec4(0.0, 0.0, 0.0, alpha);
+    vec3 totalEmissive = max(emissive + uEmissionColor, vec3(0.0));
+    FragColor = vec4(color.rgb + totalEmissive, alpha);
+    EmissiveColor = vec4(totalEmissive, alpha);
 }";
 
         uint vertex = Compile(ShaderType.VertexShader, vert);
