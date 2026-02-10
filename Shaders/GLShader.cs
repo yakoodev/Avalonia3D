@@ -364,7 +364,7 @@ namespace Avalonia3D.Shaders
             var specularFactor = material?.SpecularFactor ?? 1f;
             var specularColorFactor = material?.SpecularColorFactor ?? Vector3.One;
             var materialIor = material?.Ior ?? 1.5f;
-            var materialEmissiveStrength = material?.EmissiveIntensity ?? 1f;
+            var materialEmissiveStrength = material?.EmissiveStrength ?? 1f;
 
             if (_transmissionFactorLocation != -1)
                 _gl.Uniform1(_transmissionFactorLocation, transmissionFactor);

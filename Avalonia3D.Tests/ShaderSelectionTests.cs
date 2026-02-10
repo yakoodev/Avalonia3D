@@ -170,7 +170,7 @@ public class ShaderSelectionTests
         var scene = CreateScene();
         var material = new Material
         {
-            EmissiveIntensity = 2.5f
+            EmissiveStrength = 2.5f
         };
 
         var shaderId = ShaderSelectionPolicy.ResolvePbrShaderId(material, scene);
@@ -178,6 +178,22 @@ public class ShaderSelectionTests
         Assert.StartsWith(ShaderIds.PbrVariantPrefix, shaderId);
         Assert.True(ShaderIds.TryParsePbrVariantId(shaderId, out var features));
         Assert.True(features.HasFlag(PbrFeatures.EmissiveStrength));
+    }
+
+
+
+    [Fact]
+    public void ResolvePbrShaderId_DoesNotEnableEmissiveStrengthFeature_ForEmissiveIntensityOnly()
+    {
+        var scene = CreateScene();
+        var material = new Material
+        {
+            EmissiveIntensity = 2.5f
+        };
+
+        var shaderId = ShaderSelectionPolicy.ResolvePbrShaderId(material, scene);
+
+        Assert.Equal(ShaderIds.Pbr, shaderId);
     }
 
     [Fact]

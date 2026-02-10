@@ -295,7 +295,7 @@ namespace Avalonia3D.Loaders
             target.AlphaMode = ParseAlphaMode(material.Alpha);
             target.AlphaCutoff = material.AlphaCutoff;
             target.DoubleSided = material.DoubleSided;
-            target.EmissiveIntensity = extensionPayload.EmissiveStrength.Value;
+            target.EmissiveStrength = extensionPayload.EmissiveStrength.Value;
             target.TransmissionFactor = extensionPayload.Transmission.Factor;
             target.TransmissionThickness = extensionPayload.Transmission.Thickness;
             target.TransmissionIor = extensionPayload.Transmission.Ior;
