@@ -154,7 +154,8 @@ void main()
         const string frag = @"#version 300 es
 precision mediump float;
 in vec2 TexCoord;
-out vec4 FragColor;
+layout(location = 0) out vec4 FragColor;
+layout(location = 1) out vec4 EmissiveColor;
 uniform vec4 uBaseColorFactor;
 uniform sampler2D uBaseColorMap;
 uniform int uHasBaseColorMap;
@@ -188,6 +189,7 @@ void main()
 
     float alpha = uAlphaMode == 2 ? sampledAlpha : 1.0;
     FragColor = vec4(color.rgb + emissive + uEmissionColor, alpha);
+    EmissiveColor = vec4(0.0, 0.0, 0.0, alpha);
 }";
 
         uint vertex = Compile(ShaderType.VertexShader, vert);

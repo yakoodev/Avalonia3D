@@ -1,3 +1,4 @@
+using System;
 using Silk.NET.OpenGL;
 
 namespace Avalonia3D.Rendering
@@ -19,6 +20,21 @@ namespace Avalonia3D.Rendering
             gl.Viewport(0, 0, (uint)context.Width, (uint)context.Height);
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, context.RenderContext.FrameState.OutputFramebufferId);
             gl.Enable(EnableCap.DepthTest);
+
+            if (context.RenderContext.FrameState.HasEmissiveTarget)
+            {
+                Span<GLEnum> drawBuffers = stackalloc GLEnum[]
+                {
+                    GLEnum.ColorAttachment0,
+                    GLEnum.ColorAttachment1
+                };
+                gl.DrawBuffers(drawBuffers);
+            }
+            else
+            {
+                Span<GLEnum> drawBuffers = stackalloc GLEnum[] { GLEnum.ColorAttachment0 };
+                gl.DrawBuffers(drawBuffers);
+            }
 
             if (_settings.MsaaPolicy == MsaaPolicy.Disabled)
             {

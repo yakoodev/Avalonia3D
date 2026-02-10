@@ -8,8 +8,6 @@ namespace Avalonia3D.Rendering
     public sealed class BloomPass : IRenderPass
     {
         private readonly GraphicsProfile _settings;
-        private uint _sceneCopyTexture;
-        private uint _sceneCopyFramebuffer;
         private uint _extractProgram;
         private uint _blurProgram;
         private uint _compositeProgram;
@@ -51,15 +49,19 @@ namespace Avalonia3D.Rendering
                 return;
             }
 
-            gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, context.RenderContext.FrameState.OutputFramebufferId);
-            gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, _sceneCopyFramebuffer);
-            gl.BlitFramebuffer(0, 0, context.Width, context.Height, 0, 0, context.Width, context.Height, (uint)ClearBufferMask.ColorBufferBit, GLEnum.Linear);
-
             gl.Disable(EnableCap.DepthTest);
             gl.Disable(EnableCap.Blend);
             gl.BindVertexArray(_vao);
 
-            RenderBrightPass(gl, context.Width, context.Height, runtimeSettings.Threshold, runtimeSettings.MinContribution);
+            if (context.RenderContext.FrameState.EmissiveTextureId == 0)
+            {
+                gl.BindVertexArray(0);
+                gl.UseProgram(0);
+                gl.Viewport(0, 0, (uint)context.Width, (uint)context.Height);
+                return;
+            }
+
+            RenderBrightPass(gl, context.Width, context.Height, runtimeSettings.Threshold, runtimeSettings.MinContribution, context.RenderContext.FrameState.EmissiveTextureId);
             RenderDownsampleBlurChain(gl, bloom.Radius);
             RenderComposite(gl, context.RenderContext.FrameState.OutputFramebufferId, runtimeSettings.Intensity);
 
@@ -70,14 +72,14 @@ namespace Avalonia3D.Rendering
             gl.Viewport(0, 0, (uint)context.Width, (uint)context.Height);
         }
 
-        private void RenderBrightPass(GL gl, int fullWidth, int fullHeight, float threshold, float minContribution)
+        private void RenderBrightPass(GL gl, int fullWidth, int fullHeight, float threshold, float minContribution, uint emissiveTextureId)
         {
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, _levelFramebuffers[0]);
             gl.Viewport(0, 0, (uint)Math.Max(1, fullWidth / 2), (uint)Math.Max(1, fullHeight / 2));
 
             gl.UseProgram(_extractProgram);
             gl.ActiveTexture(TextureUnit.Texture0);
-            gl.BindTexture(TextureTarget.Texture2D, _sceneCopyTexture);
+            gl.BindTexture(TextureTarget.Texture2D, emissiveTextureId);
             gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uSceneTexture"), 0);
             gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uThreshold"), threshold);
             gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uMinContribution"), minContribution);
@@ -141,26 +143,6 @@ namespace Avalonia3D.Rendering
             _cachedHeight = height;
             _levelTextures.Clear();
             _levelFramebuffers.Clear();
-
-            if (_sceneCopyTexture == 0)
-            {
-                _sceneCopyTexture = gl.GenTexture();
-            }
-
-            if (_sceneCopyFramebuffer == 0)
-            {
-                _sceneCopyFramebuffer = gl.GenFramebuffer();
-            }
-
-            gl.BindTexture(TextureTarget.Texture2D, _sceneCopyTexture);
-            gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, (uint)width, (uint)height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, null);
-            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
-            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
-            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
-            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
-
-            gl.BindFramebuffer(FramebufferTarget.Framebuffer, _sceneCopyFramebuffer);
-            gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, TextureTarget.Texture2D, _sceneCopyTexture, 0);
 
             for (var level = 0; level < levels; level++)
             {

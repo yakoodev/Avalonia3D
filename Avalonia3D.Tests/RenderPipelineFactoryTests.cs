@@ -1,4 +1,5 @@
 using Avalonia3D.Rendering;
+using System;
 using System.Linq;
 using Xunit;
 
@@ -86,4 +87,28 @@ public class RenderPipelineFactoryTests
         Assert.Contains("BloomPass", names);
         Assert.DoesNotContain("PostEffectsPass", names);
     }
+    [Fact]
+    public void CreatePasses_BloomEnabled_ContainsForwardBloomAndPostEffectsInOrder()
+    {
+        var settings = GraphicsProfile.High with
+        {
+            PostFx = GraphicsProfile.High.PostFx with
+            {
+                Effects = PostEffectsFlags.Bloom | PostEffectsFlags.ToneMapping | PostEffectsFlags.GammaCorrection,
+                Bloom = GraphicsProfile.High.PostFx.Bloom with { Enabled = true, Intensity = 1.2f }
+            }
+        };
+
+        var passes = _factory.CreatePasses(settings);
+        var names = passes.Select(p => p.Name).ToArray();
+
+        var forwardIndex = Array.IndexOf(names, "ForwardPass");
+        var bloomIndex = Array.IndexOf(names, "BloomPass");
+        var postIndex = Array.IndexOf(names, "PostEffectsPass");
+
+        Assert.True(forwardIndex >= 0);
+        Assert.True(bloomIndex > forwardIndex);
+        Assert.True(postIndex > bloomIndex);
+    }
+
 }
