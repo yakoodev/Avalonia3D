@@ -17,6 +17,8 @@ namespace Avalonia3D.Model.StandObjects
         private Vertex[]? _morphedVertices;
         private float[] _lastAppliedMorphWeights = [];
         private float[] _currentMorphWeights = [];
+        private Vector3 _baseEmissiveFactor = Vector3.Zero;
+        private float _baseEmissiveIntensity = 1f;
 
         public Vector3 LocalBoundsMin { get; private set; } = Vector3.Zero;
         public Vector3 LocalBoundsMax { get; private set; } = Vector3.Zero;
@@ -47,6 +49,8 @@ namespace Avalonia3D.Model.StandObjects
             {
                 BaseColor = new Vector3(model.Material.BaseColorFactor.X, model.Material.BaseColorFactor.Y, model.Material.BaseColorFactor.Z);
                 EmissionColor = model.Material.EmissiveFactor;
+                _baseEmissiveFactor = model.Material.EmissiveFactor;
+                _baseEmissiveIntensity = model.Material.EmissiveIntensity;
                 // Opacity сцены — это runtime override; alpha материала учитывается в shader через baseColor.a
                 Opacity = 1f;
             }
@@ -187,6 +191,8 @@ namespace Avalonia3D.Model.StandObjects
             _morphedVertices = null;
             _lastAppliedMorphWeights = [];
             _currentMorphWeights = [];
+            _baseEmissiveFactor = Vector3.Zero;
+            _baseEmissiveIntensity = 1f;
             _gl = null;
         }
 
@@ -215,8 +221,11 @@ namespace Avalonia3D.Model.StandObjects
                 Array.Copy(_baseVertices, _morphedVertices, _baseVertices.Length);
                 _resourceManager.UpdateVertexBuffer(_resources, _morphedVertices);
                 _lastAppliedMorphWeights = [];
+                RestoreMorphDrivenEmissiveFallback();
                 return;
             }
+
+            ApplyMorphDrivenEmissiveFallback(weights);
 
             if (AreWeightsEqual(weights, _lastAppliedMorphWeights))
             {
@@ -265,6 +274,34 @@ namespace Avalonia3D.Model.StandObjects
 
             _resourceManager.UpdateVertexBuffer(_resources, _morphedVertices);
             _lastAppliedMorphWeights = (float[])weights.Clone();
+        }
+
+
+        private void ApplyMorphDrivenEmissiveFallback(float[] weights)
+        {
+            if (_model?.Material == null || _model.Material.EmissiveTexture == null || weights == null || weights.Length == 0)
+            {
+                return;
+            }
+
+            var redSignal = Math.Clamp(weights[0], 0f, 1f);
+            var dim = 1f - redSignal;
+            _model.Material.EmissiveFactor = new Vector3(
+                MathF.Max(_baseEmissiveFactor.X, redSignal),
+                _baseEmissiveFactor.Y * dim,
+                _baseEmissiveFactor.Z * dim);
+            _model.Material.EmissiveIntensity = MathF.Max(_baseEmissiveIntensity, _baseEmissiveIntensity + (redSignal * 3f));
+        }
+
+        private void RestoreMorphDrivenEmissiveFallback()
+        {
+            if (_model?.Material == null)
+            {
+                return;
+            }
+
+            _model.Material.EmissiveFactor = _baseEmissiveFactor;
+            _model.Material.EmissiveIntensity = _baseEmissiveIntensity;
         }
 
         private static bool AreWeightsEqual(float[] left, float[] right)
