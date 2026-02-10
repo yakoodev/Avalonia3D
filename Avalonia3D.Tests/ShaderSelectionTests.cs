@@ -143,6 +143,43 @@ public class ShaderSelectionTests
         Assert.Same(scene.ShaderRegistry.Get("scene-default"), selected);
     }
 
+
+    [Fact]
+    public void ResolvePbrShaderId_ReturnsDynamicVariant_ForEmissiveAndMetallicWithoutNormalMap()
+    {
+        var scene = CreateScene();
+        var material = new Material
+        {
+            BaseColorTexture = new TextureData(),
+            MetallicRoughnessTexture = new TextureData(),
+            EmissiveTexture = new TextureData()
+        };
+
+        var shaderId = ShaderSelectionPolicy.ResolvePbrShaderId(material, scene);
+
+        Assert.StartsWith(ShaderIds.PbrVariantPrefix, shaderId);
+        Assert.True(ShaderIds.TryParsePbrVariantId(shaderId, out var features));
+        Assert.True(features.HasFlag(PbrFeatures.MetallicRoughnessMap));
+        Assert.True(features.HasFlag(PbrFeatures.EmissiveMap));
+        Assert.False(features.HasFlag(PbrFeatures.NormalMap));
+    }
+
+    [Fact]
+    public void ResolvePbrShaderId_ReturnsDynamicVariant_ForEmissiveStrengthExtension()
+    {
+        var scene = CreateScene();
+        var material = new Material
+        {
+            EmissiveIntensity = 2.5f
+        };
+
+        var shaderId = ShaderSelectionPolicy.ResolvePbrShaderId(material, scene);
+
+        Assert.StartsWith(ShaderIds.PbrVariantPrefix, shaderId);
+        Assert.True(ShaderIds.TryParsePbrVariantId(shaderId, out var features));
+        Assert.True(features.HasFlag(PbrFeatures.EmissiveStrength));
+    }
+
     [Fact]
     public void Select_UsesFallback_WhenNoMaterialAndNoSceneDefault()
     {
