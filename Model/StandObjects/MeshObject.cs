@@ -16,6 +16,7 @@ namespace Avalonia3D.Model.StandObjects
         private Vertex[]? _baseVertices;
         private Vertex[]? _morphedVertices;
         private float[] _lastAppliedMorphWeights = [];
+        private float[] _currentMorphWeights = [];
 
         public Vector3 LocalBoundsMin { get; private set; } = Vector3.Zero;
         public Vector3 LocalBoundsMax { get; private set; } = Vector3.Zero;
@@ -27,6 +28,7 @@ namespace Avalonia3D.Model.StandObjects
             _baseVertices = model?.Vertices == null ? null : (Vertex[])model.Vertices.Clone();
             _morphedVertices = _baseVertices == null ? null : (Vertex[])_baseVertices.Clone();
             _lastAppliedMorphWeights = [];
+            _currentMorphWeights = [];
 
             if (model?.Vertices == null || model.Vertices.Length == 0)
             {
@@ -73,6 +75,13 @@ namespace Avalonia3D.Model.StandObjects
         }
 
         public Material? Material => _model?.Material;
+        public bool SupportsMorphTargets => _model?.HasMorphTargets == true;
+
+        public void SetMorphWeights(float[] weights)
+        {
+            _currentMorphWeights = weights == null ? [] : (float[])weights.Clone();
+            ApplyMorphTargetsIfNeeded();
+        }
 
         private static Vector3 GetCenterOfGravity(Vertex[] vertices)
         {
@@ -177,6 +186,7 @@ namespace Avalonia3D.Model.StandObjects
             _baseVertices = null;
             _morphedVertices = null;
             _lastAppliedMorphWeights = [];
+            _currentMorphWeights = [];
             _gl = null;
         }
 
@@ -194,8 +204,7 @@ namespace Avalonia3D.Model.StandObjects
                 return;
             }
 
-            var weightsNode = ResolveMorphWeightsNode();
-            var weights = weightsNode?.MorphWeights;
+            var weights = _currentMorphWeights;
             if (weights == null || weights.Length == 0)
             {
                 if (_lastAppliedMorphWeights.Length == 0)
@@ -256,22 +265,6 @@ namespace Avalonia3D.Model.StandObjects
 
             _resourceManager.UpdateVertexBuffer(_resources, _morphedVertices);
             _lastAppliedMorphWeights = (float[])weights.Clone();
-        }
-
-        private SceneNode? ResolveMorphWeightsNode()
-        {
-            var current = Node;
-            while (current != null)
-            {
-                if (current.MorphWeights != null && current.MorphWeights.Length > 0)
-                {
-                    return current;
-                }
-
-                current = current.Parent;
-            }
-
-            return null;
         }
 
         private static bool AreWeightsEqual(float[] left, float[] right)

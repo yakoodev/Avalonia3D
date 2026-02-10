@@ -9,8 +9,10 @@ namespace Avalonia3D.Animation
     {
         private readonly Dictionary<AnimationChannel, SceneNode?> _channelNodes = new();
         private readonly Dictionary<AnimationChannel, MeshObject?> _channelMaterialTargets = new();
+        private readonly Dictionary<AnimationChannel, IReadOnlyList<MeshObject>> _channelMorphTargets = new();
         private bool _isStopped;
         private AnimationMaterialTargetResolver _materialTargetResolver;
+        private AnimationMorphTargetResolver _morphTargetResolver;
 
         public AnimationClipPlayer(AnimationClip clip, SceneGraph sceneGraph, Action<AnimationClipPlayer>? onCompleted = null)
         {
@@ -18,6 +20,7 @@ namespace Avalonia3D.Animation
             SceneGraph = sceneGraph ?? throw new ArgumentNullException(nameof(sceneGraph));
             OnCompleted = onCompleted;
             _materialTargetResolver = new AnimationMaterialTargetResolver(SceneGraph);
+            _morphTargetResolver = new AnimationMorphTargetResolver(SceneGraph);
             RebindNodes();
         }
 
@@ -35,6 +38,7 @@ namespace Avalonia3D.Animation
         {
             SceneGraph = sceneGraph ?? throw new ArgumentNullException(nameof(sceneGraph));
             _materialTargetResolver = new AnimationMaterialTargetResolver(SceneGraph);
+            _morphTargetResolver = new AnimationMorphTargetResolver(SceneGraph);
             RebindNodes();
         }
 
@@ -189,7 +193,16 @@ namespace Avalonia3D.Animation
 
             if (channel.FloatArrayKeyframes.Count > 0)
             {
-                node.MorphWeights = channel.SampleFloatArray(time);
+                var weights = channel.SampleFloatArray(time);
+                node.MorphWeights = weights;
+
+                if (_channelMorphTargets.TryGetValue(channel, out var targets))
+                {
+                    foreach (var target in targets)
+                    {
+                        target.SetMorphWeights(weights);
+                    }
+                }
             }
         }
 
@@ -197,6 +210,7 @@ namespace Avalonia3D.Animation
         {
             _channelNodes.Clear();
             _channelMaterialTargets.Clear();
+            _channelMorphTargets.Clear();
 
             foreach (var channel in Clip.Channels)
             {
@@ -205,6 +219,10 @@ namespace Avalonia3D.Animation
                 _channelMaterialTargets[channel] = NeedsMaterialTarget(channel.Property)
                     ? node != null ? _materialTargetResolver.ResolveByNode(node) : null
                     : null;
+
+                _channelMorphTargets[channel] = channel.Property == AnimationTargetProperty.MorphWeights
+                    ? _morphTargetResolver.ResolveTargets(channel.TargetNodeKey)
+                    : [];
             }
         }
 
