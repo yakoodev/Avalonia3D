@@ -18,7 +18,15 @@ namespace Avalonia3D.Model
         public bool DoubleSided { get; set; }
         public float EmissiveIntensity { get; set; } = 1f;
         public bool HasTextureTransparency { get; set; }
+    }
+
+    public sealed class MaterialSurfaceAdvancedSettings
+    {
         public MaterialTransmissionSettings Transmission { get; set; } = new();
+        public MaterialClearcoatSettings Clearcoat { get; set; } = new();
+        public MaterialSheenSettings Sheen { get; set; } = new();
+        public MaterialSpecularSettings Specular { get; set; } = new();
+        public MaterialIorSettings Ior { get; set; } = new();
 
         public bool HasTransmission
         {
@@ -26,11 +34,9 @@ namespace Avalonia3D.Model
             set => Transmission.Enabled = value;
         }
 
-        public float TransmissionFactor
-        {
-            get => Transmission.Factor;
-            set => Transmission.Factor = value;
-        }
+        public bool HasClearcoat => Clearcoat.Factor > 0.001f;
+        public bool HasSheen => Sheen.ColorFactor.LengthSquared() > 0.0001f || Sheen.RoughnessFactor > 0.001f;
+        public bool HasSpecular => Specular.Factor > 0.001f;
     }
 
     public sealed class MaterialTransmissionSettings
@@ -43,6 +49,29 @@ namespace Avalonia3D.Model
         public Vector3 AttenuationColor { get; set; } = Vector3.One;
     }
 
+    public sealed class MaterialClearcoatSettings
+    {
+        public float Factor { get; set; }
+        public float Roughness { get; set; }
+    }
+
+    public sealed class MaterialSheenSettings
+    {
+        public Vector3 ColorFactor { get; set; } = Vector3.Zero;
+        public float RoughnessFactor { get; set; }
+    }
+
+    public sealed class MaterialSpecularSettings
+    {
+        public float Factor { get; set; } = 1f;
+        public Vector3 ColorFactor { get; set; } = Vector3.One;
+    }
+
+    public sealed class MaterialIorSettings
+    {
+        public float Value { get; set; } = 1.5f;
+    }
+
     public class Material
     {
         public Vector4 BaseColorFactor { get; set; } = new(1f, 1f, 1f, 1f);
@@ -53,6 +82,7 @@ namespace Avalonia3D.Model
         public float Opacity { get; set; } = 1.0f;
         public bool IsTransparent { get; set; }
         public MaterialSurfaceSettings Surface { get; set; } = new();
+        public MaterialSurfaceAdvancedSettings SurfaceAdvanced { get; set; } = new();
 
         public MaterialAlphaMode AlphaMode
         {
@@ -86,38 +116,80 @@ namespace Avalonia3D.Model
 
         public bool HasTransmission
         {
-            get => Surface.HasTransmission;
-            set => Surface.HasTransmission = value;
+            get => SurfaceAdvanced.HasTransmission;
+            set => SurfaceAdvanced.HasTransmission = value;
         }
 
         public float TransmissionFactor
         {
-            get => Surface.TransmissionFactor;
-            set => Surface.TransmissionFactor = value;
+            get => SurfaceAdvanced.Transmission.Factor;
+            set => SurfaceAdvanced.Transmission.Factor = value;
         }
 
         public float TransmissionThickness
         {
-            get => Surface.Transmission.Thickness;
-            set => Surface.Transmission.Thickness = value;
+            get => SurfaceAdvanced.Transmission.Thickness;
+            set => SurfaceAdvanced.Transmission.Thickness = value;
         }
 
         public float TransmissionIor
         {
-            get => Surface.Transmission.Ior;
-            set => Surface.Transmission.Ior = value;
+            get => SurfaceAdvanced.Transmission.Ior;
+            set => SurfaceAdvanced.Transmission.Ior = value;
         }
 
         public float TransmissionAttenuationDistance
         {
-            get => Surface.Transmission.AttenuationDistance;
-            set => Surface.Transmission.AttenuationDistance = value;
+            get => SurfaceAdvanced.Transmission.AttenuationDistance;
+            set => SurfaceAdvanced.Transmission.AttenuationDistance = value;
         }
 
         public Vector3 TransmissionAttenuationColor
         {
-            get => Surface.Transmission.AttenuationColor;
-            set => Surface.Transmission.AttenuationColor = value;
+            get => SurfaceAdvanced.Transmission.AttenuationColor;
+            set => SurfaceAdvanced.Transmission.AttenuationColor = value;
+        }
+
+        public float ClearcoatFactor
+        {
+            get => SurfaceAdvanced.Clearcoat.Factor;
+            set => SurfaceAdvanced.Clearcoat.Factor = value;
+        }
+
+        public float ClearcoatRoughness
+        {
+            get => SurfaceAdvanced.Clearcoat.Roughness;
+            set => SurfaceAdvanced.Clearcoat.Roughness = value;
+        }
+
+        public Vector3 SheenColorFactor
+        {
+            get => SurfaceAdvanced.Sheen.ColorFactor;
+            set => SurfaceAdvanced.Sheen.ColorFactor = value;
+        }
+
+        public float SheenRoughnessFactor
+        {
+            get => SurfaceAdvanced.Sheen.RoughnessFactor;
+            set => SurfaceAdvanced.Sheen.RoughnessFactor = value;
+        }
+
+        public float SpecularFactor
+        {
+            get => SurfaceAdvanced.Specular.Factor;
+            set => SurfaceAdvanced.Specular.Factor = value;
+        }
+
+        public Vector3 SpecularColorFactor
+        {
+            get => SurfaceAdvanced.Specular.ColorFactor;
+            set => SurfaceAdvanced.Specular.ColorFactor = value;
+        }
+
+        public float Ior
+        {
+            get => SurfaceAdvanced.Ior.Value;
+            set => SurfaceAdvanced.Ior.Value = value;
         }
 
         public TextureData? BaseColorTexture { get; set; }

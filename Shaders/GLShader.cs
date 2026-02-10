@@ -58,6 +58,14 @@ namespace Avalonia3D.Shaders
         private int _transmissionAttenuationDistanceLocation = -1;
         private int _transmissionAttenuationColorLocation = -1;
         private int _hasTransmissionLocation = -1;
+        private int _clearcoatFactorLocation = -1;
+        private int _clearcoatRoughnessLocation = -1;
+        private int _sheenColorFactorLocation = -1;
+        private int _sheenRoughnessFactorLocation = -1;
+        private int _materialSpecularFactorLocation = -1;
+        private int _materialSpecularColorFactorLocation = -1;
+        private int _materialIorLocation = -1;
+        private int _materialEmissiveStrengthLocation = -1;
 
         public uint Handle => _shaderProgram;
         private GL _gl;
@@ -207,6 +215,14 @@ namespace Avalonia3D.Shaders
             _transmissionAttenuationDistanceLocation = _gl.GetUniformLocation(_shaderProgram, "uTransmissionAttenuationDistance");
             _transmissionAttenuationColorLocation = _gl.GetUniformLocation(_shaderProgram, "uTransmissionAttenuationColor");
             _hasTransmissionLocation = _gl.GetUniformLocation(_shaderProgram, "uHasTransmission");
+            _clearcoatFactorLocation = _gl.GetUniformLocation(_shaderProgram, "uClearcoatFactor");
+            _clearcoatRoughnessLocation = _gl.GetUniformLocation(_shaderProgram, "uClearcoatRoughness");
+            _sheenColorFactorLocation = _gl.GetUniformLocation(_shaderProgram, "uSheenColorFactor");
+            _sheenRoughnessFactorLocation = _gl.GetUniformLocation(_shaderProgram, "uSheenRoughnessFactor");
+            _materialSpecularFactorLocation = _gl.GetUniformLocation(_shaderProgram, "uSpecularFactor");
+            _materialSpecularColorFactorLocation = _gl.GetUniformLocation(_shaderProgram, "uSpecularColorFactor");
+            _materialIorLocation = _gl.GetUniformLocation(_shaderProgram, "uMaterialIor");
+            _materialEmissiveStrengthLocation = _gl.GetUniformLocation(_shaderProgram, "uMaterialEmissiveStrength");
         }
 
         public unsafe void SetUniforms(IRenderContext renderContext, SceneObject sceneObject, Matrix4x4 lightSpaceMatrix = default)
@@ -341,6 +357,15 @@ namespace Avalonia3D.Shaders
             var transmissionAttenuationDistance = material?.TransmissionAttenuationDistance ?? float.PositiveInfinity;
             var transmissionAttenuationColor = material?.TransmissionAttenuationColor ?? Vector3.One;
 
+            var clearcoatFactor = material?.ClearcoatFactor ?? 0f;
+            var clearcoatRoughness = material?.ClearcoatRoughness ?? 0f;
+            var sheenColorFactor = material?.SheenColorFactor ?? Vector3.Zero;
+            var sheenRoughnessFactor = material?.SheenRoughnessFactor ?? 0f;
+            var specularFactor = material?.SpecularFactor ?? 1f;
+            var specularColorFactor = material?.SpecularColorFactor ?? Vector3.One;
+            var materialIor = material?.Ior ?? 1.5f;
+            var materialEmissiveStrength = material?.EmissiveIntensity ?? 1f;
+
             if (_transmissionFactorLocation != -1)
                 _gl.Uniform1(_transmissionFactorLocation, transmissionFactor);
 
@@ -355,6 +380,30 @@ namespace Avalonia3D.Shaders
 
             if (_transmissionAttenuationColorLocation != -1)
                 _gl.Uniform3(_transmissionAttenuationColorLocation, transmissionAttenuationColor.X, transmissionAttenuationColor.Y, transmissionAttenuationColor.Z);
+
+            if (_clearcoatFactorLocation != -1)
+                _gl.Uniform1(_clearcoatFactorLocation, clearcoatFactor);
+
+            if (_clearcoatRoughnessLocation != -1)
+                _gl.Uniform1(_clearcoatRoughnessLocation, clearcoatRoughness);
+
+            if (_sheenColorFactorLocation != -1)
+                _gl.Uniform3(_sheenColorFactorLocation, sheenColorFactor.X, sheenColorFactor.Y, sheenColorFactor.Z);
+
+            if (_sheenRoughnessFactorLocation != -1)
+                _gl.Uniform1(_sheenRoughnessFactorLocation, sheenRoughnessFactor);
+
+            if (_materialSpecularFactorLocation != -1)
+                _gl.Uniform1(_materialSpecularFactorLocation, specularFactor);
+
+            if (_materialSpecularColorFactorLocation != -1)
+                _gl.Uniform3(_materialSpecularColorFactorLocation, specularColorFactor.X, specularColorFactor.Y, specularColorFactor.Z);
+
+            if (_materialIorLocation != -1)
+                _gl.Uniform1(_materialIorLocation, materialIor);
+
+            if (_materialEmissiveStrengthLocation != -1)
+                _gl.Uniform1(_materialEmissiveStrengthLocation, materialEmissiveStrength);
 
             if (_hasTransmissionLocation != -1)
                 _gl.Uniform1(_hasTransmissionLocation, hasTransmission ? 1 : 0);

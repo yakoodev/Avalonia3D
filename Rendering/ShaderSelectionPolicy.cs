@@ -61,10 +61,13 @@ public sealed class ShaderSelectionPolicy
     {
         var features = BuildPbrFeatures(material, scene);
 
-        var isTransmission = features.HasFlag(PbrFeatures.Transmission);
-        var hasCoreMaps = HasAll(features, PbrFeatures.BaseColorMap, PbrFeatures.NormalMap, PbrFeatures.MetallicRoughnessMap);
-        var hasAoEmissive = HasAll(features, PbrFeatures.OcclusionMap, PbrFeatures.EmissiveMap);
-        var hasIbl = features.HasFlag(PbrFeatures.ReflectionsIbl);
+        var selectionMask = PbrFeatures.BaseColorMap | PbrFeatures.NormalMap | PbrFeatures.MetallicRoughnessMap | PbrFeatures.OcclusionMap | PbrFeatures.EmissiveMap | PbrFeatures.ReflectionsIbl | PbrFeatures.Transmission;
+        var selectionFeatures = features & selectionMask;
+
+        var isTransmission = selectionFeatures.HasFlag(PbrFeatures.Transmission);
+        var hasCoreMaps = HasAll(selectionFeatures, PbrFeatures.BaseColorMap, PbrFeatures.NormalMap, PbrFeatures.MetallicRoughnessMap);
+        var hasAoEmissive = HasAll(selectionFeatures, PbrFeatures.OcclusionMap, PbrFeatures.EmissiveMap);
+        var hasIbl = selectionFeatures.HasFlag(PbrFeatures.ReflectionsIbl);
 
         if (isTransmission && hasCoreMaps && hasAoEmissive && hasIbl)
         {
@@ -76,7 +79,7 @@ public sealed class ShaderSelectionPolicy
             return ShaderIds.PbrTransmission;
         }
 
-        return features switch
+        return selectionFeatures switch
         {
             PbrFeatures.BaseColorMap => ShaderIds.PbrBaseColor,
             PbrFeatures.BaseColorMap | PbrFeatures.NormalMap => ShaderIds.PbrBaseColorNormal,
@@ -124,6 +127,31 @@ public sealed class ShaderSelectionPolicy
         if (material.HasTransmission && material.TransmissionFactor > 0.001f)
         {
             features |= PbrFeatures.Transmission;
+        }
+
+        if (material.ClearcoatFactor > 0.001f)
+        {
+            features |= PbrFeatures.Clearcoat;
+        }
+
+        if (material.SheenColorFactor.LengthSquared() > 0.0001f || material.SheenRoughnessFactor > 0.001f)
+        {
+            features |= PbrFeatures.Sheen;
+        }
+
+        if (material.SpecularFactor > 0.001f)
+        {
+            features |= PbrFeatures.Specular;
+        }
+
+        if (Math.Abs(material.Ior - 1.5f) > 0.0001f)
+        {
+            features |= PbrFeatures.Ior;
+        }
+
+        if (Math.Abs(material.EmissiveIntensity - 1f) > 0.0001f)
+        {
+            features |= PbrFeatures.EmissiveStrength;
         }
 
         return features;

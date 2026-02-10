@@ -296,6 +296,46 @@ public sealed class MaterialAlphaAndLoaderTests
         Assert.Equal(new Vector3(0.9f, 0.8f, 0.7f), material.TransmissionAttenuationColor);
     }
 
+
+    [Fact]
+    public void LoadModels_KhrAdvancedExtensions_ReadsAdvancedSurfaceSettings()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"mat-loader-advanced-{Guid.NewGuid():N}.gltf");
+        File.WriteAllText(path, GetAdvancedExtensionsGltfJson());
+
+        var gltf = SharpGLTF.Schema2.ModelRoot.Load(path);
+        var models = ModelLoader.LoadModels(gltf);
+        File.Delete(path);
+        var material = Assert.Single(models).Material;
+
+        Assert.NotNull(material);
+        Assert.InRange(material!.ClearcoatFactor, 0.59f, 0.61f);
+        Assert.InRange(material.ClearcoatRoughness, 0.19f, 0.21f);
+        Assert.Equal(new Vector3(0.1f, 0.2f, 0.3f), material.SheenColorFactor);
+        Assert.InRange(material.SheenRoughnessFactor, 0.39f, 0.41f);
+        Assert.InRange(material.SpecularFactor, 0.89f, 0.91f);
+        Assert.Equal(new Vector3(0.9f, 0.8f, 0.7f), material.SpecularColorFactor);
+        Assert.InRange(material.Ior, 1.69f, 1.71f);
+        Assert.InRange(material.EmissiveIntensity, 2.49f, 2.51f);
+        Assert.True(material.HasTransmission);
+        Assert.InRange(material.TransmissionFactor, 0.79f, 0.81f);
+    }
+
+    [Fact]
+    public void LoadModels_UnknownMaterialExtension_IsIgnoredWithoutCrash()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"mat-loader-unknown-ext-{Guid.NewGuid():N}.gltf");
+        File.WriteAllText(path, GetUnknownExtensionGltfJson());
+
+        var gltf = SharpGLTF.Schema2.ModelRoot.Load(path);
+        var models = ModelLoader.LoadModels(gltf);
+        File.Delete(path);
+
+        var material = Assert.Single(models).Material;
+        Assert.NotNull(material);
+        Assert.Equal(MaterialAlphaMode.Opaque, material!.AlphaMode);
+    }
+
     [Fact]
     public void OpaqueMaterialDefaults_DoNotRegress()
     {
@@ -581,6 +621,108 @@ public sealed class MaterialAlphaAndLoaderTests
                 "baseColorFactor": [1,1,1,1],
                 "metallicFactor": 0,
                 "roughnessFactor": 0.4
+              }
+            }
+          ],
+          "buffers": [
+            {
+              "uri": "data:application/octet-stream;base64,AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAABAAIA",
+              "byteLength": 42
+            }
+          ],
+          "bufferViews": [
+            { "buffer": 0, "byteOffset": 0, "byteLength": 36, "target": 34962 },
+            { "buffer": 0, "byteOffset": 36, "byteLength": 6, "target": 34963 }
+          ],
+          "accessors": [
+            { "bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3", "min": [0,0,0], "max": [1,1,0] },
+            { "bufferView": 1, "componentType": 5123, "count": 3, "type": "SCALAR" }
+          ]
+        }
+        """;
+
+
+    private static string GetAdvancedExtensionsGltfJson() =>
+        """
+        {
+          "asset": { "version": "2.0" },
+          "extensionsUsed": [
+            "KHR_materials_transmission",
+            "KHR_materials_ior",
+            "KHR_materials_emissive_strength",
+            "KHR_materials_clearcoat",
+            "KHR_materials_sheen",
+            "KHR_materials_specular"
+          ],
+          "scenes": [ { "nodes": [0] } ],
+          "nodes": [ { "mesh": 0, "name": "n" } ],
+          "meshes": [
+            { "primitives": [ { "attributes": { "POSITION": 0 }, "indices": 1, "material": 0 } ] }
+          ],
+          "materials": [
+            {
+              "extensions": {
+                "KHR_materials_transmission": { "transmissionFactor": 0.8 },
+                "KHR_materials_ior": { "ior": 1.7 },
+                "KHR_materials_emissive_strength": { "emissiveStrength": 2.5 },
+                "KHR_materials_clearcoat": { "clearcoatFactor": 0.6, "clearcoatRoughnessFactor": 0.2 },
+                "KHR_materials_sheen": { "sheenColorFactor": [0.1, 0.2, 0.3], "sheenRoughnessFactor": 0.4 },
+                "KHR_materials_specular": { "specularFactor": 0.9, "specularColorFactor": [0.9, 0.8, 0.7] }
+              },
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [1,1,1,1],
+                "metallicFactor": 0,
+                "roughnessFactor": 1
+              }
+            }
+          ],
+          "buffers": [
+            {
+              "uri": "data:application/octet-stream;base64,AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAABAAIA",
+              "byteLength": 42
+            }
+          ],
+          "bufferViews": [
+            { "buffer": 0, "byteOffset": 0, "byteLength": 36, "target": 34962 },
+            { "buffer": 0, "byteOffset": 36, "byteLength": 6, "target": 34963 }
+          ],
+          "accessors": [
+            { "bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3", "min": [0,0,0], "max": [1,1,0] },
+            { "bufferView": 1, "componentType": 5123, "count": 3, "type": "SCALAR" }
+          ]
+        }
+        """;
+
+    private static string GetUnknownExtensionGltfJson() =>
+        """
+        {
+          "asset": { "version": "2.0" },
+          "extensionsUsed": ["VENDOR_unknown_material_ext"],
+          "scenes": [ { "nodes": [0] } ],
+          "nodes": [ { "mesh": 0, "name": "n" } ],
+          "meshes": [
+            {
+              "primitives": [
+                {
+                  "attributes": { "POSITION": 0 },
+                  "indices": 1,
+                  "material": 0
+                }
+              ]
+            }
+          ],
+          "materials": [
+            {
+              "extensions": {
+                "VENDOR_unknown_material_ext": {
+                  "foo": 1,
+                  "bar": true
+                }
+              },
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [1,1,1,1],
+                "metallicFactor": 0,
+                "roughnessFactor": 1
               }
             }
           ],
