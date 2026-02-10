@@ -148,6 +148,51 @@ public sealed class ShaderSelectionPolicy
             features |= PbrFeatures.EmissiveStrength;
         }
 
+        if (material.ExtensionTextures.ClearcoatTexture != null)
+        {
+            features |= PbrFeatures.ClearcoatMap;
+        }
+
+        if (material.ExtensionTextures.ClearcoatRoughnessTexture != null)
+        {
+            features |= PbrFeatures.ClearcoatRoughnessMap;
+        }
+
+        if (material.ExtensionTextures.ClearcoatNormalTexture != null)
+        {
+            features |= PbrFeatures.ClearcoatNormalMap;
+        }
+
+        if (material.ExtensionTextures.SheenColorTexture != null)
+        {
+            features |= PbrFeatures.SheenColorMap;
+        }
+
+        if (material.ExtensionTextures.SheenRoughnessTexture != null)
+        {
+            features |= PbrFeatures.SheenRoughnessMap;
+        }
+
+        if (material.ExtensionTextures.SpecularTexture != null)
+        {
+            features |= PbrFeatures.SpecularMap;
+        }
+
+        if (material.ExtensionTextures.SpecularColorTexture != null)
+        {
+            features |= PbrFeatures.SpecularColorMap;
+        }
+
+        if (material.ExtensionTextures.TransmissionTexture != null)
+        {
+            features |= PbrFeatures.TransmissionMap;
+        }
+
+        if (material.ExtensionTextures.VolumeThicknessTexture != null)
+        {
+            features |= PbrFeatures.VolumeThicknessMap;
+        }
+
         return features;
     }
 
