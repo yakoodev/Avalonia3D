@@ -9,6 +9,7 @@ using Avalonia3D.Sandbox.Scenes;
 using Avalonia3D.Sandbox.Services;
 using Avalonia3D.Sandbox.Utilities;
 using Avalonia3D.Shaders;
+using Serilog;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -545,7 +546,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             AvailableClips.Add(clip);
         }
 
-        SelectedClipName = AvailableClips.FirstOrDefault();
+        SelectedClipName = AvailableClips.FirstOrDefault(c => string.Equals(c, "Start_Liftoff", StringComparison.Ordinal))
+            ?? AvailableClips.FirstOrDefault();
     }
 
 
@@ -559,8 +561,25 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         ExecuteOnRenderThread(() =>
         {
             var started = _scene.AnimatorComponent.PlayClip(SelectedClipName, loop: true, speed: (float)PlaybackSpeed);
+            Log.Information("AutoPlay clip attempt. Clip={Clip}, Started={Started}", SelectedClipName, started);
+
             if (!started)
             {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    Dispatcher.UIThread.Post(() => ExecuteOnRenderThread(() =>
+                    {
+                        var retryStarted = _scene.AnimatorComponent.PlayClip(SelectedClipName, loop: true, speed: (float)PlaybackSpeed);
+                        Log.Information("AutoPlay clip retry. Clip={Clip}, Started={Started}", SelectedClipName, retryStarted);
+                        if (!retryStarted)
+                        {
+                            return;
+                        }
+
+                        var retryState = _scene.AnimatorComponent.GetClipState(SelectedClipName);
+                        Dispatcher.UIThread.Post(() => SelectedClipState = retryState);
+                    }), DispatcherPriority.Background);
+                });
                 return;
             }
 

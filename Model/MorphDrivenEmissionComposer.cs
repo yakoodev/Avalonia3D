@@ -28,10 +28,15 @@ namespace Avalonia3D.Model
             var a = Math.Clamp(normalizedActivation, 0f, 1f);
             var dim = 1f - a;
 
+            if (a <= 0.0001f)
+            {
+                return new MorphDrivenEmissionResult(baseEmissiveFactor, baseEmissiveIntensity, baseSceneEmissionColor);
+            }
+
             var factor = new Vector3(
                 MathF.Max(baseEmissiveFactor.X, a),
-                baseEmissiveFactor.Y * dim,
-                baseEmissiveFactor.Z * dim);
+                baseEmissiveFactor.Y * dim * 0.35f,
+                baseEmissiveFactor.Z * dim * 0.35f);
 
             var intensity = MathF.Max(baseEmissiveIntensity, baseEmissiveIntensity + (a * MaterialIntensityBoost));
 
@@ -47,8 +52,8 @@ namespace Avalonia3D.Model
 
             var sceneEmission = new Vector3(
                 sceneRed,
-                baseSceneEmissionColor.Y * dim,
-                baseSceneEmissionColor.Z * dim);
+                baseSceneEmissionColor.Y * dim * 0.1f,
+                baseSceneEmissionColor.Z * dim * 0.1f);
 
             return new MorphDrivenEmissionResult(factor, intensity, sceneEmission);
         }
