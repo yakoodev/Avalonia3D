@@ -106,7 +106,7 @@ void main()
 }";
 
             const string fragment = @"#version 300 es
-precision mediump float;
+precision highp float;
 in vec2 vUv;
 out vec4 FragColor;
 uniform sampler2D uSceneTexture;
@@ -127,19 +127,21 @@ vec3 ApplyToneMapping(vec3 color)
 
 void main()
 {
-    vec3 color = texture(uSceneTexture, vUv).rgb;
+    vec3 color = max(texture(uSceneTexture, vUv).rgb, vec3(0.0));
 
     if (uApplyToneMapping == 1)
     {
         color = ApplyToneMapping(color);
     }
 
+    color = max(color, vec3(0.0));
+
     if (uApplyGamma == 1)
     {
-        color = pow(max(color, vec3(0.0)), vec3(1.0 / max(uGamma, 0.0001)));
+        color = pow(color, vec3(1.0 / max(uGamma, 0.0001)));
     }
 
-    FragColor = vec4(color, 1.0);
+    FragColor = vec4(clamp(color, vec3(0.0), vec3(1.0)), 1.0);
 }";
 
             var vertexShader = CompileShader(gl, ShaderType.VertexShader, vertex);
