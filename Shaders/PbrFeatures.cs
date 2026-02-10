@@ -12,6 +12,10 @@ public enum PbrFeatures
     OcclusionMap = 1 << 3,
     EmissiveMap = 1 << 4,
     ReflectionsIbl = 1 << 5,
-    Transmission = 1 << 6
+    Transmission = 1 << 6,
+    Clearcoat = 1 << 7,
+    Sheen = 1 << 8,
+    Specular = 1 << 9,
+    Ior = 1 << 10,
+    EmissiveStrength = 1 << 11
 }
-

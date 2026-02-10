@@ -30,7 +30,6 @@ void main()
 {
     gl_Position = uMVP * vec4(aPosition, 1.0);
     FragPos = vec3(uModel * vec4(aPosition, 1.0));
-    mat3 normalMatrix = transpose(inverse(mat3(uModel)));
     Normal = normalize(mat3(uModel) * aNormal);
     TexCoord = aTexCoord;
     FragPosLightSpace = uLightSpaceMatrix * vec4(FragPos, 1.0);
@@ -40,98 +39,65 @@ void main()
     private static string BuildFragmentShaderSource(PbrFeatures features, int maxLights)
     {
         var sb = new StringBuilder();
-
         sb.AppendLine("#version 300 es");
         sb.AppendLine("precision mediump float;");
-        sb.AppendLine();
-        sb.AppendLine("in vec2 TexCoord;");
-        sb.AppendLine("in vec3 Normal;");
-        sb.AppendLine("in vec3 FragPos;");
-        sb.AppendLine("in vec4 FragPosLightSpace;");
-        sb.AppendLine();
-        sb.AppendLine("layout(location = 0) out vec4 FragColor;");
-        sb.AppendLine("layout(location = 1) out vec4 EmissiveColor;");
-        sb.AppendLine();
+        sb.AppendLine("in vec2 TexCoord; in vec3 Normal; in vec3 FragPos; in vec4 FragPosLightSpace;");
+        sb.AppendLine("layout(location = 0) out vec4 FragColor; layout(location = 1) out vec4 EmissiveColor;");
         AppendUniforms(sb, maxLights);
         AppendShadowFunction(sb);
+        sb.AppendLine(features.HasFlag(PbrFeatures.NormalMap)
+            ? @"vec3 GetNormal(){ vec3 norm=normalize(Normal); if(uHasNormalMap==0) return norm; vec3 t=texture(uNormalMap, TexCoord).xyz*2.0-1.0; vec3 Q1=dFdx(FragPos); vec3 Q2=dFdy(FragPos); vec2 st1=dFdx(TexCoord); vec2 st2=dFdy(TexCoord); vec3 T=normalize(Q1*st2.t-Q2*st1.t); vec3 B=-normalize(cross(norm,T)); return normalize(mat3(T,B,norm)*t);}"
+            : "vec3 GetNormal(){ return normalize(Normal); }");
+        sb.AppendLine(features.HasFlag(PbrFeatures.ReflectionsIbl)
+            ? @"vec3 ComputeEnvironmentReflection(vec3 n, vec3 v, float r){ if(uHasEnvironmentMap==0) return vec3(0.0); vec3 rd=reflect(-v,n); vec2 uv=vec2(atan(rd.z, rd.x)/(2.0*3.14159265)+0.5, acos(clamp(rd.y,-1.0,1.0))/3.14159265); return texture(uEnvironmentMap, uv).rgb*(1.0-clamp(r,0.0,1.0))*uReflectionIntensity; }"
+            : "vec3 ComputeEnvironmentReflection(vec3 n, vec3 v, float r){ return vec3(0.0); }");
 
-        if (features.HasFlag(PbrFeatures.NormalMap))
+        sb.AppendLine("void main(){ vec3 norm=GetNormal(); vec3 viewDir=normalize(uViewPos-FragPos); vec4 baseColor=uBaseColorFactor;");
+        if (features.HasFlag(PbrFeatures.BaseColorMap)) sb.AppendLine("if(uHasBaseColorMap==1) baseColor*=texture(uBaseColorMap, TexCoord);");
+        sb.AppendLine("float metallic=uMetallicFactor; float roughness=uRoughnessFactor;");
+        if (features.HasFlag(PbrFeatures.MetallicRoughnessMap)) sb.AppendLine("if(uHasMetallicRoughnessMap==1){ vec4 mr=texture(uMetallicRoughnessMap, TexCoord); metallic*=mr.b; roughness*=mr.g; }");
+        sb.AppendLine("float ao=1.0;");
+        if (features.HasFlag(PbrFeatures.OcclusionMap)) sb.AppendLine("if(uHasOcclusionMap==1){ float a=texture(uOcclusionMap, TexCoord).r; ao=mix(1.0,a,uOcclusionStrength);} ");
+        sb.AppendLine("vec3 emissive=uEmissiveFactor*max(uEmissiveIntensity,0.0);");
+        if (features.HasFlag(PbrFeatures.EmissiveMap)) sb.AppendLine("if(uHasEmissiveMap==1) emissive*=texture(uEmissiveMap, TexCoord).rgb;");
+
+        if (features.HasFlag(PbrFeatures.EmissiveStrength)) sb.AppendLine("emissive*=max(uMaterialEmissiveStrength,0.0);");
+        if (features.HasFlag(PbrFeatures.Ior)) sb.AppendLine("float materialIor=max(uMaterialIor,1.0);"); else sb.AppendLine("float materialIor=1.5;");
+
+        sb.AppendLine("vec3 albedo=baseColor.rgb; vec3 diffuseColor=albedo*(1.0-metallic); vec3 specularColor=mix(vec3(0.04), albedo, metallic);");
+        if (features.HasFlag(PbrFeatures.Specular)) sb.AppendLine("specularColor*=clamp(uSpecularFactor,0.0,1.0)*max(uSpecularColorFactor, vec3(0.0));");
+
+        sb.AppendLine($"vec3 resultLight=vec3(0.0); float smoothness=clamp(1.0-roughness,0.04,1.0); float shininess=mix(2.0,float(uShininess),smoothness); for(int i=0;i<{maxLights};i++){{ if(i>=uLightCount) break; vec3 ambient=uAmbientStrength*uLightColor[i]; vec3 lightDir=normalize(uLightPos[i]-FragPos); float diff=max(dot(norm,lightDir),0.0); vec3 diffuse=diff*diffuseColor*uLightColor[i]; vec3 reflectDir=reflect(-lightDir,norm); float spec=pow(max(dot(viewDir,reflectDir),0.0),shininess); vec3 specular=uSpecularStrength*spec*specularColor*uLightColor[i]; float shadow=uHasShadowMap==1?ShadowCalculation(FragPosLightSpace,norm,lightDir):0.0; resultLight+=(ambient+(1.0-shadow)*(diffuse+specular))*uIntensity[i]; }} if(uLightCount==0) resultLight=albedo*0.65;");
+
+        sb.AppendLine("vec3 reflection=ComputeEnvironmentReflection(norm,viewDir,roughness);");
+        if (features.HasFlag(PbrFeatures.Clearcoat)) sb.AppendLine("reflection += ComputeEnvironmentReflection(norm, viewDir, clamp(uClearcoatRoughness,0.0,1.0))*clamp(uClearcoatFactor,0.0,1.0);");
+        if (features.HasFlag(PbrFeatures.Sheen)) sb.AppendLine("vec3 sheenContribution = max(uSheenColorFactor, vec3(0.0)) * (1.0 - clamp(uSheenRoughnessFactor,0.0,1.0));"); else sb.AppendLine("vec3 sheenContribution = vec3(0.0);");
+
+        sb.AppendLine("vec3 totalEmissive = emissive + uEmissionColor; vec3 surfaceResult = resultLight*ao + totalEmissive + reflection + sheenContribution; float sampledAlpha = baseColor.a*uAlpha; if(uAlphaMode==1 && sampledAlpha<uAlphaCutoff){ discard; }");
+
+        if (features.HasFlag(PbrFeatures.Transmission))
         {
-            AppendNormalMappingSection(sb);
+            sb.AppendLine("vec3 transmittedLight=vec3(0.0); if(uHasTransmission==1){ float transmission=clamp(uTransmissionFactor,0.0,1.0); vec3 refractedDir=refract(-viewDir,norm,1.0/max(materialIor,1.0)); float frontLighting=clamp(dot(-refractedDir,norm),0.0,1.0); float thicknessFade=exp(-max(uTransmissionThickness,0.0)); float attenuationDistance=max(uTransmissionAttenuationDistance,0.0001); vec3 attenuation=exp(-uTransmissionAttenuationColor*(uTransmissionThickness/attenuationDistance)); vec3 backgroundEstimate=vec3(0.5+0.5*frontLighting)*attenuation*thicknessFade; transmittedLight=backgroundEstimate*transmission;} vec3 result=mix(surfaceResult, transmittedLight+totalEmissive, uHasTransmission==1?clamp(uTransmissionFactor,0.0,1.0):0.0); float alphaBase=uAlphaMode==2?sampledAlpha:1.0; float transmissionAlpha=max(alphaBase,sampledAlpha); float alpha=mix(alphaBase, transmissionAlpha, float(uHasTransmission)); FragColor=vec4(result, alpha); EmissiveColor=vec4(max(totalEmissive, vec3(0.0)), alpha);");
         }
         else
         {
-            sb.AppendLine("vec3 GetNormal() { return normalize(Normal); }");
-            sb.AppendLine();
+            sb.AppendLine("float alpha=uAlphaMode==2?sampledAlpha:1.0; FragColor=vec4(surfaceResult, alpha); EmissiveColor=vec4(max(totalEmissive, vec3(0.0)), alpha);");
         }
 
-        if (features.HasFlag(PbrFeatures.ReflectionsIbl))
-        {
-            AppendReflectionsSection(sb);
-        }
-        else
-        {
-            sb.AppendLine("vec3 ComputeEnvironmentReflection(vec3 normal, vec3 viewDir, float roughness) { return vec3(0.0); }");
-            sb.AppendLine();
-        }
-
-        AppendMainShaderBody(sb, features, maxLights);
-
+        sb.AppendLine("}");
         return sb.ToString();
     }
 
     private static void AppendUniforms(StringBuilder sb, int maxLights)
     {
-        sb.AppendLine("uniform sampler2D uBaseColorMap;");
-        sb.AppendLine("uniform sampler2D uNormalMap;");
-        sb.AppendLine("uniform sampler2D uMetallicRoughnessMap;");
-        sb.AppendLine("uniform sampler2D uOcclusionMap;");
-        sb.AppendLine("uniform sampler2D uEmissiveMap;");
-        sb.AppendLine();
-        sb.AppendLine("uniform int uHasBaseColorMap;");
-        sb.AppendLine("uniform int uHasNormalMap;");
-        sb.AppendLine("uniform int uHasMetallicRoughnessMap;");
-        sb.AppendLine("uniform int uHasOcclusionMap;");
-        sb.AppendLine("uniform int uHasEmissiveMap;");
-        sb.AppendLine();
-        sb.AppendLine("uniform sampler2D uShadowMap;");
-        sb.AppendLine("uniform int uHasShadowMap;");
-        sb.AppendLine($"uniform vec3 uLightPos[{maxLights}];");
-        sb.AppendLine($"uniform vec3 uLightColor[{maxLights}];");
-        sb.AppendLine($"uniform float uIntensity[{maxLights}];");
-        sb.AppendLine("uniform int uLightCount;");
-        sb.AppendLine();
-        sb.AppendLine("uniform vec3 uViewPos;");
-        sb.AppendLine();
-        sb.AppendLine("uniform float uAmbientStrength;");
-        sb.AppendLine("uniform float uSpecularStrength;");
-        sb.AppendLine("uniform int uShininess;");
-        sb.AppendLine();
-        sb.AppendLine("uniform vec3 uModelColor;");
-        sb.AppendLine("uniform vec3 uEmissionColor;");
-        sb.AppendLine();
-        sb.AppendLine("uniform vec4 uBaseColorFactor;");
-        sb.AppendLine("uniform float uMetallicFactor;");
-        sb.AppendLine("uniform float uRoughnessFactor;");
-        sb.AppendLine("uniform float uOcclusionStrength;");
-        sb.AppendLine("uniform vec3 uEmissiveFactor;");
-        sb.AppendLine();
-        sb.AppendLine("uniform sampler2D uEnvironmentMap;");
-        sb.AppendLine("uniform float uReflectionIntensity;");
-        sb.AppendLine("uniform int uHasEnvironmentMap;");
-        sb.AppendLine();
-        sb.AppendLine("uniform float uAlpha;");
-        sb.AppendLine("uniform float uAlphaCutoff;");
-        sb.AppendLine("uniform int uAlphaMode;");
-        sb.AppendLine("uniform float uEmissiveIntensity;");
-        sb.AppendLine();
-        sb.AppendLine("uniform float uTransmissionFactor;");
-        sb.AppendLine("uniform float uTransmissionThickness;");
-        sb.AppendLine("uniform float uTransmissionIor;");
-        sb.AppendLine("uniform float uTransmissionAttenuationDistance;");
-        sb.AppendLine("uniform vec3 uTransmissionAttenuationColor;");
-        sb.AppendLine("uniform int uHasTransmission;");
-        sb.AppendLine();
+        sb.AppendLine("uniform sampler2D uBaseColorMap; uniform sampler2D uNormalMap; uniform sampler2D uMetallicRoughnessMap; uniform sampler2D uOcclusionMap; uniform sampler2D uEmissiveMap;");
+        sb.AppendLine("uniform int uHasBaseColorMap; uniform int uHasNormalMap; uniform int uHasMetallicRoughnessMap; uniform int uHasOcclusionMap; uniform int uHasEmissiveMap;");
+        sb.AppendLine($"uniform sampler2D uShadowMap; uniform int uHasShadowMap; uniform vec3 uLightPos[{maxLights}]; uniform vec3 uLightColor[{maxLights}]; uniform float uIntensity[{maxLights}]; uniform int uLightCount;");
+        sb.AppendLine("uniform vec3 uViewPos; uniform float uAmbientStrength; uniform float uSpecularStrength; uniform int uShininess;");
+        sb.AppendLine("uniform vec3 uModelColor; uniform vec3 uEmissionColor; uniform vec4 uBaseColorFactor; uniform float uMetallicFactor; uniform float uRoughnessFactor; uniform float uOcclusionStrength; uniform vec3 uEmissiveFactor;");
+        sb.AppendLine("uniform sampler2D uEnvironmentMap; uniform float uReflectionIntensity; uniform int uHasEnvironmentMap; uniform float uAlpha; uniform float uAlphaCutoff; uniform int uAlphaMode; uniform float uEmissiveIntensity;");
+        sb.AppendLine("uniform float uTransmissionFactor; uniform float uTransmissionThickness; uniform float uTransmissionIor; uniform float uTransmissionAttenuationDistance; uniform vec3 uTransmissionAttenuationColor; uniform int uHasTransmission;");
+        sb.AppendLine("uniform float uClearcoatFactor; uniform float uClearcoatRoughness; uniform vec3 uSheenColorFactor; uniform float uSheenRoughnessFactor; uniform float uSpecularFactor; uniform vec3 uSpecularColorFactor; uniform float uMaterialIor; uniform float uMaterialEmissiveStrength;");
     }
 
     private static void AppendShadowFunction(StringBuilder sb)
@@ -140,179 +106,15 @@ void main()
 {
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     projCoords = projCoords * 0.5 + 0.5;
-
     float closestDepth = texture(uShadowMap, projCoords.xy).r;
     float currentDepth = projCoords.z;
-
     float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.0005);
     float shadow = 0.0;
     vec2 texelSize = 1.0 / vec2(textureSize(uShadowMap, 0));
-
-    for(int x = -1; x <= 1; ++x)
-    {
-        for(int y = -1; y <= 1; ++y)
-        {
-            float pcfDepth = texture(uShadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
-            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
-        }
-    }
+    for(int x = -1; x <= 1; ++x){ for(int y = -1; y <= 1; ++y){ float pcfDepth = texture(uShadowMap, projCoords.xy + vec2(x, y) * texelSize).r; shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0; }}
     shadow /= 9.0;
-
-    if(projCoords.z > 1.0)
-        shadow = 0.0;
-
+    if(projCoords.z > 1.0) shadow = 0.0;
     return shadow;
 }");
-        sb.AppendLine();
-    }
-
-    private static void AppendNormalMappingSection(StringBuilder sb)
-    {
-        sb.AppendLine("// normal mapping");
-        sb.AppendLine(@"vec3 GetNormal()
-{
-    vec3 norm = normalize(Normal);
-    if (uHasNormalMap == 0)
-    {
-        return norm;
-    }
-
-    vec3 tangentNormal = texture(uNormalMap, TexCoord).xyz * 2.0 - 1.0;
-
-    vec3 Q1 = dFdx(FragPos);
-    vec3 Q2 = dFdy(FragPos);
-    vec2 st1 = dFdx(TexCoord);
-    vec2 st2 = dFdy(TexCoord);
-
-    vec3 T = normalize(Q1 * st2.t - Q2 * st1.t);
-    vec3 B = -normalize(cross(norm, T));
-    mat3 TBN = mat3(T, B, norm);
-
-    return normalize(TBN * tangentNormal);
-}");
-        sb.AppendLine();
-    }
-
-    private static void AppendReflectionsSection(StringBuilder sb)
-    {
-        sb.AppendLine("// reflections/IBL");
-        sb.AppendLine(@"vec3 ComputeEnvironmentReflection(vec3 normal, vec3 viewDir, float roughness)
-{
-    if (uHasEnvironmentMap == 0)
-    {
-        return vec3(0.0);
-    }
-
-    vec3 reflectionDir = reflect(-viewDir, normal);
-    vec2 envUv = vec2(atan(reflectionDir.z, reflectionDir.x) / (2.0 * 3.14159265) + 0.5, acos(clamp(reflectionDir.y, -1.0, 1.0)) / 3.14159265);
-    vec3 reflectedColor = texture(uEnvironmentMap, envUv).rgb;
-    float roughnessFade = 1.0 - clamp(roughness, 0.0, 1.0);
-    return reflectedColor * roughnessFade * uReflectionIntensity;
-}");
-        sb.AppendLine();
-    }
-
-    private static void AppendMainShaderBody(StringBuilder sb, PbrFeatures features, int maxLights)
-    {
-        sb.AppendLine("void main()");
-        sb.AppendLine("{");
-        sb.AppendLine("    vec3 norm = GetNormal();");
-        sb.AppendLine("    vec3 viewDir = normalize(uViewPos - FragPos);");
-        sb.AppendLine();
-
-        sb.AppendLine("    // base color/albedo");
-        sb.AppendLine("    vec4 baseColor = uBaseColorFactor;");
-        if (features.HasFlag(PbrFeatures.BaseColorMap))
-        {
-            sb.AppendLine("    if (uHasBaseColorMap == 1) { baseColor *= texture(uBaseColorMap, TexCoord); }");
-        }
-        sb.AppendLine();
-
-        sb.AppendLine("    // metallic-roughness");
-        sb.AppendLine("    float metallic = uMetallicFactor;");
-        sb.AppendLine("    float roughness = uRoughnessFactor;");
-        if (features.HasFlag(PbrFeatures.MetallicRoughnessMap))
-        {
-            sb.AppendLine("    if (uHasMetallicRoughnessMap == 1) { vec4 mrSample = texture(uMetallicRoughnessMap, TexCoord); metallic *= mrSample.b; roughness *= mrSample.g; }");
-        }
-        sb.AppendLine();
-
-        sb.AppendLine("    // ao/emissive");
-        sb.AppendLine("    float ao = 1.0;");
-        if (features.HasFlag(PbrFeatures.OcclusionMap))
-        {
-            sb.AppendLine("    if (uHasOcclusionMap == 1) { float aoSample = texture(uOcclusionMap, TexCoord).r; ao = mix(1.0, aoSample, uOcclusionStrength); }");
-        }
-        sb.AppendLine("    vec3 emissive = uEmissiveFactor * max(uEmissiveIntensity, 0.0);");
-        if (features.HasFlag(PbrFeatures.EmissiveMap))
-        {
-            sb.AppendLine("    if (uHasEmissiveMap == 1) { emissive *= texture(uEmissiveMap, TexCoord).rgb; }");
-        }
-        sb.AppendLine();
-
-        sb.AppendLine($@"    vec3 albedo = baseColor.rgb;
-    vec3 diffuseColor = albedo * (1.0 - metallic);
-    vec3 specularColor = mix(vec3(0.04), albedo, metallic);
-
-    vec3 resultLight = vec3(0.0);
-
-    float smoothness = clamp(1.0 - roughness, 0.04, 1.0);
-    float shininess = mix(2.0, float(uShininess), smoothness);
-
-    for (int i = 0; i < {maxLights}; i++)
-    {{
-        if (i >= uLightCount)
-            break;
-
-        vec3 ambient = uAmbientStrength * uLightColor[i];
-
-        vec3 lightDir = normalize(uLightPos[i] - FragPos);
-        float diff = max(dot(norm, lightDir), 0.0);
-        vec3 diffuse = diff * diffuseColor * uLightColor[i];
-
-        vec3 reflectDir = reflect(-lightDir, norm);
-        float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);
-        vec3 specular = uSpecularStrength * spec * specularColor * uLightColor[i];
-
-        float shadow = uHasShadowMap == 1 ? ShadowCalculation(FragPosLightSpace, norm, lightDir) : 0.0;
-        resultLight += (ambient + (1.0 - shadow) * (diffuse + specular)) * uIntensity[i];
-    }}
-
-    if (uLightCount == 0)
-    {{
-        resultLight = albedo * 0.65;
-    }}
-
-    vec3 reflection = ComputeEnvironmentReflection(norm, viewDir, roughness);
-    vec3 totalEmissive = emissive + uEmissionColor;
-    vec3 surfaceResult = resultLight * ao + totalEmissive + reflection;
-    float sampledAlpha = baseColor.a * uAlpha;
-
-    if (uAlphaMode == 1 && sampledAlpha < uAlphaCutoff)
-    {{
-        discard;
-    }}
-
-    vec3 transmittedLight = vec3(0.0);
-    if (uHasTransmission == 1)
-    {{
-        float transmission = clamp(uTransmissionFactor, 0.0, 1.0);
-        vec3 refractedDir = refract(-viewDir, norm, 1.0 / max(uTransmissionIor, 1.0));
-        float frontLighting = clamp(dot(-refractedDir, norm), 0.0, 1.0);
-        float thicknessFade = exp(-max(uTransmissionThickness, 0.0));
-        float attenuationDistance = max(uTransmissionAttenuationDistance, 0.0001);
-        vec3 attenuation = exp(-uTransmissionAttenuationColor * (uTransmissionThickness / attenuationDistance));
-        vec3 backgroundEstimate = vec3(0.5 + 0.5 * frontLighting) * attenuation * thicknessFade;
-        transmittedLight = backgroundEstimate * transmission;
-    }}
-
-    vec3 result = mix(surfaceResult, transmittedLight + totalEmissive, uHasTransmission == 1 ? clamp(uTransmissionFactor, 0.0, 1.0) : 0.0);
-    float alphaBase = uAlphaMode == 2 ? sampledAlpha : 1.0;
-    float transmissionAlpha = max(alphaBase, sampledAlpha);
-    float alpha = mix(alphaBase, transmissionAlpha, float(uHasTransmission));
-
-    FragColor = vec4(result, alpha);
-    EmissiveColor = vec4(max(totalEmissive, vec3(0.0)), alpha);
-}}");
     }
 }
