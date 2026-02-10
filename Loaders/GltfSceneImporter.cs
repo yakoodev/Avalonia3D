@@ -394,15 +394,6 @@ namespace Avalonia3D.Loaders
 
                 foreach (var channel in animation.Channels)
                 {
-                    if (IsUnsupportedMorphWeightsChannel(channel))
-                    {
-                        Log.Warning("GLTF animation channel '{PointerPath}' in clip '{Clip}' targets morph weights (node '{NodeName}'). Morph target animation is not supported yet by Avalonia3D runtime renderer, so this channel is skipped.",
-                            channel.TargetPointerPath,
-                            clipName,
-                            channel.TargetNode?.Name ?? $"node:{channel.TargetNode?.LogicalIndex}");
-                        continue;
-                    }
-
                     var extraction = ResolveExtractionTarget(channel);
                     if (extraction == null)
                     {
@@ -550,14 +541,14 @@ namespace Avalonia3D.Loaders
                         }
                     }
                     break;
+                case AnimationTargetProperty.MorphWeights:
+                    foreach (var (time, value) in sourceChannel.GetMorphSampler().GetLinearKeys())
+                    {
+                        targetChannel.AddKeyframe(time, value);
+                    }
+                    break;
             }
         }
-
-        private static bool IsUnsupportedMorphWeightsChannel(SharpGLTF.Schema2.AnimationChannel channel)
-        {
-            return channel != null && channel.TargetNodePath == PropertyPath.weights;
-        }
-
         private static ChannelExtractionTarget? ResolveExtractionTarget(SharpGLTF.Schema2.AnimationChannel channel)
         {
             var nodePathTarget = MapTargetProperty(channel.TargetNodePath);
@@ -579,6 +570,7 @@ namespace Avalonia3D.Loaders
                 PropertyPath.translation => AnimationTargetProperty.Position,
                 PropertyPath.rotation => AnimationTargetProperty.Rotation,
                 PropertyPath.scale => AnimationTargetProperty.Scale,
+                PropertyPath.weights => AnimationTargetProperty.MorphWeights,
                 _ => null
             };
         }

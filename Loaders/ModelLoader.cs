@@ -214,13 +214,64 @@ namespace Avalonia3D.Loaders
                 PrimitiveKey = primitiveKey,
                 Vertices = vertices,
                 Indices = indices,
-                LocalMatrix = node.LocalMatrix
+                LocalMatrix = node.LocalMatrix,
+                MorphTargets = ReadMorphTargets(prim, positions.Count)
             };
+
+            if (model.HasMorphTargets)
+            {
+                model.PrimitiveKey = string.Empty;
+            }
 
             // Загрузка материала и текстур с кешированием
             LoadMaterialForModel(model, prim);
 
             return model;
+        }
+
+
+        private static MorphTarget[] ReadMorphTargets(MeshPrimitive prim, int vertexCount)
+        {
+            if (prim == null || prim.MorphTargetsCount <= 0 || vertexCount <= 0)
+            {
+                return [];
+            }
+
+            var targets = new MorphTarget[prim.MorphTargetsCount];
+            for (var i = 0; i < prim.MorphTargetsCount; i++)
+            {
+                var accessors = prim.GetMorphTargetAccessors(i);
+                var positionDeltas = new Vector3[vertexCount];
+                var normalDeltas = new Vector3[vertexCount];
+
+                if (accessors.TryGetValue("POSITION", out var positionAccessor) && positionAccessor != null)
+                {
+                    var src = positionAccessor.AsVector3Array();
+                    var count = Math.Min(vertexCount, src.Count);
+                    for (var v = 0; v < count; v++)
+                    {
+                        positionDeltas[v] = src[v];
+                    }
+                }
+
+                if (accessors.TryGetValue("NORMAL", out var normalAccessor) && normalAccessor != null)
+                {
+                    var src = normalAccessor.AsVector3Array();
+                    var count = Math.Min(vertexCount, src.Count);
+                    for (var v = 0; v < count; v++)
+                    {
+                        normalDeltas[v] = src[v];
+                    }
+                }
+
+                targets[i] = new MorphTarget
+                {
+                    PositionDeltas = positionDeltas,
+                    NormalDeltas = normalDeltas
+                };
+            }
+
+            return targets;
         }
 
         private static void LoadMaterialForModel(Model.Model model, MeshPrimitive prim)

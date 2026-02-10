@@ -2,6 +2,7 @@ using Avalonia3D.Interfaces;
 using Avalonia3D.Model;
 using Avalonia3D.Rendering;
 using Silk.NET.OpenGL;
+using System;
 using System.Numerics;
 
 namespace Avalonia3D.Model.StandObjects
@@ -12,6 +13,9 @@ namespace Avalonia3D.Model.StandObjects
         private RenderResourceManager? _resourceManager;
         private GL? _gl;
         private Model? _model;
+        private Vertex[]? _baseVertices;
+        private Vertex[]? _morphedVertices;
+        private float[] _lastAppliedMorphWeights = [];
 
         public Vector3 LocalBoundsMin { get; private set; } = Vector3.Zero;
         public Vector3 LocalBoundsMax { get; private set; } = Vector3.Zero;
@@ -20,6 +24,9 @@ namespace Avalonia3D.Model.StandObjects
         public void AssignModel(Model model)
         {
             _model = model;
+            _baseVertices = model?.Vertices == null ? null : (Vertex[])model.Vertices.Clone();
+            _morphedVertices = _baseVertices == null ? null : (Vertex[])_baseVertices.Clone();
+            _lastAppliedMorphWeights = [];
 
             if (model?.Vertices == null || model.Vertices.Length == 0)
             {
@@ -105,6 +112,8 @@ namespace Avalonia3D.Model.StandObjects
                 return;
             }
 
+            ApplyMorphTargetsIfNeeded();
+
             var shader = renderContext.Scene.ShaderSelectionPolicy.Select(Material, renderContext.Scene, _gl);
             if (shader == null)
             {
@@ -165,9 +174,128 @@ namespace Avalonia3D.Model.StandObjects
             _resources = null;
             _resourceManager = null;
             _model = null;
+            _baseVertices = null;
+            _morphedVertices = null;
+            _lastAppliedMorphWeights = [];
             _gl = null;
         }
 
+
+
+        private void ApplyMorphTargetsIfNeeded()
+        {
+            if (_model == null || _resources == null || _resourceManager == null)
+            {
+                return;
+            }
+
+            if (!_model.HasMorphTargets || _baseVertices == null || _morphedVertices == null)
+            {
+                return;
+            }
+
+            var weightsNode = ResolveMorphWeightsNode();
+            var weights = weightsNode?.MorphWeights;
+            if (weights == null || weights.Length == 0)
+            {
+                if (_lastAppliedMorphWeights.Length == 0)
+                {
+                    return;
+                }
+
+                Array.Copy(_baseVertices, _morphedVertices, _baseVertices.Length);
+                _resourceManager.UpdateVertexBuffer(_resources, _morphedVertices);
+                _lastAppliedMorphWeights = [];
+                return;
+            }
+
+            if (AreWeightsEqual(weights, _lastAppliedMorphWeights))
+            {
+                return;
+            }
+
+            var morphCount = Math.Min(_model.MorphTargets.Length, weights.Length);
+            for (var i = 0; i < _baseVertices.Length; i++)
+            {
+                var baseVertex = _baseVertices[i];
+                var position = baseVertex.Position;
+                var normal = baseVertex.Normal;
+
+                for (var m = 0; m < morphCount; m++)
+                {
+                    var w = weights[m];
+                    if (MathF.Abs(w) < 0.000001f)
+                    {
+                        continue;
+                    }
+
+                    var target = _model.MorphTargets[m];
+                    if (i < target.PositionDeltas.Length)
+                    {
+                        position += target.PositionDeltas[i] * w;
+                    }
+
+                    if (i < target.NormalDeltas.Length)
+                    {
+                        normal += target.NormalDeltas[i] * w;
+                    }
+                }
+
+                if (normal != Vector3.Zero)
+                {
+                    normal = Vector3.Normalize(normal);
+                }
+
+                _morphedVertices[i] = new Vertex
+                {
+                    Position = position,
+                    Normal = normal,
+                    TexCoord = baseVertex.TexCoord
+                };
+            }
+
+            _resourceManager.UpdateVertexBuffer(_resources, _morphedVertices);
+            _lastAppliedMorphWeights = (float[])weights.Clone();
+        }
+
+        private SceneNode? ResolveMorphWeightsNode()
+        {
+            var current = Node;
+            while (current != null)
+            {
+                if (current.MorphWeights != null && current.MorphWeights.Length > 0)
+                {
+                    return current;
+                }
+
+                current = current.Parent;
+            }
+
+            return null;
+        }
+
+        private static bool AreWeightsEqual(float[] left, float[] right)
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left == null || right == null || left.Length != right.Length)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < left.Length; i++)
+            {
+                if (MathF.Abs(left[i] - right[i]) > 0.000001f)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
 
         public static MaterialAlphaMode ResolveAlphaMode(Material? material, float opacity, ShaderRenderMode renderMode)
         {

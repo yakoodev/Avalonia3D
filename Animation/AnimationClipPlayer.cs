@@ -118,6 +118,9 @@ namespace Avalonia3D.Animation
                     case AnimationTargetProperty.EmissiveColor:
                         ApplyMaterialChannel(channel, time);
                         break;
+                    case AnimationTargetProperty.MorphWeights:
+                        ApplyMorphWeightsChannel(channel, time);
+                        break;
                 }
             }
         }
@@ -173,6 +176,20 @@ namespace Avalonia3D.Animation
                         meshObject.Material.EmissiveFactor = channel.SampleVector3(time);
                     }
                     break;
+            }
+        }
+
+
+        private void ApplyMorphWeightsChannel(AnimationChannel channel, float time)
+        {
+            if (!_channelNodes.TryGetValue(channel, out var node) || node == null)
+            {
+                return;
+            }
+
+            if (channel.FloatArrayKeyframes.Count > 0)
+            {
+                node.MorphWeights = channel.SampleFloatArray(time);
             }
         }
 

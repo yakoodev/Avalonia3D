@@ -15,6 +15,7 @@ namespace Avalonia3D.Model
         public Vector3 Position { get; set; } = Vector3.Zero;
         public Quaternion Rotation { get; set; } = Quaternion.Identity;
         public Vector3 Scale { get; set; } = Vector3.One;
+        public float[] MorphWeights { get; set; } = [];
         public SceneNode? Parent { get; private set; }
         public IReadOnlyList<SceneNode> Children => _children;
 

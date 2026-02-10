@@ -130,6 +130,29 @@ public class AnimationTests
 
 
 
+
+    [Fact]
+    public void AnimationClipPlayer_Update_AppliesMorphWeightsToNode()
+    {
+        var graph = new SceneGraph();
+        var node = new SceneNode { Name = "Eye", StableId = "node:eye" };
+        graph.Root.AddChild(node);
+
+        var clip = new AnimationClip("Morph");
+        var channel = new AnimationChannel("node:eye", AnimationTargetProperty.MorphWeights);
+        channel.AddKeyframe(0f, new float[] { 0f, 1f });
+        channel.AddKeyframe(1f, new float[] { 1f, 0f });
+        clip.Channels.Add(channel);
+
+        var player = new AnimationClipPlayer(clip, graph);
+        player.Play(loop: false, speed: 1f);
+
+        Assert.True(player.Update(0.5f));
+        Assert.Equal(2, node.MorphWeights.Length);
+        Assert.InRange(node.MorphWeights[0], 0.49f, 0.51f);
+        Assert.InRange(node.MorphWeights[1], 0.49f, 0.51f);
+    }
+
     [Fact]
     public void AnimationClipPlayer_Update_AppliesEmissiveColorToMaterial()
     {
