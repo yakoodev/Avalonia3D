@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Avalonia3D.Model;
 using Avalonia3D.Model.StandObjects;
+using Serilog;
 
 namespace Avalonia3D.Animation
 {
@@ -36,6 +37,22 @@ namespace Avalonia3D.Animation
 
                 var result = new List<MeshObject>();
                 CollectMeshObjects(rootObject, node, result);
+
+                if (result.Count == 0)
+                {
+                    Log.Warning("Morph resolver found node '{NodeKey}' but no morph-capable mesh targets.", nodeKey);
+                }
+                else
+                {
+                    var summary = string.Join(" | ", result.ConvertAll(m =>
+                    {
+                        var mat = m.Material;
+                        return $"mesh={m.Name ?? m.Node.Name ?? "$mesh"}, hasMorph={m.SupportsMorphTargets}, hasEmissiveTex={mat?.EmissiveTexture != null}, emissiveFactor={mat?.EmissiveFactor}, emissiveIntensity={mat?.EmissiveIntensity}";
+                    }));
+
+                    Log.Debug("Morph resolver targets for node '{NodeKey}': {Summary}", nodeKey, summary);
+                }
+
                 return result;
             }
 

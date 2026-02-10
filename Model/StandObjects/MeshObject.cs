@@ -26,6 +26,8 @@ namespace Avalonia3D.Model.StandObjects
         private readonly MorphDrivenEmissionComposer _morphEmissionComposer = new();
         private Vector3 _baseSceneEmissionColor = Vector3.Zero;
         private bool _hasAdditiveSceneEmissionOverride;
+        private bool _loggedMorphPipelineSnapshot;
+        private float _maxObservedNormalizedActivation;
 
         public Vector3 LocalBoundsMin { get; private set; } = Vector3.Zero;
         public Vector3 LocalBoundsMax { get; private set; } = Vector3.Zero;
@@ -42,6 +44,8 @@ namespace Avalonia3D.Model.StandObjects
             _loggedMorphFallbackApplied = false;
             _morphActivationSignal.Reset();
             _hasAdditiveSceneEmissionOverride = false;
+            _loggedMorphPipelineSnapshot = false;
+            _maxObservedNormalizedActivation = 0f;
 
             if (model?.Vertices == null || model.Vertices.Length == 0)
             {
@@ -146,6 +150,19 @@ namespace Avalonia3D.Model.StandObjects
             }
 
             ApplyMorphTargetsIfNeeded();
+
+            if (_hasAdditiveSceneEmissionOverride && !_loggedMorphPipelineSnapshot && _resources != null)
+            {
+                _loggedMorphPipelineSnapshot = true;
+                Log.Debug("Morph pipeline snapshot for mesh '{MeshId}': hasOverride={HasOverride}, emissionColor={EmissionColor}, materialEmissiveFactor={EmissiveFactor}, materialEmissiveIntensity={EmissiveIntensity}, emissiveTextureBound={HasEmissiveTexture}, emissiveTextureId={EmissiveTextureId}",
+                    Name ?? Node.Name ?? "$mesh",
+                    _hasAdditiveSceneEmissionOverride,
+                    EmissionColor,
+                    _model?.Material?.EmissiveFactor,
+                    _model?.Material?.EmissiveIntensity,
+                    _resources.EmissiveTextureId != 0,
+                    _resources.EmissiveTextureId);
+            }
 
             var shader = renderContext.Scene.ShaderSelectionPolicy.Select(Material, renderContext.Scene, _gl);
             if (shader == null)
@@ -317,6 +334,15 @@ namespace Avalonia3D.Model.StandObjects
 
             var rawActivation = ResolveMorphActivationSignal(weights);
             var redSignal = _morphActivationSignal.Normalize(rawActivation);
+            if (redSignal > _maxObservedNormalizedActivation + 0.05f)
+            {
+                _maxObservedNormalizedActivation = redSignal;
+                Log.Debug("Morph activation peak for mesh '{MeshId}': normalizedActivationPeak={Peak}, rawActivation={Raw}",
+                    Name ?? Node.Name ?? "$mesh",
+                    _maxObservedNormalizedActivation,
+                    rawActivation);
+            }
+
             var composed = _morphEmissionComposer.Compose(
                 _baseEmissiveFactor,
                 _baseEmissiveIntensity,
@@ -369,6 +395,8 @@ namespace Avalonia3D.Model.StandObjects
             _model.Material.EmissiveIntensity = _baseEmissiveIntensity;
             EmissionColor = _baseSceneEmissionColor;
             _hasAdditiveSceneEmissionOverride = false;
+            _loggedMorphPipelineSnapshot = false;
+            _maxObservedNormalizedActivation = 0f;
             _loggedMorphFallbackApplied = false;
         }
 
