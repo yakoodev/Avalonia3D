@@ -27,7 +27,9 @@ public class MorphDrivenEmissionComposerTests
         var c = new MorphDrivenEmissionComposer
         {
             MaterialIntensityBoost = 4f,
-            SceneRedBoost = 2.5f
+            SceneActivationThreshold = 0.05f,
+            SceneRedAtThreshold = 3.5f,
+            SceneRedAtFullActivation = 9f
         };
 
         var r = c.Compose(
@@ -38,6 +40,29 @@ public class MorphDrivenEmissionComposerTests
 
         Assert.Equal(new Vector3(0.5f, 0.4f, 0.3f), r.EmissiveFactor);
         Assert.InRange(r.EmissiveIntensity, 2.99f, 3.01f);
-        Assert.Equal(new Vector3(1.25f, 0.15f, 0.1f), r.SceneEmissionColor);
+        Assert.InRange(r.SceneEmissionColor.X, 6.10f, 6.11f);
+        Assert.InRange(r.SceneEmissionColor.Y, 0.149f, 0.151f);
+        Assert.InRange(r.SceneEmissionColor.Z, 0.099f, 0.101f);
+    }
+
+    [Fact]
+    public void Compose_BelowThreshold_DoesNotForceSceneRedBoost()
+    {
+        var c = new MorphDrivenEmissionComposer
+        {
+            SceneActivationThreshold = 0.2f,
+            SceneRedAtThreshold = 3.5f,
+            SceneRedAtFullActivation = 9f
+        };
+
+        var r = c.Compose(
+            baseEmissiveFactor: new Vector3(0.1f, 0.1f, 0.1f),
+            baseEmissiveIntensity: 1f,
+            baseSceneEmissionColor: new Vector3(0.2f, 0.4f, 0.6f),
+            normalizedActivation: 0.1f);
+
+        Assert.InRange(r.SceneEmissionColor.X, 0.199f, 0.201f);
+        Assert.InRange(r.SceneEmissionColor.Y, 0.359f, 0.361f);
+        Assert.InRange(r.SceneEmissionColor.Z, 0.539f, 0.541f);
     }
 }

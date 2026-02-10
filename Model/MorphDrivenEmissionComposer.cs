@@ -15,7 +15,9 @@ namespace Avalonia3D.Model
     public sealed class MorphDrivenEmissionComposer
     {
         public float MaterialIntensityBoost { get; init; } = 4f;
-        public float SceneRedBoost { get; init; } = 2.5f;
+        public float SceneActivationThreshold { get; init; } = 0.05f;
+        public float SceneRedAtThreshold { get; init; } = 3.5f;
+        public float SceneRedAtFullActivation { get; init; } = 9f;
 
         public MorphDrivenEmissionResult Compose(
             Vector3 baseEmissiveFactor,
@@ -33,8 +35,18 @@ namespace Avalonia3D.Model
 
             var intensity = MathF.Max(baseEmissiveIntensity, baseEmissiveIntensity + (a * MaterialIntensityBoost));
 
+            var sceneActivation = a <= SceneActivationThreshold
+                ? 0f
+                : (a - SceneActivationThreshold) / MathF.Max(1f - SceneActivationThreshold, 0.0001f);
+
+            var sceneRed = sceneActivation <= 0f
+                ? baseSceneEmissionColor.X
+                : MathF.Max(
+                    baseSceneEmissionColor.X,
+                    SceneRedAtThreshold + ((SceneRedAtFullActivation - SceneRedAtThreshold) * sceneActivation));
+
             var sceneEmission = new Vector3(
-                MathF.Max(baseSceneEmissionColor.X, a * SceneRedBoost),
+                sceneRed,
                 baseSceneEmissionColor.Y * dim,
                 baseSceneEmissionColor.Z * dim);
 
