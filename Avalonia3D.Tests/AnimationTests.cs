@@ -310,6 +310,33 @@ public class AnimationTests
         throw new FileNotFoundException($"Test asset {fileName} not found.");
     }
 
+
+    [Fact]
+    public void MeshObject_SetMorphWeights_WithoutMorphTargets_ButWithEmissiveTexture_AppliesFallbackSignal()
+    {
+        var model = new Model.Model
+        {
+            Vertices = new[]
+            {
+                new Vertex { Position = new Vector3(0f, 0f, 0f), Normal = Vector3.UnitY, TexCoord = Vector2.Zero }
+            },
+            Material = new Material
+            {
+                EmissiveFactor = new Vector3(0.2f, 0.2f, 0.2f),
+                EmissiveIntensity = 1f,
+                EmissiveTexture = new TextureData { Width = 1, Height = 1, Data = new byte[] { 255, 255, 255, 255 } }
+            }
+        };
+
+        var mesh = new MeshObject { Name = "EmissiveReceiver" };
+        mesh.AssignModel(model);
+
+        mesh.SetMorphWeights(new[] { 0.8f, 0.1f });
+
+        Assert.True(mesh.Material!.EmissiveIntensity > 1f);
+        Assert.True(mesh.EmissionColor.X > 0.2f);
+    }
+
     private static void AssertVectorEqual(Vector3 expected, Vector3 actual, float epsilon = 0.0001f)
     {
         Assert.True(Vector3.Distance(expected, actual) <= epsilon,

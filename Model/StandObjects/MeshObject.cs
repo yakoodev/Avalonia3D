@@ -105,7 +105,15 @@ namespace Avalonia3D.Model.StandObjects
 
             if (!SupportsMorphTargets && _currentMorphWeights.Length > 0)
             {
-                Log.Warning("Morph weights provided for mesh '{MeshId}' that has no morph targets.", Name ?? Node.Name ?? "$mesh");
+                if (_model?.Material?.EmissiveTexture != null)
+                {
+                    ApplyMorphDrivenEmissiveFallback(_currentMorphWeights);
+                    Log.Debug("Morph signal routed to emissive-only mesh '{MeshId}' (no morph geometry targets).", Name ?? Node.Name ?? "$mesh");
+                }
+                else
+                {
+                    Log.Warning("Morph weights provided for mesh '{MeshId}' that has no morph targets and no emissive texture.", Name ?? Node.Name ?? "$mesh");
+                }
             }
 
             ApplyMorphTargetsIfNeeded();

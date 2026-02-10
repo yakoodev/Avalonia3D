@@ -71,7 +71,7 @@ namespace Avalonia3D.Animation
 
         private static void CollectMeshObjects(SceneObject obj, SceneNode targetNode, List<MeshObject> result)
         {
-            if (ReferenceEquals(obj.Node, targetNode) && obj is MeshObject m && m.SupportsMorphTargets)
+            if (ReferenceEquals(obj.Node, targetNode) && obj is MeshObject m && (m.SupportsMorphTargets || m.Material?.EmissiveTexture != null))
             {
                 result.Add(m);
             }
@@ -82,7 +82,7 @@ namespace Avalonia3D.Animation
                 {
                     foreach (var child in group)
                     {
-                        if (child.SupportsMorphTargets)
+                        if (child.SupportsMorphTargets || child.Material?.EmissiveTexture != null)
                         {
                             result.Add(child);
                         }
