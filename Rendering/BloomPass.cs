@@ -5,11 +5,141 @@ using System.Collections.Generic;
 
 namespace Avalonia3D.Rendering
 {
+    public interface IBloomSourceResolver
+    {
+        BloomSourceResolution Resolve(GL gl, RenderPipelineContext context, BloomProfile bloomProfile);
+    }
+
+    public readonly record struct BloomSourceResolution(uint PrimaryTextureId, uint SecondaryTextureId, float SecondaryContribution, string SourceTag)
+    {
+        public static BloomSourceResolution None => new(0, 0, 0f, "none");
+
+        public bool IsValid => PrimaryTextureId != 0;
+    }
+
+    public sealed class BloomSourceResolver : IBloomSourceResolver
+    {
+        private uint _sceneCopyTexture;
+        private uint _sceneCopyFramebuffer;
+        private int _cachedWidth;
+        private int _cachedHeight;
+
+        public BloomSourceResolution Resolve(GL gl, RenderPipelineContext context, BloomProfile bloomProfile)
+        {
+            var frameState = context.RenderContext.FrameState;
+            var emissiveTextureId = frameState.EmissiveTextureId;
+            var colorTextureId = ResolveColorTexture(gl, context);
+
+            if (emissiveTextureId != 0)
+            {
+                var secondaryContribution = colorTextureId != 0
+                    ? Math.Clamp(bloomProfile.ColorAdditiveContribution, 0f, 1f)
+                    : 0f;
+                return new BloomSourceResolution(emissiveTextureId, colorTextureId, secondaryContribution, secondaryContribution > 0f ? "emissive+color" : "emissive");
+            }
+
+            if (colorTextureId != 0)
+            {
+                return new BloomSourceResolution(colorTextureId, 0, 0f, "color-fallback");
+            }
+
+            return BloomSourceResolution.None;
+        }
+
+        private uint ResolveColorTexture(GL gl, RenderPipelineContext context)
+        {
+            var forwardColorTextureId = context.RenderContext.FrameState.ForwardColorTextureId;
+            if (forwardColorTextureId != 0)
+            {
+                return forwardColorTextureId;
+            }
+
+            if (!EnsureSceneCopyTarget(gl, context.Width, context.Height))
+            {
+                return 0;
+            }
+
+            gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, context.RenderContext.FrameState.OutputFramebufferId);
+            gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, _sceneCopyFramebuffer);
+            gl.BlitFramebuffer(0, 0, context.Width, context.Height, 0, 0, context.Width, context.Height, (uint)ClearBufferMask.ColorBufferBit, GLEnum.Linear);
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, context.RenderContext.FrameState.OutputFramebufferId);
+
+            return _sceneCopyTexture;
+        }
+
+        private unsafe bool EnsureSceneCopyTarget(GL gl, int width, int height)
+        {
+            if (width <= 0 || height <= 0)
+            {
+                return false;
+            }
+
+            if (_sceneCopyTexture != 0 && _cachedWidth == width && _cachedHeight == height)
+            {
+                return true;
+            }
+
+            if (_sceneCopyTexture == 0)
+            {
+                _sceneCopyTexture = gl.GenTexture();
+            }
+
+            if (_sceneCopyFramebuffer == 0)
+            {
+                _sceneCopyFramebuffer = gl.GenFramebuffer();
+            }
+
+            _cachedWidth = width;
+            _cachedHeight = height;
+
+            gl.BindTexture(TextureTarget.Texture2D, _sceneCopyTexture);
+            gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, (uint)width, (uint)height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, null);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, _sceneCopyFramebuffer);
+            gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, TextureTarget.Texture2D, _sceneCopyTexture, 0);
+            gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+            return true;
+        }
+    }
+
+    internal static class BloomRuntimeSettingsResolver
+    {
+        public static (float Threshold, float Intensity, float MinContribution) Resolve(BloomProfile bloom, ShaderRenderMode renderMode, GraphicsProfile graphicsProfile)
+        {
+            if (renderMode == ShaderRenderMode.Unlit)
+            {
+                return (bloom.Threshold * 0.25f, bloom.Intensity * bloom.UnlitIntensityBoost, bloom.EmissiveMinContribution);
+            }
+
+            if (renderMode is ShaderRenderMode.Default or ShaderRenderMode.Pbr)
+            {
+                var postFxEnabled = graphicsProfile.PostFx.Effects.HasFlag(PostEffectsFlags.Bloom) && graphicsProfile.PostFx.Bloom.Enabled;
+                if (!postFxEnabled)
+                {
+                    return (bloom.Threshold, bloom.Intensity, 0f);
+                }
+
+                var exposure = graphicsProfile.PbrTuning.Exposure;
+                var reflection = graphicsProfile.Reflections.Enabled ? graphicsProfile.Reflections.Intensity : 0f;
+                var normalizedExposure = Math.Clamp(exposure, 0.1f, 4f);
+                var threshold = bloom.Threshold / MathF.Sqrt(normalizedExposure);
+                var intensity = bloom.Intensity * (0.85f + (0.3f * normalizedExposure) + (0.25f * reflection));
+                var minContribution = bloom.EmissiveMinContribution * Math.Clamp(0.5f + reflection, 0.25f, 1.5f);
+                return (Math.Clamp(threshold, 0f, 16f), Math.Clamp(intensity, 0f, 8f), Math.Clamp(minContribution, 0f, 1f));
+            }
+
+            return (bloom.Threshold, bloom.Intensity, 0f);
+        }
+    }
+
     public sealed class BloomPass : IRenderPass
     {
         private readonly GraphicsProfile _settings;
-        private uint _sceneCopyTexture;
-        private uint _sceneCopyFramebuffer;
+        private readonly IBloomSourceResolver _sourceResolver;
         private uint _extractProgram;
         private uint _blurProgram;
         private uint _compositeProgram;
@@ -22,9 +152,10 @@ namespace Avalonia3D.Rendering
         private bool _failed;
         private bool _diagnosticsLogged;
 
-        public BloomPass(GraphicsProfile settings)
+        public BloomPass(GraphicsProfile settings, IBloomSourceResolver? sourceResolver = null)
         {
             _settings = settings.Validate();
+            _sourceResolver = sourceResolver ?? new BloomSourceResolver();
         }
 
         public string Name => "BloomPass";
@@ -42,7 +173,7 @@ namespace Avalonia3D.Rendering
                 return;
             }
 
-            var runtimeSettings = ResolveRuntimeSettings(bloom, context.Scene.RenderMode);
+            var runtimeSettings = BloomRuntimeSettingsResolver.Resolve(bloom, context.Scene.RenderMode, _settings);
 
             var gl = context.Gl;
             if (!EnsurePrograms(gl) || !EnsureQuad(gl) || !EnsureTargets(gl, context.Width, context.Height, bloom.Iterations))
@@ -51,8 +182,8 @@ namespace Avalonia3D.Rendering
                 return;
             }
 
-            var sourceTextureId = ResolveBrightPassSource(gl, context);
-            if (sourceTextureId == 0)
+            var source = _sourceResolver.Resolve(gl, context, bloom);
+            if (!source.IsValid)
             {
                 return;
             }
@@ -61,49 +192,36 @@ namespace Avalonia3D.Rendering
             gl.Disable(EnableCap.Blend);
             gl.BindVertexArray(_vao);
 
-            RenderBrightPass(gl, context.Width, context.Height, runtimeSettings.Threshold, runtimeSettings.MinContribution, sourceTextureId);
+            RenderBrightPass(gl, context.Width, context.Height, runtimeSettings.Threshold, runtimeSettings.MinContribution, source);
             RenderDownsampleBlurChain(gl, bloom.Radius);
             RenderComposite(gl, context.RenderContext.FrameState.OutputFramebufferId, runtimeSettings.Intensity);
 
-            LogDiagnosticsOnce(context, runtimeSettings, sourceTextureId == context.RenderContext.FrameState.EmissiveTextureId ? "emissive" : "color-fallback");
+            LogDiagnosticsOnce(context, runtimeSettings, source.SourceTag);
 
             gl.BindVertexArray(0);
             gl.UseProgram(0);
             gl.Viewport(0, 0, (uint)context.Width, (uint)context.Height);
         }
 
-        private uint ResolveBrightPassSource(GL gl, RenderPipelineContext context)
-        {
-            var emissiveTextureId = context.RenderContext.FrameState.EmissiveTextureId;
-            if (emissiveTextureId != 0)
-            {
-                return emissiveTextureId;
-            }
-
-            if (!EnsureSceneCopyTarget(gl, context.Width, context.Height))
-            {
-                return 0;
-            }
-
-            gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, context.RenderContext.FrameState.OutputFramebufferId);
-            gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, _sceneCopyFramebuffer);
-            gl.BlitFramebuffer(0, 0, context.Width, context.Height, 0, 0, context.Width, context.Height, (uint)ClearBufferMask.ColorBufferBit, GLEnum.Linear);
-            gl.BindFramebuffer(FramebufferTarget.Framebuffer, context.RenderContext.FrameState.OutputFramebufferId);
-
-            return _sceneCopyTexture;
-        }
-
-        private void RenderBrightPass(GL gl, int fullWidth, int fullHeight, float threshold, float minContribution, uint sourceTextureId)
+        private void RenderBrightPass(GL gl, int fullWidth, int fullHeight, float threshold, float minContribution, BloomSourceResolution source)
         {
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, _levelFramebuffers[0]);
             gl.Viewport(0, 0, (uint)Math.Max(1, fullWidth / 2), (uint)Math.Max(1, fullHeight / 2));
 
             gl.UseProgram(_extractProgram);
             gl.ActiveTexture(TextureUnit.Texture0);
-            gl.BindTexture(TextureTarget.Texture2D, sourceTextureId);
+            gl.BindTexture(TextureTarget.Texture2D, source.PrimaryTextureId);
             gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uSceneTexture"), 0);
+
+            gl.ActiveTexture(TextureUnit.Texture1);
+            gl.BindTexture(TextureTarget.Texture2D, source.SecondaryTextureId);
+            gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uSecondaryTexture"), 1);
+            gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uSecondaryContribution"), source.SecondaryContribution);
+
             gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uThreshold"), threshold);
             gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uMinContribution"), minContribution);
+            gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uSoftKnee"), _settings.PostFx.Bloom.SoftKnee);
+            gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uNormalizationBoost"), _settings.PostFx.Bloom.NormalizationBoost);
             gl.DrawArrays(PrimitiveType.Triangles, 0, 6);
         }
 
@@ -145,36 +263,6 @@ namespace Avalonia3D.Rendering
             }
 
             gl.Disable(EnableCap.Blend);
-        }
-
-        private unsafe bool EnsureSceneCopyTarget(GL gl, int width, int height)
-        {
-            if (width <= 0 || height <= 0)
-            {
-                return false;
-            }
-
-            if (_sceneCopyTexture == 0)
-            {
-                _sceneCopyTexture = gl.GenTexture();
-            }
-
-            if (_sceneCopyFramebuffer == 0)
-            {
-                _sceneCopyFramebuffer = gl.GenFramebuffer();
-            }
-
-            gl.BindTexture(TextureTarget.Texture2D, _sceneCopyTexture);
-            gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, (uint)width, (uint)height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, null);
-            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
-            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
-            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
-            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
-
-            gl.BindFramebuffer(FramebufferTarget.Framebuffer, _sceneCopyFramebuffer);
-            gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, TextureTarget.Texture2D, _sceneCopyTexture, 0);
-            gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-            return true;
         }
 
         private unsafe bool EnsureTargets(GL gl, int width, int height, int iterations)
@@ -243,18 +331,25 @@ precision mediump float;
 in vec2 vUv;
 out vec4 FragColor;
 uniform sampler2D uSceneTexture;
+uniform sampler2D uSecondaryTexture;
+uniform float uSecondaryContribution;
 uniform float uThreshold;
 uniform float uMinContribution;
+uniform float uSoftKnee;
+uniform float uNormalizationBoost;
 void main()
 {
     vec3 color = texture(uSceneTexture, vUv).rgb;
+    vec3 additive = texture(uSecondaryTexture, vUv).rgb;
+    color += additive * max(uSecondaryContribution, 0.0);
+
     float luminance = max(max(color.r, color.g), color.b);
-    float knee = max(uThreshold * 0.75, 0.0001);
+    float knee = max(uThreshold * max(uSoftKnee, 0.0), 0.0001);
     float soft = clamp((luminance - uThreshold + knee) / (2.0 * knee), 0.0, 1.0);
     float contribution = max(luminance - uThreshold, 0.0) + soft * soft * knee;
     contribution = max(contribution, luminance * max(uMinContribution, 0.0));
     float normalization = contribution / max(luminance, 0.0001);
-    FragColor = vec4(color * normalization * 1.8, 1.0);
+    FragColor = vec4(color * normalization * max(uNormalizationBoost, 0.0), 1.0);
 }";
 
             const string blurFragment = @"#version 300 es
@@ -300,15 +395,15 @@ void main()
                 return true;
             }
 
-            ReadOnlySpan<float> vertices = new float[]
-            {
+            ReadOnlySpan<float> vertices =
+            [
                 -1f, -1f, 0f, 0f,
                  1f, -1f, 1f, 0f,
                  1f,  1f, 1f, 1f,
                 -1f, -1f, 0f, 0f,
                  1f,  1f, 1f, 1f,
                 -1f,  1f, 0f, 1f
-            };
+            ];
 
             _vao = gl.GenVertexArray();
             _vbo = gl.GenBuffer();
@@ -370,16 +465,6 @@ void main()
             }
 
             return shader;
-        }
-
-        private (float Threshold, float Intensity, float MinContribution) ResolveRuntimeSettings(BloomProfile bloom, ShaderRenderMode renderMode)
-        {
-            if (renderMode != ShaderRenderMode.Unlit)
-            {
-                return (bloom.Threshold, bloom.Intensity, 0f);
-            }
-
-            return (bloom.Threshold * 0.25f, bloom.Intensity * 2.5f, 0.035f);
         }
 
         private void LogDiagnosticsOnce(RenderPipelineContext context, (float Threshold, float Intensity, float MinContribution) runtimeSettings, string source)
