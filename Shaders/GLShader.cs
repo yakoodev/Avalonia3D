@@ -2,6 +2,7 @@
 using Avalonia3D.Model;
 using Avalonia3D.Model.StandObjects;
 using Avalonia3D.Rendering;
+using Avalonia3D.Rendering.Diagnostics;
 using Serilog;
 using Silk.NET.OpenGL;
 using System;
@@ -388,6 +389,11 @@ namespace Avalonia3D.Shaders
                 _gl.Uniform3(_viewPosLocation, camera.Position.X, camera.Position.Y, camera.Position.Z);
 
             var material = (sceneObject as Interfaces.IMaterialProvider)?.Material;
+            MaterialRenderDiagnostics.DumpIfEnabled(
+                material,
+                renderContext.Scene,
+                sceneObject.Name ?? sceneObject.Node.Name ?? "$material");
+
             var baseColorFactor = material?.BaseColorFactor ?? new Vector4(sceneObject.BaseColor, 1f);
             var emissiveFactor = material?.EmissiveFactor ?? sceneObject.EmissionColor;
             var metallicFactor = material?.MetallicFactor ?? 0f;
