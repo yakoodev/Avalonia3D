@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Numerics;
 using Avalonia3D.Loaders;
+using Avalonia3D.Loaders.Policies;
 using Avalonia3D.Model;
 using Avalonia3D.Model.StandObjects;
 using Avalonia3D.Rendering;
@@ -59,7 +60,7 @@ public sealed class MaterialAlphaAndLoaderTests
     [Fact]
     public void TextureTransparencyHeuristic_DetectsMeaningfulDeepAlphaCuts()
     {
-        var method = typeof(ModelLoader).GetMethod("HasMeaningfulTextureTransparency", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        var method = typeof(DefaultMaterialImportPolicy).GetMethod("HasMeaningfulTextureTransparency", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
         Assert.NotNull(method);
 
         var texture = new TextureData
@@ -84,7 +85,7 @@ public sealed class MaterialAlphaAndLoaderTests
     [Fact]
     public void TextureTransparencyHeuristic_IgnoresDenseDeepTransparencyMasks()
     {
-        var method = typeof(ModelLoader).GetMethod("HasMeaningfulTextureTransparency", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        var method = typeof(DefaultMaterialImportPolicy).GetMethod("HasMeaningfulTextureTransparency", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
         Assert.NotNull(method);
 
         var texture = new TextureData
@@ -108,7 +109,7 @@ public sealed class MaterialAlphaAndLoaderTests
     [Fact]
     public void TextureTransparencyHeuristic_PreservesTransparentLayer_WhenDenseDeepAndLowOpaque()
     {
-        var method = typeof(ModelLoader).GetMethod("HasMeaningfulTextureTransparency", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        var method = typeof(DefaultMaterialImportPolicy).GetMethod("HasMeaningfulTextureTransparency", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
         Assert.NotNull(method);
 
         var texture = new TextureData
@@ -133,7 +134,7 @@ public sealed class MaterialAlphaAndLoaderTests
     [Fact]
     public void TextureTransparencyHeuristic_IgnoresSparseNearOpaqueAlphaNoise()
     {
-        var method = typeof(ModelLoader).GetMethod("HasMeaningfulTextureTransparency", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        var method = typeof(DefaultMaterialImportPolicy).GetMethod("HasMeaningfulTextureTransparency", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
         Assert.NotNull(method);
 
         var texture = new TextureData
@@ -155,7 +156,7 @@ public sealed class MaterialAlphaAndLoaderTests
     [Fact]
     public void TextureTransparencyHeuristic_IgnoresAlmostFullyTransparentTextures()
     {
-        var method = typeof(ModelLoader).GetMethod("HasMeaningfulTextureTransparency", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        var method = typeof(DefaultMaterialImportPolicy).GetMethod("HasMeaningfulTextureTransparency", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
         Assert.NotNull(method);
 
         var texture = new TextureData
@@ -479,6 +480,59 @@ public sealed class MaterialAlphaAndLoaderTests
             });
 
         Assert.Equal(MaterialAlphaImportProfile.Strict, fromEnv);
+    }
+
+    [Fact]
+    public void MaterialImportOverrideConfiguration_ResolveFromArgsAndEnvironment()
+    {
+        var fromArgs = MaterialImportOverrideConfiguration.ResolveConfigPath(new[] { "--material-import-overrides=cfg/materials.json" });
+        Assert.Equal("cfg/materials.json", fromArgs);
+
+        var fromEnv = MaterialImportOverrideConfiguration.ResolveConfigPath(
+            args: Array.Empty<string>(),
+            environment: new System.Collections.Generic.Dictionary<string, string?>
+            {
+                ["AVALONIA3D_MATERIAL_IMPORT_OVERRIDES"] = "cfg/env.json"
+            });
+
+        Assert.Equal("cfg/env.json", fromEnv);
+    }
+
+    [Fact]
+    public void DefaultMaterialImportPolicy_SceneOverride_CanForceOpaqueForDroidScene()
+    {
+        MaterialImportOverrideConfiguration.Configure(new System.Collections.Generic.Dictionary<string, MaterialSceneImportOverride>
+        {
+            ["Assets/TestScenes/droid/scene.gltf"] = new()
+            {
+                ForceAlphaMode = MaterialAlphaMode.Opaque
+            }
+        });
+
+        try
+        {
+            var sceneOverride = MaterialImportOverrideConfiguration.ResolveForAsset("/workspace/Avalonia3D/Avalonia3D.Sandbox/Assets/TestScenes/droid/scene.gltf");
+            var context = new MaterialImportPolicyContext
+            {
+                AlphaProfile = MaterialAlphaImportProfile.Balanced,
+                SceneOverride = sceneOverride
+            };
+
+            var policy = new DefaultMaterialImportPolicy();
+            var material = new Avalonia3D.Model.Material
+            {
+                AlphaMode = MaterialAlphaMode.Blend,
+                BaseColorFactor = new Vector4(1f, 1f, 1f, 1f)
+            };
+
+            var mode = policy.ResolveAlphaMode(material, context);
+
+            Assert.Equal(MaterialAlphaMode.Opaque, mode);
+        }
+        finally
+        {
+            MaterialImportOverrideConfiguration.Configure(null);
+        }
     }
 
     [Fact]

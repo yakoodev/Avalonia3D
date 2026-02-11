@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.LinuxFramebuffer;
 using Avalonia.LinuxFramebuffer.Input.LibInput;
 using Avalonia3D.Loaders;
+using Avalonia3D.Loaders.Policies;
 using Serilog;
 using System;
 using System.Linq;
@@ -14,6 +15,8 @@ internal static class Program
     public static int Main(string[] args)
     {
         ImportValidationConfiguration.Configure(ImportValidationConfiguration.ResolveFrom(args));
+        MaterialAlphaImportConfiguration.Configure(MaterialAlphaImportConfiguration.ResolveFrom(args));
+        MaterialImportOverrideConfiguration.ConfigureFromPath(MaterialImportOverrideConfiguration.ResolveConfigPath(args));
 
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()

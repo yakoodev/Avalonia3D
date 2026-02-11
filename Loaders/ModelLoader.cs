@@ -1,5 +1,6 @@
 ﻿// File: ModelLoader.cs - Optimized Version
 using Avalonia3D.Model;
+using Avalonia3D.Loaders.Policies;
 using Avalonia3D.Rendering;
 using Serilog;
 using SharpGLTF.Schema2;
@@ -18,46 +19,8 @@ namespace Avalonia3D.Loaders
 {
     public static class ModelLoader
     {
-        private enum TextureAlphaHeuristicProfile
-        {
-            Strict,
-            Balanced,
-            Permissive
-        }
-
-        private static class TextureAlphaHeuristics
-        {
-            public const byte SoftTransparentAlphaThreshold = 253;
-            public const byte RegularTransparentAlphaThreshold = 245;
-            public const byte DeepTransparentAlphaThreshold = 64;
-            public const byte OpaqueAlphaThreshold = 254;
-
-            public const int MaxSamples = 8192;
-            public const float MinOpaqueRatio = 0.05f;
-            public const float MinDeepTransparentRatio = 0.001f;
-            public const float MinRegularTransparentRatio = 0.01f;
-            public const float MinSoftTransparentRatio = 0.15f;
-
-            public const float DenseDeepMaskOpaqueRatio = 0.35f;
-            public const float StrictDenseDeepMaskRatio = 0.15f;
-            public const float BalancedDenseDeepMaskRatio = 0.20f;
-            public const float PermissiveDenseDeepMaskRatio = 0.35f;
-
-            public static TextureAlphaHeuristicProfile ActiveProfile { get; set; } = TextureAlphaHeuristicProfile.Balanced;
-
-            public static float GetDenseDeepMaskRatioThreshold()
-            {
-                return ActiveProfile switch
-                {
-                    TextureAlphaHeuristicProfile.Strict => StrictDenseDeepMaskRatio,
-                    TextureAlphaHeuristicProfile.Permissive => PermissiveDenseDeepMaskRatio,
-                    _ => BalancedDenseDeepMaskRatio,
-                };
-            }
-        }
-
         private static readonly GltfMaterialExtensionsReader _materialExtensionsReader = new();
-        private static readonly MaterialAlphaImportPolicy _materialAlphaImportPolicy = new();
+        private static readonly IMaterialImportPolicy _materialImportPolicy = new DefaultMaterialImportPolicy();
 
         private unsafe static long EstimateModelMemory(Model.Model m)
         {
@@ -119,16 +82,21 @@ namespace Avalonia3D.Loaders
             }
         }
 
-        public static List<Model.Model> LoadModels(ModelRoot gltf)
+        public static List<Model.Model> LoadModels(ModelRoot gltf, MaterialImportPolicyContext? policyContext = null)
         {
             var models = new List<Model.Model>();
             if (gltf == null) return models;
+
+            policyContext ??= new MaterialImportPolicyContext
+            {
+                AlphaProfile = MaterialAlphaImportConfiguration.CurrentProfile
+            };
 
             try
             {
                 foreach (var node in gltf.LogicalNodes)
                 {
-                    models.AddRange(LoadModelsForNode(node));
+                    models.AddRange(LoadModelsForNode(node, policyContext));
                 }
 
                 // Принудительная сборка мусора после загрузки
@@ -144,7 +112,7 @@ namespace Avalonia3D.Loaders
             }
         }
 
-        public static List<Model.Model> LoadModelsForNode(Node node)
+        public static List<Model.Model> LoadModelsForNode(Node node, MaterialImportPolicyContext? policyContext = null)
         {
             var models = new List<Model.Model>();
             if (node?.Mesh == null)
@@ -152,9 +120,14 @@ namespace Avalonia3D.Loaders
                 return models;
             }
 
+            policyContext ??= new MaterialImportPolicyContext
+            {
+                AlphaProfile = MaterialAlphaImportConfiguration.CurrentProfile
+            };
+
             foreach (var prim in node.Mesh.Primitives)
             {
-                var model = LoadPrimitive(prim, node);
+                var model = LoadPrimitive(prim, node, policyContext);
                 if (model != null)
                 {
                     models.Add(model);
@@ -167,7 +140,7 @@ namespace Avalonia3D.Loaders
             return models;
         }
 
-        internal static Model.Model LoadPrimitive(MeshPrimitive prim, Node node)
+        internal static Model.Model LoadPrimitive(MeshPrimitive prim, Node node, MaterialImportPolicyContext? policyContext = null)
         {
             var posAccessor = prim.GetVertexAccessor("POSITION");
             if (posAccessor == null) return null;
@@ -227,7 +200,7 @@ namespace Avalonia3D.Loaders
             }
 
             // Загрузка материала и текстур с кешированием
-            LoadMaterialForModel(model, prim);
+            LoadMaterialForModel(model, prim, policyContext);
 
             return model;
         }
@@ -277,7 +250,7 @@ namespace Avalonia3D.Loaders
             return targets;
         }
 
-        private static void LoadMaterialForModel(Model.Model model, MeshPrimitive prim)
+        private static void LoadMaterialForModel(Model.Model model, MeshPrimitive prim, MaterialImportPolicyContext? policyContext)
         {
             if (model == null)
             {
@@ -289,6 +262,11 @@ namespace Avalonia3D.Loaders
             {
                 return;
             }
+
+            policyContext ??= new MaterialImportPolicyContext
+            {
+                AlphaProfile = MaterialAlphaImportConfiguration.CurrentProfile
+            };
 
             var result = new Avalonia3D.Model.Material();
             ApplyPbrFactors(material, result);
@@ -345,8 +323,9 @@ namespace Avalonia3D.Loaders
             result.ExtensionTextures.TransmissionTexture = LoadTextureFromChannel(extensionChannels.Transmission);
             result.ExtensionTextures.VolumeThicknessTexture = LoadTextureFromChannel(extensionChannels.VolumeThickness);
 
-            result.HasTextureTransparency = HasMeaningfulTextureTransparency(result.BaseColorTexture);
-            _materialAlphaImportPolicy.Apply(result, MaterialAlphaImportConfiguration.CurrentProfile);
+            _ = _materialImportPolicy.ResolveColorSpaceHandling(result, TextureSemantic.BaseColor, policyContext);
+            _ = _materialImportPolicy.ResolveColorSpaceHandling(result, TextureSemantic.Emissive, policyContext);
+            result.AlphaMode = _materialImportPolicy.ResolveAlphaMode(result, policyContext);
 
             result.IsTransparent = result.AlphaMode == MaterialAlphaMode.Blend;
 
@@ -389,93 +368,6 @@ namespace Avalonia3D.Loaders
                 AlphaMode.BLEND => MaterialAlphaMode.Blend,
                 _ => MaterialAlphaMode.Opaque
             };
-        }
-
-        private static bool HasMeaningfulTextureTransparency(TextureData? texture)
-        {
-            if (texture?.Data == null || texture.Data.Length < 4)
-            {
-                return false;
-            }
-
-            var data = texture.Data;
-            var pixelCount = data.Length / 4;
-            if (pixelCount <= 0)
-            {
-                return false;
-            }
-
-            int sampled = 0;
-            int softTransparent = 0;
-            int regularTransparent = 0;
-            int deepTransparent = 0;
-            int opaque = 0;
-
-            int stepPixels = Math.Max(1, pixelCount / TextureAlphaHeuristics.MaxSamples);
-            var step = stepPixels * 4;
-
-            for (int i = 3; i < data.Length; i += step)
-            {
-                sampled++;
-                var alpha = data[i];
-
-                if (alpha <= TextureAlphaHeuristics.SoftTransparentAlphaThreshold)
-                {
-                    softTransparent++;
-                }
-
-                if (alpha <= TextureAlphaHeuristics.RegularTransparentAlphaThreshold)
-                {
-                    regularTransparent++;
-                }
-
-                if (alpha <= TextureAlphaHeuristics.DeepTransparentAlphaThreshold)
-                {
-                    deepTransparent++;
-                }
-
-                if (alpha >= TextureAlphaHeuristics.OpaqueAlphaThreshold)
-                {
-                    opaque++;
-                }
-            }
-
-            if (sampled == 0)
-            {
-                return false;
-            }
-
-            var opaqueRatio = opaque / (float)sampled;
-            if (opaqueRatio < TextureAlphaHeuristics.MinOpaqueRatio)
-            {
-                // Если texture alpha почти полностью прозрачная, это обычно служебный канал,
-                // а не осмысленная геометрическая прозрачность.
-                return false;
-            }
-
-            var deepTransparentRatio = deepTransparent / (float)sampled;
-            var denseDeepMaskThreshold = TextureAlphaHeuristics.GetDenseDeepMaskRatioThreshold();
-            if (deepTransparentRatio > denseDeepMaskThreshold &&
-                opaqueRatio >= TextureAlphaHeuristics.DenseDeepMaskOpaqueRatio)
-            {
-                // Плотная глубокая alpha вместе с заметной долей полностью непрозрачных пикселей
-                // обычно означает маску экспорта/вырез, а не полупрозрачную поверхность.
-                return false;
-            }
-
-            if (deepTransparentRatio >= TextureAlphaHeuristics.MinDeepTransparentRatio)
-            {
-                return true;
-            }
-
-            var regularTransparentRatio = regularTransparent / (float)sampled;
-            if (regularTransparentRatio >= TextureAlphaHeuristics.MinRegularTransparentRatio)
-            {
-                return true;
-            }
-
-            var softTransparentRatio = softTransparent / (float)sampled;
-            return softTransparentRatio >= TextureAlphaHeuristics.MinSoftTransparentRatio;
         }
 
         private static void SyncTextureRuntimeTransform(Avalonia3D.Model.Material material, TextureSemantic semantic, TextureData? texture)
