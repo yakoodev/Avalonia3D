@@ -16,6 +16,7 @@ precision mediump float;
 layout(location = 0) in vec3 aPosition;
 layout(location = 1) in vec3 aNormal;
 layout(location = 2) in vec2 aTexCoord;
+layout(location = 3) in vec2 aTexCoord1;
 
 uniform mat4 uMVP;
 uniform mat4 uModel;
@@ -24,6 +25,7 @@ uniform mat4 uLightSpaceMatrix;
 out vec3 FragPos;
 out vec3 Normal;
 out vec2 TexCoord;
+out vec2 TexCoord1;
 out vec4 FragPosLightSpace;
 
 void main()
@@ -32,6 +34,7 @@ void main()
     FragPos = vec3(uModel * vec4(aPosition, 1.0));
     Normal = normalize(mat3(uModel) * aNormal);
     TexCoord = aTexCoord;
+    TexCoord1 = aTexCoord1;
     FragPosLightSpace = uLightSpaceMatrix * vec4(FragPos, 1.0);
 }";
     }
@@ -41,28 +44,29 @@ void main()
         var sb = new StringBuilder();
         sb.AppendLine("#version 300 es");
         sb.AppendLine("precision highp float;");
-        sb.AppendLine("in vec2 TexCoord; in vec3 Normal; in vec3 FragPos; in vec4 FragPosLightSpace;");
+        sb.AppendLine("in vec2 TexCoord; in vec2 TexCoord1; in vec3 Normal; in vec3 FragPos; in vec4 FragPosLightSpace;");
         sb.AppendLine("layout(location = 0) out vec4 FragColor; layout(location = 1) out vec4 EmissiveColor;");
         AppendUniforms(sb, maxLights);
         AppendShadowFunction(sb);
         sb.AppendLine("const highp float kMaxHdrColor = 8.0;");
         sb.AppendLine("highp vec3 CompressHighlights(highp vec3 color){ highp vec3 under = min(color, vec3(1.0)); highp vec3 over = max(color - vec3(1.0), vec3(0.0)); return under + (over / (vec3(1.0) + over)); }");
         sb.AppendLine("highp vec3 SanitizeHdrColor(highp vec3 color){ highp vec3 safe = CompressHighlights(max(color, vec3(0.0))); return clamp(safe, vec3(0.0), vec3(kMaxHdrColor)); }");
+        sb.AppendLine("vec2 SelectTexCoord(int texCoordSet){ return texCoordSet==1 ? TexCoord1 : TexCoord; }");
         sb.AppendLine("vec2 ApplyUvTransform(vec2 uv, vec2 scale, float rotation, vec2 offset){ vec2 scaled=uv*scale; if(abs(rotation)<0.000001){ return scaled+offset; } float s=sin(rotation); float c=cos(rotation); vec2 rotated=vec2(scaled.x*c-scaled.y*s, scaled.x*s+scaled.y*c); return rotated+offset; }");
         sb.AppendLine(ShaderColorManagement.FunctionBlock);
         sb.AppendLine(features.HasFlag(PbrFeatures.NormalMap)
-            ? @"vec3 GetNormal(){ vec3 norm=normalize(Normal); if(uHasNormalMap==0) return norm; vec3 t=texture(uNormalMap, TexCoord).xyz*2.0-1.0; vec3 Q1=dFdx(FragPos); vec3 Q2=dFdy(FragPos); vec2 st1=dFdx(TexCoord); vec2 st2=dFdy(TexCoord); vec3 T=normalize(Q1*st2.t-Q2*st1.t); vec3 B=-normalize(cross(norm,T)); return normalize(mat3(T,B,norm)*t);}"
+            ? @"vec3 GetNormal(){ vec3 norm=normalize(Normal); if(uHasNormalMap==0) return norm; vec2 normalUv=SelectTexCoord(uNormalTexCoordSet); vec3 t=texture(uNormalMap, normalUv).xyz*2.0-1.0; vec3 Q1=dFdx(FragPos); vec3 Q2=dFdy(FragPos); vec2 st1=dFdx(normalUv); vec2 st2=dFdy(normalUv); vec3 T=normalize(Q1*st2.t-Q2*st1.t); vec3 B=-normalize(cross(norm,T)); return normalize(mat3(T,B,norm)*t);}"
             : "vec3 GetNormal(){ return normalize(Normal); }");
         sb.AppendLine(features.HasFlag(PbrFeatures.ReflectionsIbl)
             ? @"vec3 ComputeEnvironmentReflection(vec3 n, vec3 v, float r){ if(uHasEnvironmentMap==0) return vec3(0.0); vec3 rd=reflect(-v,n); vec2 uv=vec2(atan(rd.z, rd.x)/(2.0*3.14159265)+0.5, acos(clamp(rd.y,-1.0,1.0))/3.14159265); return texture(uEnvironmentMap, uv).rgb*(1.0-clamp(r,0.0,1.0))*uReflectionIntensity; }"
             : "vec3 ComputeEnvironmentReflection(vec3 n, vec3 v, float r){ return vec3(0.0); }");
 
-        sb.AppendLine("void main(){ vec2 baseColorUv=ApplyUvTransform(TexCoord,uBaseColorUvScale,uBaseColorUvRotation,uBaseColorUvOffset); vec2 emissiveUv=ApplyUvTransform(TexCoord,uEmissiveUvScale,uEmissiveUvRotation,uEmissiveUvOffset); vec3 norm=GetNormal(); highp vec3 viewDir=normalize(uViewPos-FragPos); vec4 baseColor=uBaseColorFactor;");
+        sb.AppendLine("void main(){ vec2 baseTexCoord=SelectTexCoord(uBaseColorTexCoordSet); vec2 emissiveTexCoord=SelectTexCoord(uEmissiveTexCoordSet); vec2 normalTexCoord=SelectTexCoord(uNormalTexCoordSet); vec2 metallicRoughnessTexCoord=SelectTexCoord(uMetallicRoughnessTexCoordSet); vec2 occlusionTexCoord=SelectTexCoord(uOcclusionTexCoordSet); vec2 baseColorUv=ApplyUvTransform(baseTexCoord,uBaseColorUvScale,uBaseColorUvRotation,uBaseColorUvOffset); vec2 emissiveUv=ApplyUvTransform(emissiveTexCoord,uEmissiveUvScale,uEmissiveUvRotation,uEmissiveUvOffset); vec3 norm=GetNormal(); highp vec3 viewDir=normalize(uViewPos-FragPos); vec4 baseColor=uBaseColorFactor;");
         if (features.HasFlag(PbrFeatures.BaseColorMap)) sb.AppendLine("if(uHasBaseColorMap==1) baseColor*=ApplyManualBaseColorDecode(texture(uBaseColorMap, baseColorUv));");
         sb.AppendLine("float metallic=uMetallicFactor; highp float roughness=uRoughnessFactor;");
-        if (features.HasFlag(PbrFeatures.MetallicRoughnessMap)) sb.AppendLine("if(uHasMetallicRoughnessMap==1){ vec4 mr=texture(uMetallicRoughnessMap, TexCoord); metallic*=mr.b; roughness*=mr.g; }");
+        if (features.HasFlag(PbrFeatures.MetallicRoughnessMap)) sb.AppendLine("if(uHasMetallicRoughnessMap==1){ vec4 mr=texture(uMetallicRoughnessMap, metallicRoughnessTexCoord); metallic*=mr.b; roughness*=mr.g; }");
         sb.AppendLine("float ao=1.0;");
-        if (features.HasFlag(PbrFeatures.OcclusionMap)) sb.AppendLine("if(uHasOcclusionMap==1){ float a=texture(uOcclusionMap, TexCoord).r; ao=mix(1.0,a,uOcclusionStrength);} ");
+        if (features.HasFlag(PbrFeatures.OcclusionMap)) sb.AppendLine("if(uHasOcclusionMap==1){ float a=texture(uOcclusionMap, occlusionTexCoord).r; ao=mix(1.0,a,uOcclusionStrength);} ");
         sb.AppendLine("vec3 emissive=uEmissiveFactor*max(uEmissiveIntensity,0.0);");
         if (features.HasFlag(PbrFeatures.EmissiveMap)) sb.AppendLine("if(uHasEmissiveMap==1){ vec3 emissiveSample=uForceWhiteEmissiveMap==1?vec3(1.0):ApplyManualEmissiveDecode(texture(uEmissiveMap, emissiveUv).rgb); emissive*=emissiveSample; }");
 
@@ -71,15 +75,15 @@ void main()
 
         sb.AppendLine("vec3 albedo=baseColor.rgb; vec3 diffuseColor=albedo*(1.0-metallic); vec3 specularColor=mix(vec3(0.04), albedo, metallic);");
 
-        if (features.HasFlag(PbrFeatures.ClearcoatMap)) sb.AppendLine("float clearcoatMapSample=uHasClearcoatMap==1?texture(uClearcoatMap, TexCoord).r:1.0;"); else sb.AppendLine("float clearcoatMapSample=1.0;");
-        if (features.HasFlag(PbrFeatures.ClearcoatRoughnessMap)) sb.AppendLine("float clearcoatRoughnessMapSample=uHasClearcoatRoughnessMap==1?texture(uClearcoatRoughnessMap, TexCoord).g:1.0;"); else sb.AppendLine("float clearcoatRoughnessMapSample=1.0;");
-        if (features.HasFlag(PbrFeatures.ClearcoatNormalMap)) sb.AppendLine("float clearcoatNormalInfluence=uHasClearcoatNormalMap==1?clamp(texture(uClearcoatNormalMap, TexCoord).z,0.0,1.0):1.0;"); else sb.AppendLine("float clearcoatNormalInfluence=1.0;");
-        if (features.HasFlag(PbrFeatures.SheenColorMap)) sb.AppendLine("vec3 sheenColorMapSample=uHasSheenColorMap==1?texture(uSheenColorMap, TexCoord).rgb:vec3(1.0);"); else sb.AppendLine("vec3 sheenColorMapSample=vec3(1.0);");
-        if (features.HasFlag(PbrFeatures.SheenRoughnessMap)) sb.AppendLine("float sheenRoughnessMapSample=uHasSheenRoughnessMap==1?texture(uSheenRoughnessMap, TexCoord).a:1.0;"); else sb.AppendLine("float sheenRoughnessMapSample=1.0;");
-        if (features.HasFlag(PbrFeatures.SpecularMap)) sb.AppendLine("float specularMapSample=uHasSpecularMap==1?texture(uSpecularMap, TexCoord).a:1.0;"); else sb.AppendLine("float specularMapSample=1.0;");
-        if (features.HasFlag(PbrFeatures.SpecularColorMap)) sb.AppendLine("vec3 specularColorMapSample=uHasSpecularColorMap==1?texture(uSpecularColorMap, TexCoord).rgb:vec3(1.0);"); else sb.AppendLine("vec3 specularColorMapSample=vec3(1.0);");
-        if (features.HasFlag(PbrFeatures.TransmissionMap)) sb.AppendLine("float transmissionMapSample=uHasTransmissionMap==1?texture(uTransmissionMap, TexCoord).r:1.0;"); else sb.AppendLine("float transmissionMapSample=1.0;");
-        if (features.HasFlag(PbrFeatures.VolumeThicknessMap)) sb.AppendLine("float thicknessMapSample=uHasVolumeThicknessMap==1?texture(uVolumeThicknessMap, TexCoord).g:1.0;"); else sb.AppendLine("float thicknessMapSample=1.0;");
+        if (features.HasFlag(PbrFeatures.ClearcoatMap)) sb.AppendLine("float clearcoatMapSample=uHasClearcoatMap==1?texture(uClearcoatMap, baseTexCoord).r:1.0;"); else sb.AppendLine("float clearcoatMapSample=1.0;");
+        if (features.HasFlag(PbrFeatures.ClearcoatRoughnessMap)) sb.AppendLine("float clearcoatRoughnessMapSample=uHasClearcoatRoughnessMap==1?texture(uClearcoatRoughnessMap, baseTexCoord).g:1.0;"); else sb.AppendLine("float clearcoatRoughnessMapSample=1.0;");
+        if (features.HasFlag(PbrFeatures.ClearcoatNormalMap)) sb.AppendLine("float clearcoatNormalInfluence=uHasClearcoatNormalMap==1?clamp(texture(uClearcoatNormalMap, baseTexCoord).z,0.0,1.0):1.0;"); else sb.AppendLine("float clearcoatNormalInfluence=1.0;");
+        if (features.HasFlag(PbrFeatures.SheenColorMap)) sb.AppendLine("vec3 sheenColorMapSample=uHasSheenColorMap==1?texture(uSheenColorMap, baseTexCoord).rgb:vec3(1.0);"); else sb.AppendLine("vec3 sheenColorMapSample=vec3(1.0);");
+        if (features.HasFlag(PbrFeatures.SheenRoughnessMap)) sb.AppendLine("float sheenRoughnessMapSample=uHasSheenRoughnessMap==1?texture(uSheenRoughnessMap, baseTexCoord).a:1.0;"); else sb.AppendLine("float sheenRoughnessMapSample=1.0;");
+        if (features.HasFlag(PbrFeatures.SpecularMap)) sb.AppendLine("float specularMapSample=uHasSpecularMap==1?texture(uSpecularMap, baseTexCoord).a:1.0;"); else sb.AppendLine("float specularMapSample=1.0;");
+        if (features.HasFlag(PbrFeatures.SpecularColorMap)) sb.AppendLine("vec3 specularColorMapSample=uHasSpecularColorMap==1?texture(uSpecularColorMap, baseTexCoord).rgb:vec3(1.0);"); else sb.AppendLine("vec3 specularColorMapSample=vec3(1.0);");
+        if (features.HasFlag(PbrFeatures.TransmissionMap)) sb.AppendLine("float transmissionMapSample=uHasTransmissionMap==1?texture(uTransmissionMap, baseTexCoord).r:1.0;"); else sb.AppendLine("float transmissionMapSample=1.0;");
+        if (features.HasFlag(PbrFeatures.VolumeThicknessMap)) sb.AppendLine("float thicknessMapSample=uHasVolumeThicknessMap==1?texture(uVolumeThicknessMap, baseTexCoord).g:1.0;"); else sb.AppendLine("float thicknessMapSample=1.0;");
 
         if (features.HasFlag(PbrFeatures.Specular)) sb.AppendLine("specularColor*=clamp(uSpecularFactor*specularMapSample,0.0,1.0)*max(uSpecularColorFactor*specularColorMapSample, vec3(0.0));");
 
@@ -112,7 +116,7 @@ void main()
         sb.AppendLine($"uniform sampler2D uShadowMap; uniform int uHasShadowMap; uniform vec3 uLightPos[{maxLights}]; uniform vec3 uLightColor[{maxLights}]; uniform float uIntensity[{maxLights}]; uniform int uLightCount;");
         sb.AppendLine("uniform vec3 uViewPos; uniform float uAmbientStrength; uniform float uSpecularStrength; uniform int uShininess;");
         sb.AppendLine("uniform vec3 uModelColor; uniform vec3 uEmissionColor; uniform vec4 uBaseColorFactor; uniform float uMetallicFactor; uniform float uRoughnessFactor; uniform float uOcclusionStrength; uniform vec3 uEmissiveFactor;");
-        sb.AppendLine("uniform vec2 uBaseColorUvOffset; uniform vec2 uBaseColorUvScale; uniform float uBaseColorUvRotation; uniform vec2 uEmissiveUvOffset; uniform vec2 uEmissiveUvScale; uniform float uEmissiveUvRotation;");
+        sb.AppendLine("uniform vec2 uBaseColorUvOffset; uniform vec2 uBaseColorUvScale; uniform float uBaseColorUvRotation; uniform vec2 uEmissiveUvOffset; uniform vec2 uEmissiveUvScale; uniform float uEmissiveUvRotation; uniform int uBaseColorTexCoordSet; uniform int uNormalTexCoordSet; uniform int uMetallicRoughnessTexCoordSet; uniform int uOcclusionTexCoordSet; uniform int uEmissiveTexCoordSet;");
         sb.AppendLine("uniform sampler2D uEnvironmentMap; uniform float uReflectionIntensity; uniform int uHasEnvironmentMap; uniform float uAlpha; uniform float uAlphaCutoff; uniform int uAlphaMode; uniform float uEmissiveIntensity;");
         sb.AppendLine("uniform float uTransmissionFactor; uniform float uTransmissionThickness; uniform float uTransmissionIor; uniform float uTransmissionAttenuationDistance; uniform vec3 uTransmissionAttenuationColor; uniform int uHasTransmission;");
         sb.AppendLine("uniform float uClearcoatFactor; uniform float uClearcoatRoughness; uniform vec3 uSheenColorFactor; uniform float uSheenRoughnessFactor; uniform float uSpecularFactor; uniform vec3 uSpecularColorFactor; uniform float uMaterialIor; uniform float uMaterialEmissiveStrength;");

@@ -82,6 +82,7 @@ namespace Avalonia3D.Model
         public Vector2 UvOffset { get; set; } = Vector2.Zero;
         public Vector2 UvScale { get; set; } = Vector2.One;
         public float UvRotation { get; set; }
+        public int TexCoordSet { get; set; }
 
         public Vector2 Apply(Vector2 uv)
         {
