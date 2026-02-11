@@ -55,12 +55,50 @@ namespace Avalonia3D.Rendering
 
     public sealed class RenderResourceManager
     {
+        internal interface ITextureGlAdapter
+        {
+            uint GenTexture();
+            void BindTexture(TextureTarget target, uint textureId);
+            GLEnum GetError();
+            unsafe void TexImage2D(TextureTarget target, int level, int internalFormat, uint width, uint height, int border, PixelFormat format, PixelType type, void* data);
+            void TexParameter(TextureTarget target, TextureParameterName pname, int param);
+            void GenerateMipmap(TextureTarget target);
+            void DeleteTexture(uint textureId);
+        }
+
+        private sealed class GlTextureAdapter : ITextureGlAdapter
+        {
+            private readonly GL _gl;
+
+            public GlTextureAdapter(GL gl)
+            {
+                _gl = gl;
+            }
+
+            public uint GenTexture() => _gl.GenTexture();
+            public void BindTexture(TextureTarget target, uint textureId) => _gl.BindTexture(target, textureId);
+            public GLEnum GetError() => _gl.GetError();
+            public unsafe void TexImage2D(TextureTarget target, int level, int internalFormat, uint width, uint height, int border, PixelFormat format, PixelType type, void* data)
+                => _gl.TexImage2D(target, level, internalFormat, width, height, border, format, type, data);
+            public void TexParameter(TextureTarget target, TextureParameterName pname, int param) => _gl.TexParameter(target, pname, param);
+            public void GenerateMipmap(TextureTarget target) => _gl.GenerateMipmap(target);
+            public void DeleteTexture(uint textureId) => _gl.DeleteTexture(textureId);
+        }
+
         private readonly Dictionary<string, GeometryInfo> _geometryCache = new();
         private readonly object _cacheLock = new();
+        private readonly ITextureGlAdapter _textureGl;
 
         public RenderResourceManager(GL gl)
         {
             Gl = gl ?? throw new ArgumentNullException(nameof(gl));
+            _textureGl = new GlTextureAdapter(gl);
+        }
+
+        internal RenderResourceManager(ITextureGlAdapter textureGl)
+        {
+            _textureGl = textureGl ?? throw new ArgumentNullException(nameof(textureGl));
+            Gl = null!;
         }
 
         public GL Gl { get; }
@@ -323,38 +361,40 @@ namespace Avalonia3D.Rendering
         {
             if (textureId != 0)
             {
-                Gl.DeleteTexture(textureId);
+                _textureGl.DeleteTexture(textureId);
             }
         }
 
         private void SetupMaterialTextures(Model3D model, RenderResources resources)
         {
             var material = model.Material;
+            var modelLabel = string.IsNullOrWhiteSpace(model.Name) ? (string.IsNullOrWhiteSpace(model.PrimitiveKey) ? "$unnamed-model" : model.PrimitiveKey) : model.Name;
+            var materialLabel = material?.ShaderId ?? "$default-material";
 
             if (material == null)
             {
                 if (model.TextureData != null)
                 {
-                    resources.BaseColorTextureId = SetupTexture(model.TextureData, TextureSemantic.BaseColor, resources);
+                    resources.BaseColorTextureId = SetupTexture(model.TextureData, TextureSemantic.BaseColor, resources, modelLabel, "$material-null");
                 }
 
                 return;
             }
 
-            resources.BaseColorTextureId = SetupTexture(material.BaseColorTexture ?? model.TextureData, TextureSemantic.BaseColor, resources);
-            resources.NormalTextureId = SetupTexture(material.NormalTexture, TextureSemantic.Normal, resources);
-            resources.MetallicRoughnessTextureId = SetupTexture(material.MetallicRoughnessTexture, TextureSemantic.MetallicRoughness, resources);
-            resources.OcclusionTextureId = SetupTexture(material.OcclusionTexture, TextureSemantic.Occlusion, resources);
-            resources.EmissiveTextureId = SetupTexture(material.EmissiveTexture, TextureSemantic.Emissive, resources);
-            resources.ClearcoatTextureId = SetupTexture(material.ExtensionTextures.ClearcoatTexture, TextureSemantic.Clearcoat, resources);
-            resources.ClearcoatRoughnessTextureId = SetupTexture(material.ExtensionTextures.ClearcoatRoughnessTexture, TextureSemantic.ClearcoatRoughness, resources);
-            resources.ClearcoatNormalTextureId = SetupTexture(material.ExtensionTextures.ClearcoatNormalTexture, TextureSemantic.ClearcoatNormal, resources);
-            resources.SheenColorTextureId = SetupTexture(material.ExtensionTextures.SheenColorTexture, TextureSemantic.SheenColor, resources);
-            resources.SheenRoughnessTextureId = SetupTexture(material.ExtensionTextures.SheenRoughnessTexture, TextureSemantic.SheenRoughness, resources);
-            resources.SpecularTextureId = SetupTexture(material.ExtensionTextures.SpecularTexture, TextureSemantic.Specular, resources);
-            resources.SpecularColorTextureId = SetupTexture(material.ExtensionTextures.SpecularColorTexture, TextureSemantic.SpecularColor, resources);
-            resources.TransmissionTextureId = SetupTexture(material.ExtensionTextures.TransmissionTexture, TextureSemantic.Transmission, resources);
-            resources.VolumeThicknessTextureId = SetupTexture(material.ExtensionTextures.VolumeThicknessTexture, TextureSemantic.VolumeThickness, resources);
+            resources.BaseColorTextureId = SetupTexture(material.BaseColorTexture ?? model.TextureData, TextureSemantic.BaseColor, resources, modelLabel, materialLabel);
+            resources.NormalTextureId = SetupTexture(material.NormalTexture, TextureSemantic.Normal, resources, modelLabel, materialLabel);
+            resources.MetallicRoughnessTextureId = SetupTexture(material.MetallicRoughnessTexture, TextureSemantic.MetallicRoughness, resources, modelLabel, materialLabel);
+            resources.OcclusionTextureId = SetupTexture(material.OcclusionTexture, TextureSemantic.Occlusion, resources, modelLabel, materialLabel);
+            resources.EmissiveTextureId = SetupTexture(material.EmissiveTexture, TextureSemantic.Emissive, resources, modelLabel, materialLabel);
+            resources.ClearcoatTextureId = SetupTexture(material.ExtensionTextures.ClearcoatTexture, TextureSemantic.Clearcoat, resources, modelLabel, materialLabel);
+            resources.ClearcoatRoughnessTextureId = SetupTexture(material.ExtensionTextures.ClearcoatRoughnessTexture, TextureSemantic.ClearcoatRoughness, resources, modelLabel, materialLabel);
+            resources.ClearcoatNormalTextureId = SetupTexture(material.ExtensionTextures.ClearcoatNormalTexture, TextureSemantic.ClearcoatNormal, resources, modelLabel, materialLabel);
+            resources.SheenColorTextureId = SetupTexture(material.ExtensionTextures.SheenColorTexture, TextureSemantic.SheenColor, resources, modelLabel, materialLabel);
+            resources.SheenRoughnessTextureId = SetupTexture(material.ExtensionTextures.SheenRoughnessTexture, TextureSemantic.SheenRoughness, resources, modelLabel, materialLabel);
+            resources.SpecularTextureId = SetupTexture(material.ExtensionTextures.SpecularTexture, TextureSemantic.Specular, resources, modelLabel, materialLabel);
+            resources.SpecularColorTextureId = SetupTexture(material.ExtensionTextures.SpecularColorTexture, TextureSemantic.SpecularColor, resources, modelLabel, materialLabel);
+            resources.TransmissionTextureId = SetupTexture(material.ExtensionTextures.TransmissionTexture, TextureSemantic.Transmission, resources, modelLabel, materialLabel);
+            resources.VolumeThicknessTextureId = SetupTexture(material.ExtensionTextures.VolumeThicknessTexture, TextureSemantic.VolumeThickness, resources, modelLabel, materialLabel);
         }
 
         private unsafe void UploadVertexData(Vertex[] vertices, RenderResources resources)
@@ -489,23 +529,26 @@ namespace Avalonia3D.Rendering
             return IsSrgbSemantic(semantic) ? InternalFormat.Rgba : ResolveInternalFormat(semantic);
         }
 
-        private unsafe uint SetupTexture(TextureData? textureData, TextureSemantic semantic, RenderResources resources)
+        internal unsafe uint SetupTextureForTests(TextureData? textureData, TextureSemantic semantic, RenderResources resources, string modelLabel, string materialLabel)
+            => SetupTexture(textureData, semantic, resources, modelLabel, materialLabel);
+
+        private unsafe uint SetupTexture(TextureData? textureData, TextureSemantic semantic, RenderResources resources, string modelLabel, string materialLabel)
         {
             if (textureData == null || textureData.Data == null)
             {
                 return 0;
             }
 
-            uint textureId = Gl.GenTexture();
+            uint textureId = _textureGl.GenTexture();
             if (textureId == 0)
             {
-                Log.Warning("Texture allocation failed before upload: {Width}x{Height}", textureData.Width, textureData.Height);
+                Log.Warning("Texture allocation failed before upload: model={Model}, material={Material}, semantic={Semantic}, size={Width}x{Height}", modelLabel, materialLabel, semantic, textureData.Width, textureData.Height);
                 return 0;
             }
 
-            Gl.BindTexture(TextureTarget.Texture2D, textureId);
+            _textureGl.BindTexture(TextureTarget.Texture2D, textureId);
 
-            while (Gl.GetError() != GLEnum.NoError)
+            while (_textureGl.GetError() != GLEnum.NoError)
             {
             }
 
@@ -515,36 +558,38 @@ namespace Avalonia3D.Rendering
 
             fixed (byte* dataPtr = textureData.Data)
             {
-                Gl.TexImage2D(TextureTarget.Texture2D, 0, (int)preferredInternalFormat,
+                _textureGl.TexImage2D(TextureTarget.Texture2D, 0, (int)preferredInternalFormat,
                     (uint)textureData.Width, (uint)textureData.Height, 0,
                     PixelFormat.Rgba, PixelType.UnsignedByte, dataPtr);
 
-                glError = Gl.GetError();
+                glError = _textureGl.GetError();
 
                 if (glError != GLEnum.NoError && IsSrgbSemantic(semantic))
                 {
-                    while (Gl.GetError() != GLEnum.NoError)
+                    while (_textureGl.GetError() != GLEnum.NoError)
                     {
                     }
 
                     usedInternalFormat = ResolveFallbackInternalFormat(semantic);
-                    Gl.TexImage2D(TextureTarget.Texture2D, 0, (int)usedInternalFormat,
+                    _textureGl.TexImage2D(TextureTarget.Texture2D, 0, (int)usedInternalFormat,
                         (uint)textureData.Width, (uint)textureData.Height, 0,
                         PixelFormat.Rgba, PixelType.UnsignedByte, dataPtr);
 
-                    glError = Gl.GetError();
+                    glError = _textureGl.GetError();
                 }
             }
 
             if (glError == GLEnum.NoError)
             {
                 SetTextureParameters();
-                glError = Gl.GetError();
+                glError = _textureGl.GetError();
             }
 
             if (glError != GLEnum.NoError)
             {
-                Log.Warning("Texture upload GL error {GlError} for {Width}x{Height}, texture {TextureId}, semantic {Semantic}, preferred format {PreferredInternalFormat}, used format {UsedInternalFormat}", glError, textureData.Width, textureData.Height, textureId, semantic, preferredInternalFormat, usedInternalFormat);
+                _textureGl.DeleteTexture(textureId);
+                Log.Warning("Texture upload failed and texture was deleted: model={Model}, material={Material}, semantic={Semantic}, size={Width}x{Height}, texture={TextureId}, glError={GlError}, preferredFormat={PreferredInternalFormat}, usedFormat={UsedInternalFormat}", modelLabel, materialLabel, semantic, textureData.Width, textureData.Height, textureId, glError, preferredInternalFormat, usedInternalFormat);
+                return 0;
             }
             else
             {
@@ -553,7 +598,7 @@ namespace Avalonia3D.Rendering
                     resources.TextureColorFlags |= TextureColorManagement.GetMissingSrgbDecodeFlag(semantic);
                 }
 
-                Log.Information("Texture loaded: {Width}x{Height}, ID: {TextureId}, semantic {Semantic}, preferred format {PreferredInternalFormat}, used format {UsedInternalFormat}, colorFlags={TextureColorFlags}", textureData.Width, textureData.Height, textureId, semantic, preferredInternalFormat, usedInternalFormat, resources.TextureColorFlags);
+                Log.Information("Texture loaded: model={Model}, material={Material}, semantic={Semantic}, size={Width}x{Height}, texture={TextureId}, preferredFormat={PreferredInternalFormat}, usedFormat={UsedInternalFormat}, colorFlags={TextureColorFlags}", modelLabel, materialLabel, semantic, textureData.Width, textureData.Height, textureId, preferredInternalFormat, usedInternalFormat, resources.TextureColorFlags);
             }
 
             return textureId;
@@ -561,23 +606,23 @@ namespace Avalonia3D.Rendering
 
         private void SetTextureParameters()
         {
-            Gl.TexParameter(TextureTarget.Texture2D,
+            _textureGl.TexParameter(TextureTarget.Texture2D,
                 TextureParameterName.TextureMinFilter,
                 (int)GLEnum.LinearMipmapLinear);
 
-            Gl.TexParameter(TextureTarget.Texture2D,
+            _textureGl.TexParameter(TextureTarget.Texture2D,
                 TextureParameterName.TextureMagFilter,
                 (int)GLEnum.Linear);
 
-            Gl.TexParameter(TextureTarget.Texture2D,
+            _textureGl.TexParameter(TextureTarget.Texture2D,
                 TextureParameterName.TextureWrapS,
                 (int)GLEnum.Repeat);
 
-            Gl.TexParameter(TextureTarget.Texture2D,
+            _textureGl.TexParameter(TextureTarget.Texture2D,
                 TextureParameterName.TextureWrapT,
                 (int)GLEnum.Repeat);
 
-            Gl.GenerateMipmap(TextureTarget.Texture2D);
+            _textureGl.GenerateMipmap(TextureTarget.Texture2D);
         }
 
         private unsafe void SetupVertexAttributes()
