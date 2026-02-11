@@ -92,6 +92,7 @@ namespace Avalonia3D.Shaders
         private int _ambientStrengthClampLocation = -1;
         private int _directLightContributionClampLocation = -1;
         private int _separateEmissiveTargetLocation = -1;
+        private int _separateEmissiveSurfaceScaleLocation = -1;
         private int _hasEnvironmentMapLocation = -1;
         private int _transmissionFactorLocation = -1;
         private int _transmissionThicknessLocation = -1;
@@ -323,6 +324,7 @@ namespace Avalonia3D.Shaders
             _ambientStrengthClampLocation = _gl.GetUniformLocation(_shaderProgram, "uAmbientStrengthClamp");
             _directLightContributionClampLocation = _gl.GetUniformLocation(_shaderProgram, "uDirectLightContributionClamp");
             _separateEmissiveTargetLocation = _gl.GetUniformLocation(_shaderProgram, "uSeparateEmissiveTarget");
+            _separateEmissiveSurfaceScaleLocation = _gl.GetUniformLocation(_shaderProgram, "uSeparateEmissiveSurfaceScale");
             _hasEnvironmentMapLocation = _gl.GetUniformLocation(_shaderProgram, "uHasEnvironmentMap");
             _transmissionFactorLocation = _gl.GetUniformLocation(_shaderProgram, "uTransmissionFactor");
             _transmissionThicknessLocation = _gl.GetUniformLocation(_shaderProgram, "uTransmissionThickness");
@@ -556,6 +558,9 @@ namespace Avalonia3D.Shaders
 
             if (_separateEmissiveTargetLocation != -1)
                 _gl.Uniform1(_separateEmissiveTargetLocation, frameState.HasEmissiveTarget ? 1 : 0);
+
+            if (_separateEmissiveSurfaceScaleLocation != -1)
+                _gl.Uniform1(_separateEmissiveSurfaceScaleLocation, frameState.SeparateEmissiveSurfaceScale);
 
             var hasTransmission = material?.HasTransmission == true && material.TransmissionFactor > 0.001f;
             var transmissionFactor = material?.TransmissionFactor ?? 0f;

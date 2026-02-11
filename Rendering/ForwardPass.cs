@@ -21,6 +21,7 @@ namespace Avalonia3D.Rendering
             var frameState = context.RenderContext.FrameState;
             frameState.AmbientStrengthClamp = _settings.PbrTuning.AmbientStrengthClamp;
             frameState.DirectLightContributionClamp = _settings.PbrTuning.DirectLightContributionClamp;
+            frameState.SeparateEmissiveSurfaceScale = _settings.PbrTuning.SeparateEmissiveSurfaceScale;
 
             if (!_settings.Reflections.Enabled || _settings.Reflections.Mode == ReflectionMode.Off)
             {

@@ -128,10 +128,7 @@ vec3 ApplyToneMapping(vec3 color)
 {
     if (uToneMappingOperator == 1)
     {
-        float wp = max(uWhitePoint, 0.0001);
-        vec3 reinhard = color / (color + vec3(1.0));
-        vec3 whiteScale = vec3(1.0) / (vec3(1.0) + vec3(1.0 / (wp * wp)));
-        return reinhard / max(whiteScale, vec3(0.0001));
+        return color / (color + vec3(1.0));
     }
 
     return color;

@@ -131,6 +131,7 @@ public class PbrShaderSourceBuilderTests
         Assert.Contains("uPbrDebugViewMode", fragmentSource);
         Assert.Contains("debugSurfaceResult", fragmentSource);
         Assert.Contains("emissiveToSurface", fragmentSource);
+        Assert.Contains("uSeparateEmissiveSurfaceScale", fragmentSource);
         Assert.Contains("baseColor.rgb", fragmentSource);
         Assert.Contains("directLightComponent", fragmentSource);
         Assert.Contains("iblComponent", fragmentSource);
