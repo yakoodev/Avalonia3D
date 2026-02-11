@@ -67,4 +67,33 @@ public class PbrShaderSourceBuilderTests
         Assert.Contains("ApplyManualEmissiveDecode", fragmentSource);
     }
 
+    [Fact]
+    public void Build_WithSpecularFeatureAndNoSpecularTextures_StillDeclaresSpecularSamples()
+    {
+        var builder = new PbrShaderSourceBuilder();
+
+        var (_, fragmentSource) = builder.Build(PbrFeatures.Specular, maxLights: 4);
+
+        Assert.Contains("float specularMapSample=1.0;", fragmentSource);
+        Assert.Contains("vec3 specularColorMapSample=vec3(1.0);", fragmentSource);
+        Assert.Contains("specularColor*=clamp(uSpecularFactor*specularMapSample", fragmentSource);
+    }
+
+    [Fact]
+    public void Build_WithSpecularAndBaseColorMap_AppliesSpecularAfterSampleDeclarations()
+    {
+        var builder = new PbrShaderSourceBuilder();
+
+        var (_, fragmentSource) = builder.Build(PbrFeatures.Specular | PbrFeatures.BaseColorMap, maxLights: 4);
+
+        var specularMapDecl = fragmentSource.IndexOf("float specularMapSample", StringComparison.Ordinal);
+        var specularColorMapDecl = fragmentSource.IndexOf("vec3 specularColorMapSample", StringComparison.Ordinal);
+        var specularApply = fragmentSource.IndexOf("specularColor*=clamp(uSpecularFactor*specularMapSample", StringComparison.Ordinal);
+
+        Assert.True(specularMapDecl >= 0);
+        Assert.True(specularColorMapDecl >= 0);
+        Assert.True(specularApply > specularMapDecl);
+        Assert.True(specularApply > specularColorMapDecl);
+    }
+
 }

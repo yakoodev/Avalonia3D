@@ -70,7 +70,6 @@ void main()
         if (features.HasFlag(PbrFeatures.Ior)) sb.AppendLine("float materialIor=max(uMaterialIor,1.0);"); else sb.AppendLine("float materialIor=1.5;");
 
         sb.AppendLine("vec3 albedo=baseColor.rgb; vec3 diffuseColor=albedo*(1.0-metallic); vec3 specularColor=mix(vec3(0.04), albedo, metallic);");
-        if (features.HasFlag(PbrFeatures.Specular)) sb.AppendLine("specularColor*=clamp(uSpecularFactor*specularMapSample,0.0,1.0)*max(uSpecularColorFactor*specularColorMapSample, vec3(0.0));");
 
         if (features.HasFlag(PbrFeatures.ClearcoatMap)) sb.AppendLine("float clearcoatMapSample=uHasClearcoatMap==1?texture(uClearcoatMap, TexCoord).r:1.0;"); else sb.AppendLine("float clearcoatMapSample=1.0;");
         if (features.HasFlag(PbrFeatures.ClearcoatRoughnessMap)) sb.AppendLine("float clearcoatRoughnessMapSample=uHasClearcoatRoughnessMap==1?texture(uClearcoatRoughnessMap, TexCoord).g:1.0;"); else sb.AppendLine("float clearcoatRoughnessMapSample=1.0;");
@@ -81,6 +80,8 @@ void main()
         if (features.HasFlag(PbrFeatures.SpecularColorMap)) sb.AppendLine("vec3 specularColorMapSample=uHasSpecularColorMap==1?texture(uSpecularColorMap, TexCoord).rgb:vec3(1.0);"); else sb.AppendLine("vec3 specularColorMapSample=vec3(1.0);");
         if (features.HasFlag(PbrFeatures.TransmissionMap)) sb.AppendLine("float transmissionMapSample=uHasTransmissionMap==1?texture(uTransmissionMap, TexCoord).r:1.0;"); else sb.AppendLine("float transmissionMapSample=1.0;");
         if (features.HasFlag(PbrFeatures.VolumeThicknessMap)) sb.AppendLine("float thicknessMapSample=uHasVolumeThicknessMap==1?texture(uVolumeThicknessMap, TexCoord).g:1.0;"); else sb.AppendLine("float thicknessMapSample=1.0;");
+
+        if (features.HasFlag(PbrFeatures.Specular)) sb.AppendLine("specularColor*=clamp(uSpecularFactor*specularMapSample,0.0,1.0)*max(uSpecularColorFactor*specularColorMapSample, vec3(0.0));");
 
         sb.AppendLine($"vec3 resultLight=vec3(0.0); float smoothness=clamp(1.0-roughness,0.04,1.0); float shininess=mix(2.0,float(uShininess),smoothness); for(int i=0;i<{maxLights};i++){{ if(i>=uLightCount) break; vec3 ambient=uAmbientStrength*uLightColor[i]; vec3 lightDir=normalize(uLightPos[i]-FragPos); float diff=max(dot(norm,lightDir),0.0); vec3 diffuse=diff*diffuseColor*uLightColor[i]; vec3 reflectDir=reflect(-lightDir,norm); highp float spec=pow(max(dot(viewDir,reflectDir),0.0),shininess); highp vec3 specular=uSpecularStrength*spec*specularColor*uLightColor[i]; float shadow=uHasShadowMap==1?ShadowCalculation(FragPosLightSpace,norm,lightDir):0.0; resultLight+=(ambient+(1.0-shadow)*(diffuse+specular))*uIntensity[i]; }} if(uLightCount==0) resultLight=albedo*0.65;");
 
