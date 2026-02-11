@@ -95,6 +95,8 @@ namespace Avalonia3D.Shaders
         private int _materialSpecularColorFactorLocation = -1;
         private int _materialIorLocation = -1;
         private int _materialEmissiveStrengthLocation = -1;
+        private int _manualBaseColorSrgbDecodeLocation = -1;
+        private int _manualEmissiveSrgbDecodeLocation = -1;
 
         public uint Handle => _shaderProgram;
         private GL _gl;
@@ -312,6 +314,8 @@ namespace Avalonia3D.Shaders
             _materialSpecularColorFactorLocation = _gl.GetUniformLocation(_shaderProgram, "uSpecularColorFactor");
             _materialIorLocation = _gl.GetUniformLocation(_shaderProgram, "uMaterialIor");
             _materialEmissiveStrengthLocation = _gl.GetUniformLocation(_shaderProgram, "uMaterialEmissiveStrength");
+            _manualBaseColorSrgbDecodeLocation = _gl.GetUniformLocation(_shaderProgram, "uManualBaseColorSrgbDecode");
+            _manualEmissiveSrgbDecodeLocation = _gl.GetUniformLocation(_shaderProgram, "uManualEmissiveSrgbDecode");
         }
 
         public unsafe void SetUniforms(IRenderContext renderContext, SceneObject sceneObject, Matrix4x4 lightSpaceMatrix = default)
@@ -544,6 +548,17 @@ namespace Avalonia3D.Shaders
 
         public void BindMaterial(RenderResources resources, Material? material, uint? shadowMapId)
         {
+            if (_manualBaseColorSrgbDecodeLocation != -1)
+            {
+                _gl.Uniform1(_manualBaseColorSrgbDecodeLocation,
+                    TextureColorManagement.HasMissingSrgbDecode(resources.TextureColorFlags, TextureSemantic.BaseColor) ? 1 : 0);
+            }
+
+            if (_manualEmissiveSrgbDecodeLocation != -1)
+            {
+                _gl.Uniform1(_manualEmissiveSrgbDecodeLocation,
+                    TextureColorManagement.HasMissingSrgbDecode(resources.TextureColorFlags, TextureSemantic.Emissive) ? 1 : 0);
+            }
             BindTextureUnit(resources.BaseColorTextureId, _baseColorMapLocation, _hasBaseColorMapLocation, 0);
             BindTextureUnit(resources.NormalTextureId, _normalMapLocation, _hasNormalMapLocation, 1);
             BindTextureUnit(resources.MetallicRoughnessTextureId, _metallicRoughnessMapLocation, _hasMetallicRoughnessMapLocation, 2);

@@ -51,7 +51,20 @@ public class PbrShaderSourceBuilderTests
         Assert.Contains("uEmissiveUvOffset", fragmentSource);
         Assert.Contains("uEmissiveUvScale", fragmentSource);
         Assert.Contains("uEmissiveUvRotation", fragmentSource);
-        Assert.Contains("texture(uBaseColorMap, baseColorUv)", fragmentSource);
-        Assert.Contains("texture(uEmissiveMap, emissiveUv)", fragmentSource);
+        Assert.Contains("ApplyManualBaseColorDecode(texture(uBaseColorMap, baseColorUv))", fragmentSource);
+        Assert.Contains("ApplyManualEmissiveDecode(texture(uEmissiveMap, emissiveUv).rgb)", fragmentSource);
     }
+    [Fact]
+    public void Build_WithBaseColorAndEmissiveMaps_IncludesManualSrgbDecodeControls()
+    {
+        var builder = new PbrShaderSourceBuilder();
+
+        var (_, fragmentSource) = builder.Build(PbrFeatures.BaseColorMap | PbrFeatures.EmissiveMap, maxLights: 4);
+
+        Assert.Contains("uManualBaseColorSrgbDecode", fragmentSource);
+        Assert.Contains("uManualEmissiveSrgbDecode", fragmentSource);
+        Assert.Contains("ApplyManualBaseColorDecode", fragmentSource);
+        Assert.Contains("ApplyManualEmissiveDecode", fragmentSource);
+    }
+
 }

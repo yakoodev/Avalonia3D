@@ -26,6 +26,8 @@ public sealed class UnlitShader : IShader3D
     private int _emissiveMapLocation = -1;
     private int _hasEmissiveMapLocation = -1;
     private int _forceWhiteEmissiveMapLocation = -1;
+    private int _manualBaseColorSrgbDecodeLocation = -1;
+    private int _manualEmissiveSrgbDecodeLocation = -1;
 
     public uint Handle => _program;
 
@@ -146,6 +148,18 @@ public sealed class UnlitShader : IShader3D
         {
             _gl.Uniform1(_hasEmissiveMapLocation, emissiveTextureId != 0 ? 1 : 0);
         }
+
+        if (_manualBaseColorSrgbDecodeLocation != -1)
+        {
+            _gl.Uniform1(_manualBaseColorSrgbDecodeLocation,
+                TextureColorManagement.HasMissingSrgbDecode(resources.TextureColorFlags, TextureSemantic.BaseColor) ? 1 : 0);
+        }
+
+        if (_manualEmissiveSrgbDecodeLocation != -1)
+        {
+            _gl.Uniform1(_manualEmissiveSrgbDecodeLocation,
+                TextureColorManagement.HasMissingSrgbDecode(resources.TextureColorFlags, TextureSemantic.Emissive) ? 1 : 0);
+        }
     }
 
     public void Dispose()
@@ -184,7 +198,7 @@ void main()
     gl_Position = uMVP * vec4(aPosition, 1.0);
 }";
 
-    internal const string FragmentShaderSource = @"#version 300 es
+    internal static string FragmentShaderSource => @"#version 300 es
 precision mediump float;
 in vec2 TexCoord;
 layout(location = 0) out vec4 FragColor;
@@ -202,12 +216,14 @@ uniform vec3 uEmissionColor;
 uniform sampler2D uEmissiveMap;
 uniform int uHasEmissiveMap;
 uniform int uForceWhiteEmissiveMap;
+" + ShaderColorManagement.UniformBlock + @"
+" + ShaderColorManagement.FunctionBlock + @"
 void main()
 {
     vec4 color = uBaseColorFactor;
     if (uHasBaseColorMap == 1)
     {
-        color *= texture(uBaseColorMap, TexCoord);
+        color *= ApplyManualBaseColorDecode(texture(uBaseColorMap, TexCoord));
     }
 
     float sampledAlpha = color.a * uAlpha;
@@ -220,7 +236,7 @@ void main()
     emissive *= max(uMaterialEmissiveStrength, 0.0);
     if (uHasEmissiveMap == 1)
     {
-        vec3 emissiveSample = uForceWhiteEmissiveMap == 1 ? vec3(1.0) : texture(uEmissiveMap, TexCoord).rgb;
+        vec3 emissiveSample = uForceWhiteEmissiveMap == 1 ? vec3(1.0) : ApplyManualEmissiveDecode(texture(uEmissiveMap, TexCoord).rgb);
         emissive *= emissiveSample;
     }
 
@@ -254,5 +270,7 @@ void main()
         _emissiveMapLocation = _gl.GetUniformLocation(_program, "uEmissiveMap");
         _hasEmissiveMapLocation = _gl.GetUniformLocation(_program, "uHasEmissiveMap");
         _forceWhiteEmissiveMapLocation = _gl.GetUniformLocation(_program, "uForceWhiteEmissiveMap");
+        _manualBaseColorSrgbDecodeLocation = _gl.GetUniformLocation(_program, "uManualBaseColorSrgbDecode");
+        _manualEmissiveSrgbDecodeLocation = _gl.GetUniformLocation(_program, "uManualEmissiveSrgbDecode");
     }
 }
