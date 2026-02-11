@@ -8,8 +8,8 @@ namespace Avalonia3D.Rendering;
 /// </summary>
 public static class BloomSourceRuntimePolicy
 {
-    public static (float Threshold, float Intensity, float MinContribution) Resolve(
-        (float Threshold, float Intensity, float MinContribution) runtime,
+    public static BloomRuntimeSettings Resolve(
+        BloomRuntimeSettings runtime,
         BloomProfile bloom,
         string sourceTag)
     {
@@ -28,10 +28,15 @@ public static class BloomSourceRuntimePolicy
                 intensity *= Math.Clamp(bloom.EmissivePrimaryWithColorIntensityScale, 0f, 1f);
             }
 
-            return (
-                Math.Clamp(threshold, 0f, 16f),
-                Math.Clamp(intensity, 0f, 8f),
-                Math.Clamp(bloom.EmissivePrimaryMinContribution, 0f, 1f));
+            var normalizationBoost = runtime.NormalizationBoost * Math.Clamp(bloom.EmissivePrimaryNormalizationScale, 0f, 1f);
+
+            return runtime with
+            {
+                Threshold = Math.Clamp(threshold, 0f, 16f),
+                Intensity = Math.Clamp(intensity, 0f, 8f),
+                MinContribution = Math.Clamp(bloom.EmissivePrimaryMinContribution, 0f, 1f),
+                NormalizationBoost = Math.Clamp(normalizationBoost, 0f, 4f)
+            };
         }
 
         return runtime;

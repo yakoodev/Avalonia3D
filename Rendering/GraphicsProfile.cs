@@ -26,6 +26,7 @@ namespace Avalonia3D.Rendering
         public float EmissivePrimaryThresholdScale { get; init; } = 1.35f;
         public float EmissivePrimaryIntensityScale { get; init; } = 0.55f;
         public float EmissivePrimaryWithColorIntensityScale { get; init; } = 0.85f;
+        public float EmissivePrimaryNormalizationScale { get; init; } = 0.6f;
         public float EmissivePrimaryMinContribution { get; init; } = 0.0f;
     }
 
@@ -112,6 +113,7 @@ namespace Avalonia3D.Rendering
                     EmissivePrimaryThresholdScale = 1.35f,
                     EmissivePrimaryIntensityScale = 0.55f,
                     EmissivePrimaryWithColorIntensityScale = 0.85f,
+                    EmissivePrimaryNormalizationScale = 0.6f,
                     EmissivePrimaryMinContribution = 0.0f
                 }
             },
@@ -165,6 +167,7 @@ namespace Avalonia3D.Rendering
                     EmissivePrimaryThresholdScale = 1.35f,
                     EmissivePrimaryIntensityScale = 0.55f,
                     EmissivePrimaryWithColorIntensityScale = 0.85f,
+                    EmissivePrimaryNormalizationScale = 0.6f,
                     EmissivePrimaryMinContribution = 0.0f
                 }
             },
@@ -216,6 +219,7 @@ namespace Avalonia3D.Rendering
                     EmissivePrimaryThresholdScale = 1.35f,
                     EmissivePrimaryIntensityScale = 0.55f,
                     EmissivePrimaryWithColorIntensityScale = 0.85f,
+                    EmissivePrimaryNormalizationScale = 0.6f,
                     EmissivePrimaryMinContribution = 0.0f
                 }
             },
@@ -269,6 +273,7 @@ namespace Avalonia3D.Rendering
                     EmissivePrimaryThresholdScale = 1.35f,
                     EmissivePrimaryIntensityScale = 0.55f,
                     EmissivePrimaryWithColorIntensityScale = 0.85f,
+                    EmissivePrimaryNormalizationScale = 0.6f,
                     EmissivePrimaryMinContribution = 0.0f
                 }
             },
@@ -363,6 +368,7 @@ namespace Avalonia3D.Rendering
                     EmissivePrimaryThresholdScale = Math.Clamp(bloom.EmissivePrimaryThresholdScale, 0.5f, 4f),
                     EmissivePrimaryIntensityScale = Math.Clamp(bloom.EmissivePrimaryIntensityScale, 0f, 1f),
                     EmissivePrimaryWithColorIntensityScale = Math.Clamp(bloom.EmissivePrimaryWithColorIntensityScale, 0f, 1f),
+                    EmissivePrimaryNormalizationScale = Math.Clamp(bloom.EmissivePrimaryNormalizationScale, 0f, 1f),
                     EmissivePrimaryMinContribution = Math.Clamp(bloom.EmissivePrimaryMinContribution, 0f, 1f)
                 }
             };

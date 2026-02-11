@@ -116,13 +116,25 @@ namespace Avalonia3D.Rendering
         }
     }
 
+    public readonly record struct BloomRuntimeSettings(
+        float Threshold,
+        float Intensity,
+        float MinContribution,
+        float SoftKnee,
+        float NormalizationBoost);
+
     internal static class BloomRuntimeSettingsResolver
     {
-        public static (float Threshold, float Intensity, float MinContribution) Resolve(BloomProfile bloom, ShaderRenderMode renderMode, GraphicsProfile graphicsProfile)
+        public static BloomRuntimeSettings Resolve(BloomProfile bloom, ShaderRenderMode renderMode, GraphicsProfile graphicsProfile)
         {
             if (renderMode == ShaderRenderMode.Unlit)
             {
-                return (bloom.Threshold * 0.25f, bloom.Intensity * bloom.UnlitIntensityBoost, bloom.EmissiveMinContribution);
+                return new BloomRuntimeSettings(
+                    bloom.Threshold * 0.25f,
+                    bloom.Intensity * bloom.UnlitIntensityBoost,
+                    bloom.EmissiveMinContribution,
+                    bloom.SoftKnee,
+                    bloom.NormalizationBoost);
             }
 
             if (renderMode is ShaderRenderMode.Default or ShaderRenderMode.Pbr)
@@ -130,7 +142,12 @@ namespace Avalonia3D.Rendering
                 var postFxEnabled = graphicsProfile.PostFx.Effects.HasFlag(PostEffectsFlags.Bloom) && graphicsProfile.PostFx.Bloom.Enabled;
                 if (!postFxEnabled)
                 {
-                    return (bloom.Threshold, bloom.Intensity, 0f);
+                    return new BloomRuntimeSettings(
+                        bloom.Threshold,
+                        bloom.Intensity,
+                        0f,
+                        bloom.SoftKnee,
+                        bloom.NormalizationBoost);
                 }
 
                 var exposure = Math.Clamp(graphicsProfile.PbrTuning.Exposure, 0.1f, 4f);
@@ -147,10 +164,20 @@ namespace Avalonia3D.Rendering
                 var baseContribution = Math.Max(bloom.EmissiveMinContribution, bloom.ColorAdditiveContribution * 0.12f);
                 var minContribution = baseContribution * (1f + (0.3f * reflectionWeight));
 
-                return (Math.Clamp(threshold, 0f, 16f), Math.Clamp(intensity, 0f, 8f), Math.Clamp(minContribution, 0f, 1f));
+                return new BloomRuntimeSettings(
+                    Math.Clamp(threshold, 0f, 16f),
+                    Math.Clamp(intensity, 0f, 8f),
+                    Math.Clamp(minContribution, 0f, 1f),
+                    bloom.SoftKnee,
+                    bloom.NormalizationBoost);
             }
 
-            return (bloom.Threshold, bloom.Intensity, 0f);
+            return new BloomRuntimeSettings(
+                bloom.Threshold,
+                bloom.Intensity,
+                0f,
+                bloom.SoftKnee,
+                bloom.NormalizationBoost);
         }
     }
 
@@ -217,7 +244,7 @@ namespace Avalonia3D.Rendering
             gl.Disable(EnableCap.Blend);
             gl.BindVertexArray(_vao);
 
-            RenderBrightPass(gl, context.Width, context.Height, runtimeSettings.Threshold, runtimeSettings.MinContribution, source);
+            RenderBrightPass(gl, context.Width, context.Height, runtimeSettings, source);
             RenderDownsampleBlurChain(gl, bloom.Radius);
             RenderComposite(gl, context.RenderContext.FrameState.OutputFramebufferId, runtimeSettings.Intensity);
 
@@ -228,7 +255,7 @@ namespace Avalonia3D.Rendering
             gl.Viewport(0, 0, (uint)context.Width, (uint)context.Height);
         }
 
-        private void RenderBrightPass(GL gl, int fullWidth, int fullHeight, float threshold, float minContribution, BloomSourceResolution source)
+        private void RenderBrightPass(GL gl, int fullWidth, int fullHeight, BloomRuntimeSettings runtimeSettings, BloomSourceResolution source)
         {
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, _levelFramebuffers[0]);
             gl.Viewport(0, 0, (uint)Math.Max(1, fullWidth / 2), (uint)Math.Max(1, fullHeight / 2));
@@ -243,10 +270,10 @@ namespace Avalonia3D.Rendering
             gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uSecondaryTexture"), 1);
             gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uSecondaryContribution"), source.SecondaryContribution);
 
-            gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uThreshold"), threshold);
-            gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uMinContribution"), minContribution);
-            gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uSoftKnee"), _settings.PostFx.Bloom.SoftKnee);
-            gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uNormalizationBoost"), _settings.PostFx.Bloom.NormalizationBoost);
+            gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uThreshold"), runtimeSettings.Threshold);
+            gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uMinContribution"), runtimeSettings.MinContribution);
+            gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uSoftKnee"), runtimeSettings.SoftKnee);
+            gl.Uniform1(gl.GetUniformLocation(_extractProgram, "uNormalizationBoost"), runtimeSettings.NormalizationBoost);
             gl.DrawArrays(PrimitiveType.Triangles, 0, 6);
         }
 
@@ -492,7 +519,7 @@ void main()
             return shader;
         }
 
-        private void LogDiagnosticsOnce(RenderPipelineContext context, (float Threshold, float Intensity, float MinContribution) runtimeSettings, string source)
+        private void LogDiagnosticsOnce(RenderPipelineContext context, BloomRuntimeSettings runtimeSettings, string source)
         {
             if (_diagnosticsLogged)
             {
@@ -501,7 +528,7 @@ void main()
 
             _diagnosticsLogged = true;
             Log.Information(
-                "BloomPass active. Mode={Mode}, Source={Source}, SourceFbo={SourceFbo}, Size={Width}x{Height}, Threshold={Threshold:0.###}, Intensity={Intensity:0.###}, MinContribution={MinContribution:0.###}, Levels={Levels}",
+                "BloomPass active. Mode={Mode}, Source={Source}, SourceFbo={SourceFbo}, Size={Width}x{Height}, Threshold={Threshold:0.###}, Intensity={Intensity:0.###}, MinContribution={MinContribution:0.###}, SoftKnee={SoftKnee:0.###}, NormalizationBoost={NormalizationBoost:0.###}, Levels={Levels}",
                 context.Scene.RenderMode,
                 source,
                 context.RenderContext.FrameState.OutputFramebufferId,
@@ -510,6 +537,8 @@ void main()
                 runtimeSettings.Threshold,
                 runtimeSettings.Intensity,
                 runtimeSettings.MinContribution,
+                runtimeSettings.SoftKnee,
+                runtimeSettings.NormalizationBoost,
                 _levelTextures.Count);
         }
     }
