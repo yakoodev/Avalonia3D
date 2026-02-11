@@ -415,7 +415,9 @@ namespace Avalonia3D.Shaders
                 materialKey: sceneObject.Name ?? sceneObject.Node.Name ?? "$material");
 
             var baseColorFactor = material?.BaseColorFactor ?? new Vector4(sceneObject.BaseColor, 1f);
-            var emissiveFactor = material?.EmissiveFactor ?? sceneObject.EmissionColor;
+            // SceneObject-level emission is passed through uEmissionColor (EmissionUniformResolver).
+            // Keep emissiveFactor fallback black to avoid double-counting when material is absent.
+            var emissiveFactor = material?.EmissiveFactor ?? Vector3.Zero;
             var metallicFactor = material?.MetallicFactor ?? 0f;
             var roughnessFactor = material?.RoughnessFactor ?? 1f;
             var occlusionStrength = material?.OcclusionStrength ?? 1f;
