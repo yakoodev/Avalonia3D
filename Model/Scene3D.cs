@@ -243,7 +243,7 @@ namespace Avalonia3D.Model
         {
             ResetSceneGraph();
             var importResult = Importer.ImportWithAnimations(gltfPath);
-            LastImportReport = new SceneImportReport(importResult.Status, importResult.Issues);
+            LastImportReport = new SceneImportReport(importResult.Status, importResult.Issues, importResult.UnsupportedAnimationChannels);
             SceneGraph = importResult.Graph;
             AnimatorComponent.SetSceneGraph(SceneGraph);
             foreach (var clip in importResult.Clips)
@@ -301,9 +301,12 @@ namespace Avalonia3D.Model
         }
     }
 
-    public readonly record struct SceneImportReport(SceneImportStatus Status, IReadOnlyList<string> Issues)
+    public readonly record struct SceneImportReport(
+        SceneImportStatus Status,
+        IReadOnlyList<string> Issues,
+        IReadOnlyList<UnsupportedAnimationChannelReport> UnsupportedAnimationChannels)
     {
-        public static SceneImportReport Success => new(SceneImportStatus.Success, []);
+        public static SceneImportReport Success => new(SceneImportStatus.Success, [], []);
         public bool IsDegraded => Status == SceneImportStatus.Degraded;
     }
 }
