@@ -212,6 +212,7 @@ namespace Avalonia3D.Loaders
             {
                 Name = $"{node.Name}_{prim.Material?.Name ?? "mat"}",
                 PrimitiveKey = primitiveKey,
+                MaterialKey = prim.Material != null ? $"material:{prim.Material.LogicalIndex}" : string.Empty,
                 Vertices = vertices,
                 Indices = indices,
                 LocalMatrix = node.LocalMatrix,

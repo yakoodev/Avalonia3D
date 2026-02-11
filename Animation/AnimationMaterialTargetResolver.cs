@@ -14,6 +14,22 @@ namespace Avalonia3D.Animation
             _sceneGraph = sceneGraph ?? throw new ArgumentNullException(nameof(sceneGraph));
         }
 
+        public IReadOnlyList<MeshObject> ResolveByMaterialKey(string materialKey)
+        {
+            if (string.IsNullOrWhiteSpace(materialKey))
+            {
+                return [];
+            }
+
+            var result = new List<MeshObject>();
+            foreach (var rootObject in _sceneGraph.RootObjects)
+            {
+                CollectByMaterialKey(rootObject, materialKey, result);
+            }
+
+            return result;
+        }
+
         public MeshObject? ResolveByNodeKey(string nodeKey)
         {
             if (string.IsNullOrWhiteSpace(nodeKey))
@@ -22,12 +38,7 @@ namespace Avalonia3D.Animation
             }
 
             var node = _sceneGraph.FindNodeByKey(nodeKey);
-            if (node == null)
-            {
-                return null;
-            }
-
-            return ResolveByNode(node);
+            return node == null ? null : ResolveByNode(node);
         }
 
         public MeshObject? ResolveByNode(SceneNode node)
@@ -49,27 +60,42 @@ namespace Avalonia3D.Animation
             return null;
         }
 
-        private static MeshObject? ResolveInObjectTree(SceneObject obj, SceneNode targetNode)
+        private static void CollectByMaterialKey(SceneObject obj, string materialKey, List<MeshObject> result)
         {
-            if (obj == null)
+            if (obj is MeshObject mesh && string.Equals(mesh.MaterialKey, materialKey, StringComparison.Ordinal))
             {
-                return null;
+                result.Add(mesh);
             }
 
+            if (obj is not MeshGroup group)
+            {
+                return;
+            }
+
+            foreach (var child in group)
+            {
+                CollectByMaterialKey(child, materialKey, result);
+            }
+        }
+
+        private static MeshObject? ResolveInObjectTree(SceneObject obj, SceneNode targetNode)
+        {
             if (ReferenceEquals(obj.Node, targetNode))
             {
                 return ResolveMaterialHolder(obj);
             }
 
-            if (obj is MeshGroup group)
+            if (obj is not MeshGroup group)
             {
-                foreach (var child in group)
+                return null;
+            }
+
+            foreach (var child in group)
+            {
+                var match = ResolveInObjectTree(child, targetNode);
+                if (match != null)
                 {
-                    var match = ResolveInObjectTree(child, targetNode);
-                    if (match != null)
-                    {
-                        return match;
-                    }
+                    return match;
                 }
             }
 
@@ -83,14 +109,16 @@ namespace Avalonia3D.Animation
                 return meshObject;
             }
 
-            if (nodeOwner is MeshGroup group)
+            if (nodeOwner is not MeshGroup group)
             {
-                foreach (var child in group)
+                return null;
+            }
+
+            foreach (var child in group)
+            {
+                if (child.Material != null)
                 {
-                    if (child.Material != null)
-                    {
-                        return child;
-                    }
+                    return child;
                 }
             }
 
