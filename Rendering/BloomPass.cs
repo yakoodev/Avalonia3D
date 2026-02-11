@@ -35,13 +35,17 @@ namespace Avalonia3D.Rendering
                 var secondaryContribution = 0f;
                 if (colorTextureId != 0)
                 {
-                    secondaryContribution = Math.Clamp(bloomProfile.ColorAdditiveContribution, 0f, 1f);
-                    if (context.Scene.RenderMode is ShaderRenderMode.Default or ShaderRenderMode.Pbr)
-                    {
-                        secondaryContribution = Math.Max(secondaryContribution, 0.35f);
-                    }
+                    secondaryContribution = BloomSecondaryContributionPolicy.Resolve(
+                        context.Scene.RenderMode,
+                        bloomProfile,
+                        hasEmissivePrimary: true);
                 }
-                return new BloomSourceResolution(emissiveTextureId, colorTextureId, secondaryContribution, secondaryContribution > 0f ? "emissive+color" : "emissive");
+
+                return new BloomSourceResolution(
+                    emissiveTextureId,
+                    colorTextureId,
+                    secondaryContribution,
+                    secondaryContribution > 0f ? "emissive+color" : "emissive");
             }
 
             if (colorTextureId != 0)
