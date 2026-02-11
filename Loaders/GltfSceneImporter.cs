@@ -596,96 +596,24 @@ namespace Avalonia3D.Loaders
             };
         }
 
-        private static readonly (string PathToken, TextureSlot Slot)[] TextureSlotPathRegistry =
-        [
-            ("/pbrMetallicRoughness/baseColorTexture", TextureSlot.BaseColor),
-            ("/emissiveTexture", TextureSlot.Emissive),
-            ("/normalTexture", TextureSlot.Normal),
-            ("/occlusionTexture", TextureSlot.Occlusion),
-            ("/pbrMetallicRoughness/metallicRoughnessTexture", TextureSlot.MetallicRoughness)
-        ];
-
-        private static readonly (string Suffix, AnimationTargetProperty Property)[] TextureTransformPropertyRegistry =
-        [
-            ("/offset", AnimationTargetProperty.TextureTransformOffset),
-            ("/scale", AnimationTargetProperty.TextureTransformScale),
-            ("/rotation", AnimationTargetProperty.TextureTransformRotation),
-            ("/texCoord", AnimationTargetProperty.TextureTransformTexCoord)
-        ];
-
         private static ChannelTargetDescriptor? MapPointerTargetProperty(string? pointerPath)
         {
-            if (string.IsNullOrWhiteSpace(pointerPath) || !pointerPath.Contains("/materials/", StringComparison.OrdinalIgnoreCase))
+            if (!GltfAnimationPointerRegistry.TryResolve(pointerPath, out var registration))
             {
                 return null;
             }
 
-            if (pointerPath.EndsWith("/emissiveFactor", StringComparison.OrdinalIgnoreCase))
+            return registration.TargetKind switch
             {
-                return new ChannelTargetDescriptor(AnimationTargetKind.MaterialProperty, AnimationTargetProperty.EmissiveColor);
-            }
-
-            if (pointerPath.EndsWith("/extensions/KHR_materials_emissive_strength/emissiveStrength", StringComparison.OrdinalIgnoreCase)
-                || pointerPath.EndsWith("/emissiveStrength", StringComparison.OrdinalIgnoreCase)
-                || pointerPath.EndsWith("/emissiveIntensity", StringComparison.OrdinalIgnoreCase))
-            {
-                return new ChannelTargetDescriptor(AnimationTargetKind.MaterialProperty, AnimationTargetProperty.EmissiveIntensity);
-            }
-
-            if (pointerPath.EndsWith("/pbrMetallicRoughness/baseColorFactor", StringComparison.OrdinalIgnoreCase)
-                || pointerPath.EndsWith("/baseColorFactor", StringComparison.OrdinalIgnoreCase))
-            {
-                return new ChannelTargetDescriptor(AnimationTargetKind.MaterialProperty, AnimationTargetProperty.BaseColorFactor);
-            }
-
-            if (TryResolveTextureTransformPath(pointerPath, out var textureSlot, out var textureProperty))
-            {
-                return new ChannelTargetDescriptor(AnimationTargetKind.TextureProperty, textureProperty, textureSlot);
-            }
-
-            return null;
+                GltfAnimationPointerTargetKind.Material => new ChannelTargetDescriptor(AnimationTargetKind.MaterialProperty, registration.RuntimeProperty),
+                GltfAnimationPointerTargetKind.Texture when registration.TextureSlot.HasValue => new ChannelTargetDescriptor(AnimationTargetKind.TextureProperty, registration.RuntimeProperty, registration.TextureSlot),
+                _ => null
+            };
         }
 
-        private static bool TryResolveTextureTransformPath(string pointerPath, out TextureSlot textureSlot, out AnimationTargetProperty textureProperty)
+        internal static bool TryResolvePointerTargetForTests(string? pointerPath, out GltfAnimationPointerRegistration registration)
         {
-            textureSlot = default;
-            textureProperty = default;
-
-            if (!pointerPath.Contains("KHR_texture_transform", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            var slotResolved = false;
-            foreach (var entry in TextureSlotPathRegistry)
-            {
-                if (!pointerPath.Contains(entry.PathToken, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                textureSlot = entry.Slot;
-                slotResolved = true;
-                break;
-            }
-
-            if (!slotResolved)
-            {
-                return false;
-            }
-
-            foreach (var entry in TextureTransformPropertyRegistry)
-            {
-                if (!pointerPath.EndsWith(entry.Suffix, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                textureProperty = entry.Property;
-                return true;
-            }
-
-            return false;
+            return GltfAnimationPointerRegistry.TryResolve(pointerPath, out registration);
         }
 
         private static bool TryExtractVector3PointerKeys(SharpGLTF.Schema2.AnimationChannel channel, out List<(float Time, Vector3 Value)> keys)
