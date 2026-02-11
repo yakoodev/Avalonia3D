@@ -20,6 +20,7 @@ namespace Avalonia3D.Rendering
             var gl = context.Gl;
             var frameState = context.RenderContext.FrameState;
             frameState.AmbientStrengthClamp = _settings.PbrTuning.AmbientStrengthClamp;
+            frameState.DirectLightContributionClamp = _settings.PbrTuning.DirectLightContributionClamp;
 
             if (!_settings.Reflections.Enabled || _settings.Reflections.Mode == ReflectionMode.Off)
             {

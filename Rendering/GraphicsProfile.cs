@@ -49,6 +49,7 @@ namespace Avalonia3D.Rendering
         public float IblSpecularIntensity { get; init; } = 1.0f;
         public float ReflectionContributionClamp { get; init; } = 1.25f;
         public float AmbientStrengthClamp { get; init; } = 0.35f;
+        public float DirectLightContributionClamp { get; init; } = 1.35f;
         public float AmbientOcclusionStrength { get; init; } = 1.0f;
     }
 
@@ -120,6 +121,7 @@ namespace Avalonia3D.Rendering
                 IblSpecularIntensity = 0f,
                 ReflectionContributionClamp = 0.7f,
                 AmbientStrengthClamp = 0.25f,
+                DirectLightContributionClamp = 1.0f,
                 AmbientOcclusionStrength = 0.8f
             },
             Background = new BackgroundProfile { Red = 0.09f, Green = 0.09f, Blue = 0.10f },
@@ -297,6 +299,7 @@ namespace Avalonia3D.Rendering
                 IblSpecularIntensity = 0.6f,
                 ReflectionContributionClamp = 0.9f,
                 AmbientStrengthClamp = 0.25f,
+                DirectLightContributionClamp = 0.95f,
                 AmbientOcclusionStrength = 1.0f
             },
             Background = new BackgroundProfile { Red = 0.05f, Green = 0.05f, Blue = 0.06f },
@@ -355,6 +358,7 @@ namespace Avalonia3D.Rendering
                 IblSpecularIntensity = Math.Clamp(PbrTuning?.IblSpecularIntensity ?? 1.0f, 0f, 8.0f),
                 ReflectionContributionClamp = Math.Clamp(PbrTuning?.ReflectionContributionClamp ?? 1.25f, 0f, 8.0f),
                 AmbientStrengthClamp = Math.Clamp(PbrTuning?.AmbientStrengthClamp ?? 0.35f, 0f, 2.0f),
+                DirectLightContributionClamp = Math.Clamp(PbrTuning?.DirectLightContributionClamp ?? 1.35f, 0f, 16.0f),
                 AmbientOcclusionStrength = Math.Clamp(PbrTuning?.AmbientOcclusionStrength ?? 1.0f, 0f, 4.0f)
             };
 
@@ -400,7 +404,7 @@ namespace Avalonia3D.Rendering
         }
 
         public string ToSummary() =>
-            $"Profile={Name} ({QualityPreset}), shadows={Shadows.Enabled}:{Shadows.MapSize}, postfx={PostFx.Effects}, gamma={PostFx.Gamma:0.00}, bloom={PostFx.Bloom.Enabled}:{PostFx.Bloom.Threshold:0.00}/{PostFx.Bloom.Intensity:0.00}/{PostFx.Bloom.Radius:0.00}x{PostFx.Bloom.Iterations}, refl={Reflections.Mode}:{Reflections.Intensity:0.00}, exposure={PbrTuning.Exposure:0.00}, wp={PbrTuning.PbrWhitePoint:0.00}, ibl(diff/spec)={PbrTuning.IblDiffuseIntensity:0.00}/{PbrTuning.IblSpecularIntensity:0.00}, reflClamp={PbrTuning.ReflectionContributionClamp:0.00}, ambientClamp={PbrTuning.AmbientStrengthClamp:0.00}, lights={MaxLights}, msaa={MsaaPolicy}, bg=({Background.Red:0.00},{Background.Green:0.00},{Background.Blue:0.00})";
+            $"Profile={Name} ({QualityPreset}), shadows={Shadows.Enabled}:{Shadows.MapSize}, postfx={PostFx.Effects}, gamma={PostFx.Gamma:0.00}, bloom={PostFx.Bloom.Enabled}:{PostFx.Bloom.Threshold:0.00}/{PostFx.Bloom.Intensity:0.00}/{PostFx.Bloom.Radius:0.00}x{PostFx.Bloom.Iterations}, refl={Reflections.Mode}:{Reflections.Intensity:0.00}, exposure={PbrTuning.Exposure:0.00}, wp={PbrTuning.PbrWhitePoint:0.00}, ibl(diff/spec)={PbrTuning.IblDiffuseIntensity:0.00}/{PbrTuning.IblSpecularIntensity:0.00}, reflClamp={PbrTuning.ReflectionContributionClamp:0.00}, ambientClamp={PbrTuning.AmbientStrengthClamp:0.00}, directClamp={PbrTuning.DirectLightContributionClamp:0.00}, lights={MaxLights}, msaa={MsaaPolicy}, bg=({Background.Red:0.00},{Background.Green:0.00},{Background.Blue:0.00})";
 
         private static string? ResolveDefaultEnvironmentMapPath(bool reflectionsEnabled, ReflectionMode mode)
         {
