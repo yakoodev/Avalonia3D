@@ -5,6 +5,7 @@ using Avalonia3D.Interaction.CameraController;
 using Avalonia3D.Interaction.Behaviors;
 using Avalonia3D.Model;
 using Avalonia3D.Rendering;
+using Avalonia3D.Rendering.Diagnostics;
 using Avalonia3D.Sandbox.Scenes;
 using Avalonia3D.Sandbox.Services;
 using Avalonia3D.Sandbox.Utilities;
@@ -42,6 +43,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private bool _isImportDegraded;
     private string _behaviorTargetSemanticId = "door.main";
     private EmissiveTextureDebugMode _selectedEmissiveTextureDebugMode = EmissiveTextureDebugMode.Normal;
+    private bool _dumpPbrMaterialDiagnostics;
 
     public MainWindowViewModel(Scene3D scene, CameraController cameraController, string assetsRoot, IRenderThreadScheduler renderThreadScheduler, Action<GraphicsProfile> applyGraphicsProfile)
     {
@@ -327,6 +329,24 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedEmissiveTextureDebugMode)));
         }
     }
+
+    public bool DumpPbrMaterialDiagnostics
+    {
+        get => _dumpPbrMaterialDiagnostics;
+        set
+        {
+            if (_dumpPbrMaterialDiagnostics == value)
+            {
+                return;
+            }
+
+            _dumpPbrMaterialDiagnostics = value;
+            MaterialRenderDiagnostics.SetEnabled(value);
+            Log.Information("PBR material diagnostics dump changed: {Enabled}", value);
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DumpPbrMaterialDiagnostics)));
+        }
+    }
+
     public ShaderRenderMode SelectedRenderMode
     {
         get => _selectedRenderMode;
