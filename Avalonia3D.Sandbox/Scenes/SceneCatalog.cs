@@ -10,7 +10,12 @@ public static class SceneCatalog
 {
     public static IReadOnlyList<ISandboxScene> CreateDefault(string assetsRoot)
     {
-        var scenes = DiscoverGltfScenes(assetsRoot).ToList();
+        var scenes = new List<ISandboxScene>
+        {
+            new PbrRegressionScene()
+        };
+
+        scenes.AddRange(DiscoverGltfScenes(assetsRoot));
 
         Log.Information("Scene catalog initialized. Total scenes: {Count}", scenes.Count);
         return scenes;

@@ -107,6 +107,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             }
         });
 
+        TogglePbrUnlitCommand = new RelayCommand(_ =>
+        {
+            var targetMode = SelectedRenderMode == ShaderRenderMode.Pbr
+                ? ShaderRenderMode.Unlit
+                : ShaderRenderMode.Pbr;
+            ApplyShaderMode(targetMode);
+        });
+
         PlayClipCommand = new RelayCommand(_ => Play());
         PauseClipCommand = new RelayCommand(_ => Pause());
         StopClipCommand = new RelayCommand(_ => Stop());
@@ -147,6 +155,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public ObservableCollection<RenderQualityPreset> QualityPresets { get; }
     public ObservableCollection<EmissiveTextureDebugMode> EmissiveTextureDebugModes { get; }
     public RelayCommand SwitchShaderModeCommand { get; }
+    public RelayCommand TogglePbrUnlitCommand { get; }
     public RelayCommand PlayClipCommand { get; }
     public RelayCommand PauseClipCommand { get; }
     public RelayCommand StopClipCommand { get; }
