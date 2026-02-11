@@ -130,6 +130,7 @@ public class PbrShaderSourceBuilderTests
 
         Assert.Contains("uPbrDebugViewMode", fragmentSource);
         Assert.Contains("debugSurfaceResult", fragmentSource);
+        Assert.Contains("emissiveToSurface", fragmentSource);
         Assert.Contains("baseColor.rgb", fragmentSource);
         Assert.Contains("directLightComponent", fragmentSource);
         Assert.Contains("iblComponent", fragmentSource);
@@ -163,6 +164,7 @@ public class PbrShaderSourceBuilderTests
         Assert.Contains("uIblDiffuseIntensity", fragmentSource);
         Assert.Contains("uIblSpecularIntensity", fragmentSource);
         Assert.Contains("uReflectionContributionClamp", fragmentSource);
+        Assert.Contains("uSeparateEmissiveTarget", fragmentSource);
         Assert.Contains("uAmbientStrengthClamp", fragmentSource);
         Assert.Contains("iblDiffuse", fragmentSource);
         Assert.Contains("min(reflection + iblDiffuse", fragmentSource);
