@@ -1,5 +1,6 @@
 using Avalonia3D.Animation;
 using Avalonia3D.Helpers;
+using Avalonia3D.Loaders.Policies;
 using Avalonia3D.Memory;
 using Avalonia3D.Model;
 using Avalonia3D.Model.StandObjects;
@@ -237,6 +238,11 @@ namespace Avalonia3D.Loaders
         public SceneImportResult ImportWithAnimations(ModelRoot gltf)
         {
             var graph = new SceneGraph();
+            var policyContext = new MaterialImportPolicyContext
+            {
+                AlphaProfile = MaterialAlphaImportConfiguration.CurrentProfile
+            };
+
             if (gltf == null)
             {
                 return new SceneImportResult(graph, [], SceneImportStatus.Success);
@@ -250,7 +256,7 @@ namespace Avalonia3D.Loaders
                 {
                     foreach (var root in scene.VisualChildren)
                     {
-                        BuildNode(graph, null, root, nodeKeys);
+                        BuildNode(graph, null, root, nodeKeys, policyContext);
                     }
                 }
             }
@@ -258,7 +264,7 @@ namespace Avalonia3D.Loaders
             {
                 foreach (var node in gltf.LogicalNodes)
                 {
-                    BuildNode(graph, null, node, nodeKeys);
+                    BuildNode(graph, null, node, nodeKeys, policyContext);
                 }
             }
 
@@ -306,7 +312,7 @@ namespace Avalonia3D.Loaders
             MemoryManager.PerformAggressiveCleanup();
         }
 
-        private MeshGroup BuildNode(SceneGraph graph, MeshGroup? parent, Node node, Dictionary<Node, string> nodeKeys)
+        private MeshGroup BuildNode(SceneGraph graph, MeshGroup? parent, Node node, Dictionary<Node, string> nodeKeys, MaterialImportPolicyContext policyContext)
         {
             var group = new MeshGroup
             {
@@ -337,7 +343,7 @@ namespace Avalonia3D.Loaders
 
             if (node.Mesh != null)
             {
-                foreach (var model in ModelLoader.LoadModelsForNode(node))
+                foreach (var model in ModelLoader.LoadModelsForNode(node, policyContext))
                 {
                     var meshObject = CreateMeshObject(model, applyLocalMatrix: false);
                     group.Add(meshObject);
@@ -346,7 +352,7 @@ namespace Avalonia3D.Loaders
 
             foreach (var child in node.VisualChildren)
             {
-                BuildNode(graph, group, child, nodeKeys);
+                BuildNode(graph, group, child, nodeKeys, policyContext);
             }
 
             return group;
@@ -822,7 +828,15 @@ namespace Avalonia3D.Loaders
             if (!_modelCache.TryGetValue(gltfPath, out var models))
             {
                 var gltf = ModelRoot.Load(gltfPath);
-                models = ModelLoader.LoadModels(gltf);
+                var sceneOverride = MaterialImportOverrideConfiguration.ResolveForAsset(gltfPath);
+                var policyContext = new MaterialImportPolicyContext
+                {
+                    AssetPath = gltfPath,
+                    AlphaProfile = MaterialAlphaImportConfiguration.CurrentProfile,
+                    SceneOverride = sceneOverride
+                };
+
+                models = ModelLoader.LoadModels(gltf, policyContext);
                 _modelCache[gltfPath] = models;
             }
 

@@ -2,6 +2,7 @@
 using Avalonia.LinuxFramebuffer;
 using Avalonia.LinuxFramebuffer.Input.LibInput;
 using Avalonia3D.Loaders;
+using Avalonia3D.Loaders.Policies;
 using System;
 using System.Linq;
 
@@ -17,6 +18,7 @@ namespace Avalonia3D
         {
             ImportValidationConfiguration.Configure(ImportValidationConfiguration.ResolveFrom(args));
             MaterialAlphaImportConfiguration.Configure(MaterialAlphaImportConfiguration.ResolveFrom(args));
+            MaterialImportOverrideConfiguration.ConfigureFromPath(MaterialImportOverrideConfiguration.ResolveConfigPath(args));
 
             if (OperatingSystem.IsLinux())
                 return StartDRM(args);

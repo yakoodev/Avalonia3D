@@ -1,3 +1,4 @@
+using Avalonia3D.Loaders.Policies;
 using Avalonia3D.Model;
 using System;
 using System.Collections.Generic;
@@ -104,48 +105,11 @@ public static class MaterialAlphaImportConfiguration
 
 public sealed class MaterialAlphaImportPolicy
 {
-    private const float AlphaSignalThreshold = 0.999f;
-    private const float EmissiveFactorThresholdSq = 0.000001f;
-    private const float EmissiveStrengthThreshold = 1.001f;
+    private readonly DefaultMaterialImportPolicy _policy = new();
 
     public void Apply(Material material, MaterialAlphaImportProfile profile)
     {
-        if (material == null || material.AlphaMode != MaterialAlphaMode.Blend)
-        {
-            return;
-        }
-
-        var hasAlphaSignal = material.BaseColorFactor.W < AlphaSignalThreshold || material.HasTextureTransparency;
-        if (hasAlphaSignal)
-        {
-            return;
-        }
-
-        if (profile == MaterialAlphaImportProfile.Strict)
-        {
-            return;
-        }
-
-        if (profile == MaterialAlphaImportProfile.Balanced && HasEmissiveIntent(material))
-        {
-            return;
-        }
-
-        material.AlphaMode = MaterialAlphaMode.Opaque;
-    }
-
-    private static bool HasEmissiveIntent(Material material)
-    {
-        if (material.EmissiveTexture != null)
-        {
-            return true;
-        }
-
-        if (material.EmissiveFactor.LengthSquared() > EmissiveFactorThresholdSq)
-        {
-            return true;
-        }
-
-        return material.EmissiveStrength > EmissiveStrengthThreshold;
+        var context = new MaterialImportPolicyContext { AlphaProfile = profile };
+        material.AlphaMode = _policy.ResolveAlphaMode(material, context);
     }
 }
