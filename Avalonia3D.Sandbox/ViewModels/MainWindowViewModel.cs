@@ -629,7 +629,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
         if (!report.IsDegraded)
         {
-            ImportStatusText = "Import: OK";
+            var unsupportedSuffix = report.UnsupportedAnimationChannels.Count == 0
+                ? string.Empty
+                : $" | Unsupported animation channels: {report.UnsupportedAnimationChannels.Count}";
+
+            ImportStatusText = $"Import: OK{unsupportedSuffix}";
             return;
         }
 

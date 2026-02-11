@@ -16,20 +16,40 @@ namespace Avalonia3D.Loaders
 {
     public sealed class SceneImportResult
     {
-        public SceneImportResult(SceneGraph graph, IReadOnlyList<AnimationClip> clips, SceneImportStatus status, IReadOnlyList<string>? issues = null)
+        public SceneImportResult(
+            SceneGraph graph,
+            IReadOnlyList<AnimationClip> clips,
+            SceneImportStatus status,
+            IReadOnlyList<string>? issues = null,
+            IReadOnlyList<UnsupportedAnimationChannelReport>? unsupportedAnimationChannels = null)
         {
             Graph = graph;
             Clips = clips;
             Status = status;
             Issues = issues ?? [];
+            UnsupportedAnimationChannels = unsupportedAnimationChannels ?? [];
         }
 
         public SceneGraph Graph { get; }
         public IReadOnlyList<AnimationClip> Clips { get; }
         public SceneImportStatus Status { get; }
         public IReadOnlyList<string> Issues { get; }
+        public IReadOnlyList<UnsupportedAnimationChannelReport> UnsupportedAnimationChannels { get; }
         public bool IsDegraded => Status == SceneImportStatus.Degraded;
     }
+
+    public enum UnsupportedAnimationChannelReason
+    {
+        UnknownPointer,
+        UnsupportedValueType,
+        MissingBindingTarget
+    }
+
+    public readonly record struct UnsupportedAnimationChannelReport(
+        string ClipName,
+        string PointerPath,
+        string TargetId,
+        UnsupportedAnimationChannelReason Reason);
 
     public enum SceneImportStatus
     {
@@ -75,7 +95,7 @@ namespace Avalonia3D.Loaders
                     ? ImportWithAnimations(loaded.Model)
                     : new SceneImportResult(new SceneGraph(), [], SceneImportStatus.Success);
 
-                return new SceneImportResult(importResult.Graph, importResult.Clips, loaded.Status, loaded.Issues);
+                return new SceneImportResult(importResult.Graph, importResult.Clips, loaded.Status, loaded.Issues, importResult.UnsupportedAnimationChannels);
             }
             finally
             {
@@ -221,12 +241,12 @@ namespace Avalonia3D.Loaders
             }
 
             var materialTargetMap = BuildMaterialTargetMap(gltf, nodeKeys);
-            var clips = ExtractAnimationClips(gltf, nodeKeys, materialTargetMap);
+            var (clips, unsupportedChannels) = ExtractAnimationClips(gltf, nodeKeys, materialTargetMap);
 
             ModelLoader.ClearAllCaches();
             MemoryManager.PerformAggressiveCleanup();
             MemoryManager.LogMemoryState("After GLTF load");
-            return new SceneImportResult(graph, clips, SceneImportStatus.Success);
+            return new SceneImportResult(graph, clips, SceneImportStatus.Success, unsupportedAnimationChannels: unsupportedChannels);
         }
 
         private sealed record ModelLoadOutcome(ModelRoot? Model, SceneImportStatus Status, IReadOnlyList<string> Issues);
@@ -381,9 +401,13 @@ namespace Avalonia3D.Loaders
             return readonlyMap;
         }
 
-        private static List<AnimationClip> ExtractAnimationClips(ModelRoot gltf, IReadOnlyDictionary<Node, string> nodeKeys, IReadOnlyDictionary<int, IReadOnlyList<string>> materialTargetMap)
+        private static (List<AnimationClip> Clips, List<UnsupportedAnimationChannelReport> UnsupportedChannels) ExtractAnimationClips(
+            ModelRoot gltf,
+            IReadOnlyDictionary<Node, string> nodeKeys,
+            IReadOnlyDictionary<int, IReadOnlyList<string>> materialTargetMap)
         {
             var clips = new List<AnimationClip>();
+            var unsupportedChannels = new List<UnsupportedAnimationChannelReport>();
             foreach (var animation in gltf.LogicalAnimations)
             {
                 var clipName = string.IsNullOrWhiteSpace(animation.Name)
@@ -397,6 +421,12 @@ namespace Avalonia3D.Loaders
                     var descriptor = ParseChannelTarget(channel);
                     if (descriptor == null)
                     {
+                        unsupportedChannels.Add(CreateUnsupportedChannelReport(
+                            clipName,
+                            channel,
+                            UnsupportedAnimationChannelReason.UnknownPointer,
+                            fallbackTargetId: ResolveChannelTargetId(channel, nodeKeys)));
+
                         Log.Debug("Skipping unsupported GLTF animation channel '{PointerPath}' in clip '{Clip}'. NodePath='{NodePath}' PointerPath='{TargetPointerPath}'",
                             channel.TargetPointerPath,
                             clipName,
@@ -409,9 +439,15 @@ namespace Avalonia3D.Loaders
                     var bindingSpecs = ResolveTargetBindings(channel, resolved, nodeKeys, materialTargetMap);
                     if (bindingSpecs.Count == 0)
                     {
+                        unsupportedChannels.Add(CreateUnsupportedChannelReport(
+                            clipName,
+                            channel,
+                            UnsupportedAnimationChannelReason.MissingBindingTarget,
+                            fallbackTargetId: ResolveChannelTargetId(channel, nodeKeys, resolved)));
                         continue;
                     }
 
+                    var hasData = false;
                     foreach (var spec in bindingSpecs)
                     {
                         var animChannel = new Avalonia3D.Animation.AnimationChannel(spec.ChannelTargetKey, resolved.TargetProperty)
@@ -422,8 +458,18 @@ namespace Avalonia3D.Loaders
                         ExtractChannelKeys(channel, resolved.TargetProperty, animChannel);
                         if (animChannel.HasData)
                         {
+                            hasData = true;
                             clip.Channels.Add(animChannel);
                         }
+                    }
+
+                    if (!hasData)
+                    {
+                        unsupportedChannels.Add(CreateUnsupportedChannelReport(
+                            clipName,
+                            channel,
+                            UnsupportedAnimationChannelReason.UnsupportedValueType,
+                            fallbackTargetId: ResolveChannelTargetId(channel, nodeKeys, resolved)));
                     }
                 }
 
@@ -439,7 +485,45 @@ namespace Avalonia3D.Loaders
                 }
             }
 
-            return clips;
+            return (clips, unsupportedChannels);
+        }
+
+        private static UnsupportedAnimationChannelReport CreateUnsupportedChannelReport(
+            string clipName,
+            SharpGLTF.Schema2.AnimationChannel channel,
+            UnsupportedAnimationChannelReason reason,
+            string? fallbackTargetId = null)
+        {
+            var pointerPath = !string.IsNullOrWhiteSpace(channel.TargetPointerPath)
+                ? channel.TargetPointerPath
+                : channel.TargetNodePath.ToString();
+
+            var targetId = string.IsNullOrWhiteSpace(fallbackTargetId)
+                ? "<unknown>"
+                : fallbackTargetId;
+
+            return new UnsupportedAnimationChannelReport(clipName, pointerPath, targetId, reason);
+        }
+
+        private static string? ResolveChannelTargetId(
+            SharpGLTF.Schema2.AnimationChannel channel,
+            IReadOnlyDictionary<Node, string> nodeKeys,
+            ChannelTargetDescriptor? descriptor = null)
+        {
+            if (descriptor?.Kind is AnimationTargetKind.MaterialProperty or AnimationTargetKind.TextureProperty)
+            {
+                var materialIndex = TryParseMaterialIndex(channel.TargetPointerPath);
+                return materialIndex != null
+                    ? $"material:{materialIndex.Value}"
+                    : null;
+            }
+
+            if (channel.TargetNode != null && nodeKeys.TryGetValue(channel.TargetNode, out var nodeKey))
+            {
+                return nodeKey;
+            }
+
+            return null;
         }
 
         private static IReadOnlyList<ResolvedBindingSpec> ResolveTargetBindings(
