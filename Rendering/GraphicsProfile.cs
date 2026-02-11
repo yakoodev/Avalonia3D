@@ -23,6 +23,8 @@ namespace Avalonia3D.Rendering
         public float UnlitIntensityBoost { get; init; } = 2.5f;
         public float ColorAdditiveContribution { get; init; } = 0.2f;
         public float ColorAdditiveWhenEmissivePresentScale { get; init; } = 0.05f;
+        public float EmissivePrimaryIntensityScale { get; init; } = 0.55f;
+        public float EmissivePrimaryMinContribution { get; init; } = 0.0f;
     }
 
     public sealed record PostFxProfile
@@ -104,7 +106,9 @@ namespace Avalonia3D.Rendering
                     EmissiveMinContribution = 0.02f,
                     UnlitIntensityBoost = 2.0f,
                     ColorAdditiveContribution = 0.2f,
-                    ColorAdditiveWhenEmissivePresentScale = 0.05f
+                    ColorAdditiveWhenEmissivePresentScale = 0.05f,
+                    EmissivePrimaryIntensityScale = 0.55f,
+                    EmissivePrimaryMinContribution = 0.0f
                 }
             },
             Reflections = new ReflectionProfile
@@ -153,7 +157,9 @@ namespace Avalonia3D.Rendering
                     EmissiveMinContribution = 0.03f,
                     UnlitIntensityBoost = 2.3f,
                     ColorAdditiveContribution = 0.35f,
-                    ColorAdditiveWhenEmissivePresentScale = 0.05f
+                    ColorAdditiveWhenEmissivePresentScale = 0.05f,
+                    EmissivePrimaryIntensityScale = 0.55f,
+                    EmissivePrimaryMinContribution = 0.0f
                 }
             },
             Reflections = new ReflectionProfile
@@ -200,7 +206,9 @@ namespace Avalonia3D.Rendering
                     EmissiveMinContribution = 0.035f,
                     UnlitIntensityBoost = 2.5f,
                     ColorAdditiveContribution = 0.45f,
-                    ColorAdditiveWhenEmissivePresentScale = 0.05f
+                    ColorAdditiveWhenEmissivePresentScale = 0.05f,
+                    EmissivePrimaryIntensityScale = 0.55f,
+                    EmissivePrimaryMinContribution = 0.0f
                 }
             },
             Reflections = new ReflectionProfile
@@ -249,7 +257,9 @@ namespace Avalonia3D.Rendering
                     EmissiveMinContribution = 0.04f,
                     UnlitIntensityBoost = 2.5f,
                     ColorAdditiveContribution = 0.55f,
-                    ColorAdditiveWhenEmissivePresentScale = 0.05f
+                    ColorAdditiveWhenEmissivePresentScale = 0.05f,
+                    EmissivePrimaryIntensityScale = 0.55f,
+                    EmissivePrimaryMinContribution = 0.0f
                 }
             },
             Reflections = new ReflectionProfile
@@ -339,7 +349,9 @@ namespace Avalonia3D.Rendering
                     EmissiveMinContribution = Math.Clamp(bloom.EmissiveMinContribution, 0f, 1f),
                     UnlitIntensityBoost = Math.Clamp(bloom.UnlitIntensityBoost, 0f, 8f),
                     ColorAdditiveContribution = Math.Clamp(bloom.ColorAdditiveContribution, 0f, 1f),
-                    ColorAdditiveWhenEmissivePresentScale = Math.Clamp(bloom.ColorAdditiveWhenEmissivePresentScale, 0f, 1f)
+                    ColorAdditiveWhenEmissivePresentScale = Math.Clamp(bloom.ColorAdditiveWhenEmissivePresentScale, 0f, 1f),
+                    EmissivePrimaryIntensityScale = Math.Clamp(bloom.EmissivePrimaryIntensityScale, 0f, 1f),
+                    EmissivePrimaryMinContribution = Math.Clamp(bloom.EmissivePrimaryMinContribution, 0f, 1f)
                 }
             };
 

@@ -211,6 +211,8 @@ namespace Avalonia3D.Rendering
                 return;
             }
 
+            runtimeSettings = BloomSourceRuntimePolicy.Resolve(runtimeSettings, bloom, source.SourceTag);
+
             gl.Disable(EnableCap.DepthTest);
             gl.Disable(EnableCap.Blend);
             gl.BindVertexArray(_vao);
