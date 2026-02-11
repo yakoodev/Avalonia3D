@@ -28,6 +28,11 @@ namespace Avalonia3D.Rendering
                 return;
             }
 
+            if (context.RenderContext.FrameState.PbrDebugViewMode != PbrDebugViewMode.None)
+            {
+                return;
+            }
+
             var gl = context.Gl;
             if (!EnsureProgram(gl) || !EnsureQuad(gl) || !EnsureTexture(gl, context.Width, context.Height))
             {

@@ -1,4 +1,5 @@
 using System;
+using Avalonia3D.Rendering.Diagnostics;
 using Silk.NET.OpenGL;
 
 namespace Avalonia3D.Rendering
@@ -83,6 +84,8 @@ namespace Avalonia3D.Rendering
                 gl.DepthMask(true);
                 gl.Disable(EnableCap.Blend);
             }
+
+            PbrFrameDiagnostics.LogFrameIfEnabled(gl, frameState, context.Width, context.Height, _settings);
         }
     }
 }

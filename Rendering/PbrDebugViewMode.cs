@@ -12,5 +12,8 @@ public enum PbrDebugViewMode
     IblOnly = 3,
     EmissiveOnly = 4,
     AoOnly = 5,
-    NormalsOnly = 6
+    NormalsOnly = 6,
+    BaseColorTexRaw = 7,
+    BaseColorAfterSrgbDecode = 8,
+    BaseColorAfterFactor = 9
 }
