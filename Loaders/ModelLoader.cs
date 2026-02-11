@@ -57,6 +57,7 @@ namespace Avalonia3D.Loaders
         }
 
         private static readonly GltfMaterialExtensionsReader _materialExtensionsReader = new();
+        private static readonly MaterialAlphaImportPolicy _materialAlphaImportPolicy = new();
 
         private unsafe static long EstimateModelMemory(Model.Model m)
         {
@@ -345,7 +346,7 @@ namespace Avalonia3D.Loaders
             result.ExtensionTextures.VolumeThicknessTexture = LoadTextureFromChannel(extensionChannels.VolumeThickness);
 
             result.HasTextureTransparency = HasMeaningfulTextureTransparency(result.BaseColorTexture);
-            ApplyAlphaFallbackForUnsupportedBlend(result);
+            _materialAlphaImportPolicy.Apply(result, MaterialAlphaImportConfiguration.CurrentProfile);
 
             result.IsTransparent = result.AlphaMode == MaterialAlphaMode.Blend;
 
@@ -388,21 +389,6 @@ namespace Avalonia3D.Loaders
                 AlphaMode.BLEND => MaterialAlphaMode.Blend,
                 _ => MaterialAlphaMode.Opaque
             };
-        }
-
-        private static void ApplyAlphaFallbackForUnsupportedBlend(Avalonia3D.Model.Material material)
-        {
-            if (material == null || material.AlphaMode != MaterialAlphaMode.Blend)
-            {
-                return;
-            }
-
-            var hasFactorTransparency = material.BaseColorFactor.W < 0.999f;
-            if (!hasFactorTransparency && !material.HasTextureTransparency)
-            {
-                // Оставляем BLEND только если есть явный alpha-сигнал (factor либо значимая texture-alpha).
-                material.AlphaMode = MaterialAlphaMode.Opaque;
-            }
         }
 
         private static bool HasMeaningfulTextureTransparency(TextureData? texture)

@@ -362,6 +362,125 @@ public sealed class MaterialAlphaAndLoaderTests
         Assert.Equal(MaterialAlphaMode.Opaque, material!.AlphaMode);
     }
 
+
+    [Fact]
+    public void MaterialAlphaImportPolicy_Balanced_PreservesBlendForEmissiveMaterials()
+    {
+        var material = new Avalonia3D.Model.Material
+        {
+            AlphaMode = MaterialAlphaMode.Blend,
+            BaseColorFactor = new Vector4(1f, 1f, 1f, 1f),
+            HasTextureTransparency = false,
+            EmissiveFactor = new Vector3(0.2f, 0f, 0f)
+        };
+
+        var policy = new MaterialAlphaImportPolicy();
+        policy.Apply(material, MaterialAlphaImportProfile.Balanced);
+
+        Assert.Equal(MaterialAlphaMode.Blend, material.AlphaMode);
+    }
+
+    [Fact]
+    public void MaterialAlphaImportPolicy_Legacy_FallsBackToOpaqueEvenForEmissiveMaterials()
+    {
+        var material = new Avalonia3D.Model.Material
+        {
+            AlphaMode = MaterialAlphaMode.Blend,
+            BaseColorFactor = new Vector4(1f, 1f, 1f, 1f),
+            HasTextureTransparency = false,
+            EmissiveFactor = new Vector3(0.2f, 0f, 0f)
+        };
+
+        var policy = new MaterialAlphaImportPolicy();
+        policy.Apply(material, MaterialAlphaImportProfile.Legacy);
+
+        Assert.Equal(MaterialAlphaMode.Opaque, material.AlphaMode);
+    }
+
+    [Fact]
+    public void MaterialAlphaImportPolicy_Strict_DoesNotFallbackBlendWithoutAlphaSignal()
+    {
+        var material = new Avalonia3D.Model.Material
+        {
+            AlphaMode = MaterialAlphaMode.Blend,
+            BaseColorFactor = new Vector4(1f, 1f, 1f, 1f),
+            HasTextureTransparency = false
+        };
+
+        var policy = new MaterialAlphaImportPolicy();
+        policy.Apply(material, MaterialAlphaImportProfile.Strict);
+
+        Assert.Equal(MaterialAlphaMode.Blend, material.AlphaMode);
+    }
+
+    [Fact]
+    public void LoadModels_BlendWithoutAlphaSignal_BalancedProfile_PreservesEmissiveBlend()
+    {
+        var previous = MaterialAlphaImportConfiguration.CurrentProfile;
+        MaterialAlphaImportConfiguration.Configure(MaterialAlphaImportProfile.Balanced);
+
+        try
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"mat-loader-emissive-blend-{Guid.NewGuid():N}.gltf");
+            File.WriteAllText(path, GetBlendNoAlphaButEmissiveSignalGltfJson());
+
+            var gltf = SharpGLTF.Schema2.ModelRoot.Load(path);
+            var models = ModelLoader.LoadModels(gltf);
+            File.Delete(path);
+            var material = Assert.Single(models).Material;
+
+            Assert.NotNull(material);
+            Assert.Equal(MaterialAlphaMode.Blend, material!.AlphaMode);
+            Assert.True(material.IsTransparent);
+        }
+        finally
+        {
+            MaterialAlphaImportConfiguration.Configure(previous);
+        }
+    }
+
+    [Fact]
+    public void LoadModels_BlendWithoutAlphaSignal_LegacyProfile_FallsBackToOpaqueForEmissive()
+    {
+        var previous = MaterialAlphaImportConfiguration.CurrentProfile;
+        MaterialAlphaImportConfiguration.Configure(MaterialAlphaImportProfile.Legacy);
+
+        try
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"mat-loader-emissive-legacy-{Guid.NewGuid():N}.gltf");
+            File.WriteAllText(path, GetBlendNoAlphaButEmissiveSignalGltfJson());
+
+            var gltf = SharpGLTF.Schema2.ModelRoot.Load(path);
+            var models = ModelLoader.LoadModels(gltf);
+            File.Delete(path);
+            var material = Assert.Single(models).Material;
+
+            Assert.NotNull(material);
+            Assert.Equal(MaterialAlphaMode.Opaque, material!.AlphaMode);
+            Assert.False(material.IsTransparent);
+        }
+        finally
+        {
+            MaterialAlphaImportConfiguration.Configure(previous);
+        }
+    }
+
+    [Fact]
+    public void MaterialAlphaImportConfiguration_ResolveFromArgsAndEnvironment()
+    {
+        var fromArgs = MaterialAlphaImportConfiguration.ResolveFrom(new[] { "--material-alpha-import=legacy" });
+        Assert.Equal(MaterialAlphaImportProfile.Legacy, fromArgs);
+
+        var fromEnv = MaterialAlphaImportConfiguration.ResolveFrom(
+            args: Array.Empty<string>(),
+            environment: new System.Collections.Generic.Dictionary<string, string?>
+            {
+                ["AVALONIA3D_MATERIAL_ALPHA_IMPORT"] = "strict"
+            });
+
+        Assert.Equal(MaterialAlphaImportProfile.Strict, fromEnv);
+    }
+
     [Fact]
     public void OpaqueMaterialDefaults_DoNotRegress()
     {
@@ -536,6 +655,58 @@ public sealed class MaterialAlphaAndLoaderTests
           "materials": [
             {
               "alphaMode": "BLEND",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [1,1,1,1],
+                "metallicFactor": 0,
+                "roughnessFactor": 1
+              }
+            }
+          ],
+          "buffers": [
+            {
+              "uri": "data:application/octet-stream;base64,AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAABAAIA",
+              "byteLength": 42
+            }
+          ],
+          "bufferViews": [
+            { "buffer": 0, "byteOffset": 0, "byteLength": 36, "target": 34962 },
+            { "buffer": 0, "byteOffset": 36, "byteLength": 6, "target": 34963 }
+          ],
+          "accessors": [
+            { "bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3", "min": [0,0,0], "max": [1,1,0] },
+            { "bufferView": 1, "componentType": 5123, "count": 3, "type": "SCALAR" }
+          ]
+        }
+        """;
+
+
+    private static string GetBlendNoAlphaButEmissiveSignalGltfJson() =>
+        """
+        {
+          "asset": { "version": "2.0" },
+          "extensionsUsed": ["KHR_materials_emissive_strength"],
+          "scenes": [ { "nodes": [0] } ],
+          "nodes": [ { "mesh": 0, "name": "n" } ],
+          "meshes": [
+            {
+              "primitives": [
+                {
+                  "attributes": { "POSITION": 0 },
+                  "indices": 1,
+                  "material": 0
+                }
+              ]
+            }
+          ],
+          "materials": [
+            {
+              "alphaMode": "BLEND",
+              "emissiveFactor": [0.4,0.2,0.1],
+              "extensions": {
+                "KHR_materials_emissive_strength": {
+                  "emissiveStrength": 2.0
+                }
+              },
               "pbrMetallicRoughness": {
                 "baseColorFactor": [1,1,1,1],
                 "metallicFactor": 0,
