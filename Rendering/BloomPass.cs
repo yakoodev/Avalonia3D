@@ -187,6 +187,11 @@ namespace Avalonia3D.Rendering
                 return;
             }
 
+            if (context.RenderContext.FrameState.PbrDebugViewMode != PbrDebugViewMode.None)
+            {
+                return;
+            }
+
             var runtimeSettings = BloomRuntimeSettingsResolver.Resolve(bloom, context.Scene.RenderMode, _settings);
 
             var gl = context.Gl;
