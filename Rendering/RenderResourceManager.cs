@@ -3,6 +3,7 @@ using Silk.NET.OpenGL;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Runtime.InteropServices;
 using Avalonia3D.Model;
 using Avalonia3D.Model.StandObjects;
@@ -21,6 +22,14 @@ namespace Avalonia3D.Rendering
 
     public sealed class RenderResources
     {
+        private readonly Dictionary<TextureSemantic, TextureBindingState> _textureBindings = new();
+        private readonly IReadOnlyDictionary<TextureSemantic, TextureBindingState> _readonlyTextureBindings;
+
+        public RenderResources()
+        {
+            _readonlyTextureBindings = new ReadOnlyDictionary<TextureSemantic, TextureBindingState>(_textureBindings);
+        }
+
         public uint Vao { get; internal set; }
         public uint Vbo { get; internal set; }
         public uint Ebo { get; internal set; }
@@ -42,8 +51,42 @@ namespace Avalonia3D.Rendering
         public int IndexCount { get; internal set; }
         public bool IndicesUShort { get; internal set; }
         public TextureColorFlags TextureColorFlags { get; internal set; }
+        public IReadOnlyDictionary<TextureSemantic, TextureBindingState> TextureBindings => _readonlyTextureBindings;
         internal string? CacheKey { get; set; }
+
+        internal TextureBindingState GetTextureBindingState(TextureSemantic semantic)
+            => _textureBindings.TryGetValue(semantic, out var state)
+                ? state
+                : new TextureBindingState(semantic, 0, false, TextureColorFlags.None, null, null, GLEnum.NoError, 0, 0, false, null);
+
+        internal void SetTextureBindingState(TextureBindingState state)
+        {
+            _textureBindings[state.Semantic] = state;
+        }
+
+        internal void MarkTextureGpuBinding(TextureSemantic semantic, int textureUnit, bool wasBound)
+        {
+            var previous = GetTextureBindingState(semantic);
+            SetTextureBindingState(previous with
+            {
+                LastBoundTextureUnit = textureUnit,
+                WasBoundToGpu = wasBound
+            });
+        }
     }
+
+    public sealed record TextureBindingState(
+        TextureSemantic Semantic,
+        uint TextureId,
+        bool IsLoaded,
+        TextureColorFlags FormatFlags,
+        InternalFormat? PreferredInternalFormat,
+        InternalFormat? UsedInternalFormat,
+        GLEnum GlError,
+        int Width,
+        int Height,
+        bool WasBoundToGpu,
+        int? LastBoundTextureUnit);
 
 
     public sealed record InstanceBatchRequest(string Key, IReadOnlyList<MeshObject> Instances);
@@ -84,6 +127,24 @@ namespace Avalonia3D.Rendering
             public void GenerateMipmap(TextureTarget target) => _gl.GenerateMipmap(target);
             public void DeleteTexture(uint textureId) => _gl.DeleteTexture(textureId);
         }
+
+        private static readonly TextureSemantic[] DiagnosticSemantics =
+        {
+            TextureSemantic.BaseColor,
+            TextureSemantic.Normal,
+            TextureSemantic.MetallicRoughness,
+            TextureSemantic.Occlusion,
+            TextureSemantic.Emissive,
+            TextureSemantic.Clearcoat,
+            TextureSemantic.ClearcoatRoughness,
+            TextureSemantic.ClearcoatNormal,
+            TextureSemantic.SheenColor,
+            TextureSemantic.SheenRoughness,
+            TextureSemantic.Specular,
+            TextureSemantic.SpecularColor,
+            TextureSemantic.Transmission,
+            TextureSemantic.VolumeThickness
+        };
 
         private readonly Dictionary<string, GeometryInfo> _geometryCache = new();
         private readonly object _cacheLock = new();
@@ -367,6 +428,8 @@ namespace Avalonia3D.Rendering
 
         private void SetupMaterialTextures(Model3D model, RenderResources resources)
         {
+            EnsureTextureBindingDefaults(resources);
+
             var material = model.Material;
             var modelLabel = string.IsNullOrWhiteSpace(model.Name) ? (string.IsNullOrWhiteSpace(model.PrimitiveKey) ? "$unnamed-model" : model.PrimitiveKey) : model.Name;
             var materialLabel = material?.ShaderId ?? "$default-material";
@@ -395,6 +458,14 @@ namespace Avalonia3D.Rendering
             resources.SpecularColorTextureId = SetupTexture(material.ExtensionTextures.SpecularColorTexture, TextureSemantic.SpecularColor, resources, modelLabel, materialLabel);
             resources.TransmissionTextureId = SetupTexture(material.ExtensionTextures.TransmissionTexture, TextureSemantic.Transmission, resources, modelLabel, materialLabel);
             resources.VolumeThicknessTextureId = SetupTexture(material.ExtensionTextures.VolumeThicknessTexture, TextureSemantic.VolumeThickness, resources, modelLabel, materialLabel);
+        }
+
+        private static void EnsureTextureBindingDefaults(RenderResources resources)
+        {
+            foreach (var semantic in DiagnosticSemantics)
+            {
+                resources.SetTextureBindingState(resources.GetTextureBindingState(semantic));
+            }
         }
 
         private unsafe void UploadVertexData(Vertex[] vertices, RenderResources resources)
@@ -534,15 +605,49 @@ namespace Avalonia3D.Rendering
 
         private unsafe uint SetupTexture(TextureData? textureData, TextureSemantic semantic, RenderResources resources, string modelLabel, string materialLabel)
         {
+            var preferredInternalFormat = ResolveInternalFormat(semantic);
+            var usedInternalFormat = preferredInternalFormat;
+            var width = textureData?.Width ?? 0;
+            var height = textureData?.Height ?? 0;
+            var glError = GLEnum.NoError;
+            uint textureId = 0;
+
             if (textureData == null || textureData.Data == null)
             {
+                resources.SetTextureBindingState(new TextureBindingState(
+                    semantic,
+                    0,
+                    false,
+                    resources.TextureColorFlags,
+                    preferredInternalFormat,
+                    null,
+                    glError,
+                    width,
+                    height,
+                    false,
+                    null));
+
+                Log.Debug("Texture state: model={Model}, material={Material}, semantic={Semantic}, texture={TextureId}, preferredFormat={PreferredInternalFormat}, usedFormat={UsedInternalFormat}, glError={GlError}, size={Width}x{Height}", modelLabel, materialLabel, semantic, 0, preferredInternalFormat, null, glError, width, height);
                 return 0;
             }
 
-            uint textureId = _textureGl.GenTexture();
+            textureId = _textureGl.GenTexture();
             if (textureId == 0)
             {
-                Log.Warning("Texture allocation failed before upload: model={Model}, material={Material}, semantic={Semantic}, size={Width}x{Height}", modelLabel, materialLabel, semantic, textureData.Width, textureData.Height);
+                resources.SetTextureBindingState(new TextureBindingState(
+                    semantic,
+                    0,
+                    false,
+                    resources.TextureColorFlags,
+                    preferredInternalFormat,
+                    null,
+                    GLEnum.OutOfMemory,
+                    width,
+                    height,
+                    false,
+                    null));
+
+                Log.Warning("Texture allocation failed before upload: model={Model}, material={Material}, semantic={Semantic}, texture={TextureId}, preferredFormat={PreferredInternalFormat}, usedFormat={UsedInternalFormat}, glError={GlError}, size={Width}x{Height}", modelLabel, materialLabel, semantic, 0, preferredInternalFormat, null, GLEnum.OutOfMemory, width, height);
                 return 0;
             }
 
@@ -551,10 +656,6 @@ namespace Avalonia3D.Rendering
             while (_textureGl.GetError() != GLEnum.NoError)
             {
             }
-
-            var preferredInternalFormat = ResolveInternalFormat(semantic);
-            var usedInternalFormat = preferredInternalFormat;
-            GLEnum glError;
 
             fixed (byte* dataPtr = textureData.Data)
             {
@@ -588,18 +689,42 @@ namespace Avalonia3D.Rendering
             if (glError != GLEnum.NoError)
             {
                 _textureGl.DeleteTexture(textureId);
-                Log.Warning("Texture upload failed and texture was deleted: model={Model}, material={Material}, semantic={Semantic}, size={Width}x{Height}, texture={TextureId}, glError={GlError}, preferredFormat={PreferredInternalFormat}, usedFormat={UsedInternalFormat}", modelLabel, materialLabel, semantic, textureData.Width, textureData.Height, textureId, glError, preferredInternalFormat, usedInternalFormat);
+                resources.SetTextureBindingState(new TextureBindingState(
+                    semantic,
+                    0,
+                    false,
+                    resources.TextureColorFlags,
+                    preferredInternalFormat,
+                    usedInternalFormat,
+                    glError,
+                    width,
+                    height,
+                    false,
+                    null));
+
+                Log.Warning("Texture upload failed and texture was deleted: model={Model}, material={Material}, semantic={Semantic}, texture={TextureId}, preferredFormat={PreferredInternalFormat}, usedFormat={UsedInternalFormat}, glError={GlError}, size={Width}x{Height}", modelLabel, materialLabel, semantic, textureId, preferredInternalFormat, usedInternalFormat, glError, width, height);
                 return 0;
             }
-            else
-            {
-                if (TextureColorManagement.ShouldFlagMissingSrgbDecode(semantic, preferredInternalFormat, usedInternalFormat))
-                {
-                    resources.TextureColorFlags |= TextureColorManagement.GetMissingSrgbDecodeFlag(semantic);
-                }
 
-                Log.Information("Texture loaded: model={Model}, material={Material}, semantic={Semantic}, size={Width}x{Height}, texture={TextureId}, preferredFormat={PreferredInternalFormat}, usedFormat={UsedInternalFormat}, colorFlags={TextureColorFlags}", modelLabel, materialLabel, semantic, textureData.Width, textureData.Height, textureId, preferredInternalFormat, usedInternalFormat, resources.TextureColorFlags);
+            if (TextureColorManagement.ShouldFlagMissingSrgbDecode(semantic, preferredInternalFormat, usedInternalFormat))
+            {
+                resources.TextureColorFlags |= TextureColorManagement.GetMissingSrgbDecodeFlag(semantic);
             }
+
+            resources.SetTextureBindingState(new TextureBindingState(
+                semantic,
+                textureId,
+                true,
+                resources.TextureColorFlags,
+                preferredInternalFormat,
+                usedInternalFormat,
+                glError,
+                width,
+                height,
+                false,
+                null));
+
+            Log.Information("Texture loaded: model={Model}, material={Material}, semantic={Semantic}, texture={TextureId}, preferredFormat={PreferredInternalFormat}, usedFormat={UsedInternalFormat}, glError={GlError}, size={Width}x{Height}, colorFlags={TextureColorFlags}", modelLabel, materialLabel, semantic, textureId, preferredInternalFormat, usedInternalFormat, glError, width, height, resources.TextureColorFlags);
 
             return textureId;
         }

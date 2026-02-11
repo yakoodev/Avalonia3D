@@ -396,8 +396,9 @@ namespace Avalonia3D.Shaders
             var material = (sceneObject as Interfaces.IMaterialProvider)?.Material;
             MaterialRenderDiagnostics.DumpIfEnabled(
                 material,
-                renderContext.Scene,
-                sceneObject.Name ?? sceneObject.Node.Name ?? "$material");
+                resources: (sceneObject as MeshObject)?.Resources,
+                scene: renderContext.Scene,
+                materialKey: sceneObject.Name ?? sceneObject.Node.Name ?? "$material");
 
             var baseColorFactor = material?.BaseColorFactor ?? new Vector4(sceneObject.BaseColor, 1f);
             var emissiveFactor = material?.EmissiveFactor ?? sceneObject.EmissionColor;
@@ -598,21 +599,22 @@ namespace Avalonia3D.Shaders
                 _gl.Uniform1(_manualEmissiveSrgbDecodeLocation,
                     TextureColorManagement.HasMissingSrgbDecode(resources.TextureColorFlags, TextureSemantic.Emissive) ? 1 : 0);
             }
-            BindTextureUnit(resources.BaseColorTextureId, _baseColorMapLocation, _hasBaseColorMapLocation, 0);
-            BindTextureUnit(resources.NormalTextureId, _normalMapLocation, _hasNormalMapLocation, 1);
-            BindTextureUnit(resources.MetallicRoughnessTextureId, _metallicRoughnessMapLocation, _hasMetallicRoughnessMapLocation, 2);
-            BindTextureUnit(resources.OcclusionTextureId, _occlusionMapLocation, _hasOcclusionMapLocation, 3);
+
+            BindTextureSlot(resources, TextureSemantic.BaseColor, resources.BaseColorTextureId, _baseColorMapLocation, _hasBaseColorMapLocation, 0);
+            BindTextureSlot(resources, TextureSemantic.Normal, resources.NormalTextureId, _normalMapLocation, _hasNormalMapLocation, 1);
+            BindTextureSlot(resources, TextureSemantic.MetallicRoughness, resources.MetallicRoughnessTextureId, _metallicRoughnessMapLocation, _hasMetallicRoughnessMapLocation, 2);
+            BindTextureSlot(resources, TextureSemantic.Occlusion, resources.OcclusionTextureId, _occlusionMapLocation, _hasOcclusionMapLocation, 3);
             var emissiveTextureId = EmissionUniformResolver.ShouldSampleEmissiveTexture() ? resources.EmissiveTextureId : 0;
-            BindTextureUnit(emissiveTextureId, _emissiveMapLocation, _hasEmissiveMapLocation, 4);
-            BindTextureUnit(resources.ClearcoatTextureId, _clearcoatMapLocation, _hasClearcoatMapLocation, 7);
-            BindTextureUnit(resources.ClearcoatRoughnessTextureId, _clearcoatRoughnessMapLocation, _hasClearcoatRoughnessMapLocation, 8);
-            BindTextureUnit(resources.ClearcoatNormalTextureId, _clearcoatNormalMapLocation, _hasClearcoatNormalMapLocation, 9);
-            BindTextureUnit(resources.SheenColorTextureId, _sheenColorMapLocation, _hasSheenColorMapLocation, 10);
-            BindTextureUnit(resources.SheenRoughnessTextureId, _sheenRoughnessMapLocation, _hasSheenRoughnessMapLocation, 11);
-            BindTextureUnit(resources.SpecularTextureId, _specularMapLocation, _hasSpecularMapLocation, 12);
-            BindTextureUnit(resources.SpecularColorTextureId, _specularColorMapLocation, _hasSpecularColorMapLocation, 13);
-            BindTextureUnit(resources.TransmissionTextureId, _transmissionMapLocation, _hasTransmissionMapLocation, 14);
-            BindTextureUnit(resources.VolumeThicknessTextureId, _volumeThicknessMapLocation, _hasVolumeThicknessMapLocation, 15);
+            BindTextureSlot(resources, TextureSemantic.Emissive, emissiveTextureId, _emissiveMapLocation, _hasEmissiveMapLocation, 4);
+            BindTextureSlot(resources, TextureSemantic.Clearcoat, resources.ClearcoatTextureId, _clearcoatMapLocation, _hasClearcoatMapLocation, 7);
+            BindTextureSlot(resources, TextureSemantic.ClearcoatRoughness, resources.ClearcoatRoughnessTextureId, _clearcoatRoughnessMapLocation, _hasClearcoatRoughnessMapLocation, 8);
+            BindTextureSlot(resources, TextureSemantic.ClearcoatNormal, resources.ClearcoatNormalTextureId, _clearcoatNormalMapLocation, _hasClearcoatNormalMapLocation, 9);
+            BindTextureSlot(resources, TextureSemantic.SheenColor, resources.SheenColorTextureId, _sheenColorMapLocation, _hasSheenColorMapLocation, 10);
+            BindTextureSlot(resources, TextureSemantic.SheenRoughness, resources.SheenRoughnessTextureId, _sheenRoughnessMapLocation, _hasSheenRoughnessMapLocation, 11);
+            BindTextureSlot(resources, TextureSemantic.Specular, resources.SpecularTextureId, _specularMapLocation, _hasSpecularMapLocation, 12);
+            BindTextureSlot(resources, TextureSemantic.SpecularColor, resources.SpecularColorTextureId, _specularColorMapLocation, _hasSpecularColorMapLocation, 13);
+            BindTextureSlot(resources, TextureSemantic.Transmission, resources.TransmissionTextureId, _transmissionMapLocation, _hasTransmissionMapLocation, 14);
+            BindTextureSlot(resources, TextureSemantic.VolumeThickness, resources.VolumeThicknessTextureId, _volumeThicknessMapLocation, _hasVolumeThicknessMapLocation, 15);
 
             if (shadowMapId.HasValue)
             {
@@ -628,6 +630,18 @@ namespace Avalonia3D.Shaders
             {
                 _gl.Uniform1(_hasShadowMapLocation, 0);
             }
+        }
+
+
+        private void BindTextureSlot(RenderResources resources, TextureSemantic semantic, uint textureId, int samplerLocation, int hasTextureLocation, int unit)
+        {
+            if (MaterialRenderDiagnostics.Enabled)
+            {
+                Log.Debug("GL texture bind slot: semantic={Semantic}, unit={TextureUnit}, texture={TextureId}, willBind={WillBind}", semantic, unit, textureId, textureId != 0);
+            }
+
+            resources.MarkTextureGpuBinding(semantic, unit, textureId != 0);
+            BindTextureUnit(textureId, samplerLocation, hasTextureLocation, unit);
         }
 
         private void BindTextureUnit(uint textureId, int samplerLocation, int hasTextureLocation, int unit)

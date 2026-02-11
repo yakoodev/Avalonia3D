@@ -8,6 +8,44 @@ namespace Avalonia3D.Tests;
 [Trait("TestTarget", "Rendering")]
 public sealed class RenderResourceManagerTextureTests
 {
+
+    [Fact]
+    public void SetupTextureForTests_SavesPerSemanticBindingState_OnSuccess()
+    {
+        var gl = new FakeTextureGlAdapter
+        {
+            GeneratedTextureId = 7,
+            ErrorScript = new[]
+            {
+                GLEnum.NoError,
+                GLEnum.NoError,
+                GLEnum.NoError
+            }
+        };
+
+        var manager = new RenderResourceManager(gl);
+        var resources = new RenderResources();
+        var texture = new TextureData
+        {
+            Width = 4,
+            Height = 8,
+            Data = new byte[4 * 8 * 4]
+        };
+
+        var textureId = manager.SetupTextureForTests(texture, TextureSemantic.BaseColor, resources, "TestModel", "TestMaterial");
+
+        Assert.Equal(7u, textureId);
+        Assert.True(resources.TextureBindings.TryGetValue(TextureSemantic.BaseColor, out var binding));
+        Assert.NotNull(binding);
+        Assert.Equal(7u, binding.TextureId);
+        Assert.True(binding.IsLoaded);
+        Assert.Equal(InternalFormat.SrgbAlpha, binding.PreferredInternalFormat);
+        Assert.Equal(InternalFormat.SrgbAlpha, binding.UsedInternalFormat);
+        Assert.Equal(GLEnum.NoError, binding.GlError);
+        Assert.Equal(4, binding.Width);
+        Assert.Equal(8, binding.Height);
+    }
+
     [Fact]
     public void SetupTextureForTests_WhenUploadPipelineLeavesGlError_DeletesTextureAndReturnsZero()
     {
@@ -36,6 +74,11 @@ public sealed class RenderResourceManagerTextureTests
         Assert.Equal(0u, textureId);
         Assert.Contains(42u, gl.DeletedTextures);
         Assert.Equal(1, gl.TexImage2DCalls);
+        Assert.True(resources.TextureBindings.TryGetValue(TextureSemantic.BaseColor, out var binding));
+        Assert.NotNull(binding);
+        Assert.Equal(0u, binding.TextureId);
+        Assert.False(binding.IsLoaded);
+        Assert.Equal(GLEnum.InvalidOperation, binding.GlError);
     }
 
     private sealed class FakeTextureGlAdapter : RenderResourceManager.ITextureGlAdapter
