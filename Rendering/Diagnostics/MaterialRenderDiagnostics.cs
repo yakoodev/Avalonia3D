@@ -72,12 +72,54 @@ public static class MaterialRenderDiagnostics
         return new MaterialRenderSnapshot(
             textureStates,
             material.BaseColorFactor,
+            material.EmissiveFactor,
             material.MetallicFactor,
             material.RoughnessFactor,
             material.OcclusionStrength,
+            material.EmissiveStrength,
+            material.EmissiveIntensity,
+            material.AlphaMode,
+            material.AlphaCutoff,
+            material.SurfaceAdvanced.HasTransmission,
+            material.TransmissionFactor,
+            material.Ior,
+            BuildMaterialWarnings(material),
             ShaderSelectionPolicy.BuildPbrFeatures(material, scene),
             scene.PbrDebugViewMode,
             BuildGpuSnapshot(resources));
+    }
+
+
+    private static IReadOnlyList<string> BuildMaterialWarnings(Material material)
+    {
+        var warnings = new List<string>();
+
+        if (material.BaseColorFactor.X > 1f || material.BaseColorFactor.Y > 1f || material.BaseColorFactor.Z > 1f || material.BaseColorFactor.W > 1f)
+        {
+            warnings.Add("BaseColorFactor has component(s) > 1.0");
+        }
+
+        if (material.EmissiveFactor.X > 1f || material.EmissiveFactor.Y > 1f || material.EmissiveFactor.Z > 1f)
+        {
+            warnings.Add("EmissiveFactor has component(s) > 1.0");
+        }
+
+        if (material.EmissiveStrength > 8f)
+        {
+            warnings.Add("EmissiveStrength is high (>8.0)");
+        }
+
+        if (material.MetallicFactor < 0f || material.MetallicFactor > 1f)
+        {
+            warnings.Add("MetallicFactor is outside [0..1]");
+        }
+
+        if (material.RoughnessFactor < 0f || material.RoughnessFactor > 1f)
+        {
+            warnings.Add("RoughnessFactor is outside [0..1]");
+        }
+
+        return warnings;
     }
 
     private static MaterialGpuSnapshot BuildGpuSnapshot(RenderResources? resources)
@@ -111,9 +153,18 @@ public static class MaterialRenderDiagnostics
     public sealed record MaterialRenderSnapshot(
         IReadOnlyList<TextureSemanticState> Textures,
         Vector4 BaseColorFactor,
+        Vector3 EmissiveFactor,
         float MetallicFactor,
         float RoughnessFactor,
         float OcclusionStrength,
+        float EmissiveStrength,
+        float EmissiveIntensity,
+        MaterialAlphaMode AlphaMode,
+        float AlphaCutoff,
+        bool HasTransmission,
+        float TransmissionFactor,
+        float Ior,
+        IReadOnlyList<string> MaterialWarnings,
         PbrFeatures ComputedPbrFeatures,
         PbrDebugViewMode ActivePbrDebugViewMode,
         MaterialGpuSnapshot GpuSnapshot);
@@ -136,6 +187,9 @@ public static class MaterialRenderDiagnostics
         TextureColorFlags FormatFlags,
         string? PreferredInternalFormat,
         string? UsedInternalFormat,
+        string SourceColorFormat,
+        ColorDecodeMode DecodeMode,
+        string? DecodeFallbackReason,
         string GlError,
         int Width,
         int Height,
@@ -150,6 +204,9 @@ public static class MaterialRenderDiagnostics
                 state.FormatFlags,
                 state.PreferredInternalFormat?.ToString(),
                 state.UsedInternalFormat?.ToString(),
+                state.SourceColorFormat,
+                state.DecodeMode,
+                state.DecodeFallbackReason,
                 state.GlError.ToString(),
                 state.Width,
                 state.Height,

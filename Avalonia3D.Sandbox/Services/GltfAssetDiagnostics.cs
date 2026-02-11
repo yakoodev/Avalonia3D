@@ -25,7 +25,13 @@ public static class GltfAssetDiagnostics
         }
 
         var baseDir = Path.GetDirectoryName(gltfPath) ?? string.Empty;
-        var dependencies = GltfDependencyInspector.ReadExternalUris(gltfPath);
+        var preflight = GltfDependencyInspector.ReadPreflight(gltfPath);
+        var dependencies = preflight.ExternalUris;
+
+        foreach (var warning in preflight.Warnings)
+        {
+            Log.Debug("GLTF preflight warning for {File}: {Warning}", Path.GetFileName(gltfPath), warning);
+        }
 
         if (dependencies.Count == 0)
         {
