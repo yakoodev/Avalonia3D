@@ -6,11 +6,11 @@
 Источник истины: `PBR_QA_ASSETS.json`.
 
 Минимальный обязательный прогон:
-- `car/scene.gltf` (primary regression)
+- `car/scene.gltf` (problematic asset, white-wash контроль)
+- `cylinder_sci_fi/scene.gltf` (problematic asset, потеря текстур/переэкспозиция)
 
 Расширенный прогон:
 - `doge/scene.gltf`
-- `cylinder_sci_fi/scene.gltf`
 
 ## Подготовка
 1. Запустить `Avalonia3D.Sandbox`.
@@ -33,11 +33,15 @@ python3 tools/validate_pbr_snapshot.py
 Что проверяет:
 - у материалов есть baseColor texture;
 - средняя яркость baseColor текстур (`meanBrightness`) находится в диапазоне `[minMeanBrightness, maxMeanBrightness]`;
-- доля near-white пикселей (`nearWhiteRatio`) не превышает `maxNearWhiteRatio`.
+- доля near-white пикселей (`nearWhiteRatio`) не превышает `maxNearWhiteRatio`;
+- дельта `PBR - Unlit` по средней яркости (`maxPbrToUnlitBrightnessDelta`) не превышает порог;
+- доля «пересвеченных» пикселей в PBR-прокси (`maxPbrOverexposedRatio`) ниже порога;
+- в отчёт печатается breakdown по материалам и семантикам текстур.
 
 ## Критерии приёмки
 - Нет регрессии: baseColor-текстуры не "пропадают" в PBR.
-- Нет выгорания: текстуры не уходят в near-white по агрегатной статистике.
+- Нет выгорания: PBR не превращается в «белый силуэт», текстуры читаются на референсе.
+- QA-скрипт падает при повторном появлении «белого налёта» или потере текстур.
 - Ручное переключение PBR/Unlit стабильно и повторяемо.
 
 ## Как расширять

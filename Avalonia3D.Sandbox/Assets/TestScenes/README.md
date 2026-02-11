@@ -23,4 +23,5 @@
 
 - Реестр ассетов и пороги snapshot-проверки: `PBR_QA_ASSETS.json`.
 - Чеклист ручной/авто-валидации: `PBR_QA_CHECKLIST.md`.
+- Для проблемных ассетов доступны отдельные сцены: `car` и `cylinder_sci_fi` (через `PbrRegressionScene`).
 - Автопроверка без pixel-perfect: `python3 tools/validate_pbr_snapshot.py`.
