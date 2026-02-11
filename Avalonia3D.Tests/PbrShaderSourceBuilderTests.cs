@@ -117,4 +117,20 @@ public class PbrShaderSourceBuilderTests
         Assert.Contains("texture(uOcclusionMap, occlusionTexCoord)", fragmentSource);
     }
 
+    [Fact]
+    public void Build_IncludesPbrDebugViewUniformAndBranches()
+    {
+        var builder = new PbrShaderSourceBuilder();
+
+        var (_, fragmentSource) = builder.Build(PbrFeatures.ReflectionsIbl, maxLights: 4);
+
+        Assert.Contains("uPbrDebugViewMode", fragmentSource);
+        Assert.Contains("debugSurfaceResult", fragmentSource);
+        Assert.Contains("baseColor.rgb", fragmentSource);
+        Assert.Contains("directLightComponent", fragmentSource);
+        Assert.Contains("iblComponent", fragmentSource);
+        Assert.Contains("vec3(ao)", fragmentSource);
+        Assert.Contains("norm*0.5+0.5", fragmentSource);
+    }
+
 }

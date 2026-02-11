@@ -16,6 +16,7 @@ namespace Avalonia3D.Rendering
         public float ReflectionIntensity { get; set; }
         public bool ReflectionsEnabled { get; set; }
         public ReflectionMode ReflectionMode { get; set; } = ReflectionMode.Off;
+        public PbrDebugViewMode PbrDebugViewMode { get; set; } = PbrDebugViewMode.None;
 
         public bool HasEmissiveTarget => EmissiveFramebufferId != 0 && EmissiveTextureId != 0;
 

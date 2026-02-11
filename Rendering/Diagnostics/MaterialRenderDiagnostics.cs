@@ -74,7 +74,8 @@ public static class MaterialRenderDiagnostics
             material.MetallicFactor,
             material.RoughnessFactor,
             material.OcclusionStrength,
-            ShaderSelectionPolicy.BuildPbrFeatures(material, scene));
+            ShaderSelectionPolicy.BuildPbrFeatures(material, scene),
+            scene.PbrDebugViewMode);
     }
 
     private static TextureSemanticState CreateTextureState(Material material, TextureSemantic semantic, TextureData? texture)
@@ -96,7 +97,8 @@ public static class MaterialRenderDiagnostics
         float MetallicFactor,
         float RoughnessFactor,
         float OcclusionStrength,
-        PbrFeatures ComputedPbrFeatures);
+        PbrFeatures ComputedPbrFeatures,
+        PbrDebugViewMode ActivePbrDebugViewMode);
 
     public sealed record TextureSemanticState(
         TextureSemantic Semantic,

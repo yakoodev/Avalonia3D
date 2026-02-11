@@ -73,6 +73,7 @@ public sealed class SandboxRenderer3D : IRenderContext
     public void RenderFrame(int width, int height)
     {
         if (_gl == null) return;
+        FrameState.PbrDebugViewMode = Scene.PbrDebugViewMode;
         _renderPipeline.Execute(this, width, height);
         LogFrameMetricsIfNeeded();
         _framePresenter?.Present(_gl, width, height);
