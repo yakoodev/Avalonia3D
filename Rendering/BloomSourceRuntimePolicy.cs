@@ -20,9 +20,17 @@ public static class BloomSourceRuntimePolicy
 
         if (sourceTag.StartsWith("emissive", StringComparison.OrdinalIgnoreCase))
         {
+            var threshold = runtime.Threshold * Math.Clamp(bloom.EmissivePrimaryThresholdScale, 0.5f, 4f);
+            var intensity = runtime.Intensity * Math.Clamp(bloom.EmissivePrimaryIntensityScale, 0f, 1f);
+
+            if (sourceTag.Contains("+color", StringComparison.OrdinalIgnoreCase))
+            {
+                intensity *= Math.Clamp(bloom.EmissivePrimaryWithColorIntensityScale, 0f, 1f);
+            }
+
             return (
-                runtime.Threshold,
-                runtime.Intensity * Math.Clamp(bloom.EmissivePrimaryIntensityScale, 0f, 1f),
+                Math.Clamp(threshold, 0f, 16f),
+                Math.Clamp(intensity, 0f, 8f),
                 Math.Clamp(bloom.EmissivePrimaryMinContribution, 0f, 1f));
         }
 

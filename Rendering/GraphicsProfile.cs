@@ -22,8 +22,10 @@ namespace Avalonia3D.Rendering
         public float EmissiveMinContribution { get; init; } = 0.035f;
         public float UnlitIntensityBoost { get; init; } = 2.5f;
         public float ColorAdditiveContribution { get; init; } = 0.2f;
-        public float ColorAdditiveWhenEmissivePresentScale { get; init; } = 0.05f;
+        public float ColorAdditiveWhenEmissivePresentScale { get; init; } = 0.02f;
+        public float EmissivePrimaryThresholdScale { get; init; } = 1.35f;
         public float EmissivePrimaryIntensityScale { get; init; } = 0.55f;
+        public float EmissivePrimaryWithColorIntensityScale { get; init; } = 0.85f;
         public float EmissivePrimaryMinContribution { get; init; } = 0.0f;
     }
 
@@ -106,8 +108,10 @@ namespace Avalonia3D.Rendering
                     EmissiveMinContribution = 0.02f,
                     UnlitIntensityBoost = 2.0f,
                     ColorAdditiveContribution = 0.2f,
-                    ColorAdditiveWhenEmissivePresentScale = 0.05f,
+                    ColorAdditiveWhenEmissivePresentScale = 0.02f,
+                    EmissivePrimaryThresholdScale = 1.35f,
                     EmissivePrimaryIntensityScale = 0.55f,
+                    EmissivePrimaryWithColorIntensityScale = 0.85f,
                     EmissivePrimaryMinContribution = 0.0f
                 }
             },
@@ -157,8 +161,10 @@ namespace Avalonia3D.Rendering
                     EmissiveMinContribution = 0.03f,
                     UnlitIntensityBoost = 2.3f,
                     ColorAdditiveContribution = 0.35f,
-                    ColorAdditiveWhenEmissivePresentScale = 0.05f,
+                    ColorAdditiveWhenEmissivePresentScale = 0.02f,
+                    EmissivePrimaryThresholdScale = 1.35f,
                     EmissivePrimaryIntensityScale = 0.55f,
+                    EmissivePrimaryWithColorIntensityScale = 0.85f,
                     EmissivePrimaryMinContribution = 0.0f
                 }
             },
@@ -206,8 +212,10 @@ namespace Avalonia3D.Rendering
                     EmissiveMinContribution = 0.035f,
                     UnlitIntensityBoost = 2.5f,
                     ColorAdditiveContribution = 0.45f,
-                    ColorAdditiveWhenEmissivePresentScale = 0.05f,
+                    ColorAdditiveWhenEmissivePresentScale = 0.02f,
+                    EmissivePrimaryThresholdScale = 1.35f,
                     EmissivePrimaryIntensityScale = 0.55f,
+                    EmissivePrimaryWithColorIntensityScale = 0.85f,
                     EmissivePrimaryMinContribution = 0.0f
                 }
             },
@@ -257,8 +265,10 @@ namespace Avalonia3D.Rendering
                     EmissiveMinContribution = 0.04f,
                     UnlitIntensityBoost = 2.5f,
                     ColorAdditiveContribution = 0.55f,
-                    ColorAdditiveWhenEmissivePresentScale = 0.05f,
+                    ColorAdditiveWhenEmissivePresentScale = 0.02f,
+                    EmissivePrimaryThresholdScale = 1.35f,
                     EmissivePrimaryIntensityScale = 0.55f,
+                    EmissivePrimaryWithColorIntensityScale = 0.85f,
                     EmissivePrimaryMinContribution = 0.0f
                 }
             },
@@ -350,7 +360,9 @@ namespace Avalonia3D.Rendering
                     UnlitIntensityBoost = Math.Clamp(bloom.UnlitIntensityBoost, 0f, 8f),
                     ColorAdditiveContribution = Math.Clamp(bloom.ColorAdditiveContribution, 0f, 1f),
                     ColorAdditiveWhenEmissivePresentScale = Math.Clamp(bloom.ColorAdditiveWhenEmissivePresentScale, 0f, 1f),
+                    EmissivePrimaryThresholdScale = Math.Clamp(bloom.EmissivePrimaryThresholdScale, 0.5f, 4f),
                     EmissivePrimaryIntensityScale = Math.Clamp(bloom.EmissivePrimaryIntensityScale, 0f, 1f),
+                    EmissivePrimaryWithColorIntensityScale = Math.Clamp(bloom.EmissivePrimaryWithColorIntensityScale, 0f, 1f),
                     EmissivePrimaryMinContribution = Math.Clamp(bloom.EmissivePrimaryMinContribution, 0f, 1f)
                 }
             };

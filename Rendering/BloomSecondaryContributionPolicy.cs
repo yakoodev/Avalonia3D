@@ -24,7 +24,8 @@ public static class BloomSecondaryContributionPolicy
 
         if (renderMode is ShaderRenderMode.Default or ShaderRenderMode.Pbr)
         {
-            return configured * scale;
+            var attenuated = configured * scale;
+            return Math.Min(attenuated, 0.03f);
         }
 
         return configured;
