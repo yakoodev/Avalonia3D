@@ -22,7 +22,7 @@ namespace Avalonia3D.Rendering
                 return false;
             }
 
-            if (!RenderResourceManager.IsSrgbSemantic(semantic))
+            if (!TextureSemanticColorPolicy.RequiresSrgbDecode(semantic))
             {
                 return false;
             }

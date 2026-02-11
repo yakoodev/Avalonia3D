@@ -582,22 +582,18 @@ namespace Avalonia3D.Rendering
 
         internal static InternalFormat ResolveInternalFormat(TextureSemantic semantic)
         {
-            return semantic switch
-            {
-                TextureSemantic.BaseColor or TextureSemantic.Emissive => InternalFormat.SrgbAlpha,
-                _ => InternalFormat.Rgba
-            };
+            return TextureSemanticColorPolicy.ResolvePreferredInternalFormat(semantic);
         }
 
         internal static bool IsSrgbSemantic(TextureSemantic semantic)
         {
-            return semantic == TextureSemantic.BaseColor || semantic == TextureSemantic.Emissive;
+            return TextureSemanticColorPolicy.RequiresSrgbDecode(semantic);
         }
 
 
         internal static InternalFormat ResolveFallbackInternalFormat(TextureSemantic semantic)
         {
-            return IsSrgbSemantic(semantic) ? InternalFormat.Rgba : ResolveInternalFormat(semantic);
+            return TextureSemanticColorPolicy.ResolveFallbackInternalFormat(semantic);
         }
 
         internal unsafe uint SetupTextureForTests(TextureData? textureData, TextureSemantic semantic, RenderResources resources, string modelLabel, string materialLabel)
