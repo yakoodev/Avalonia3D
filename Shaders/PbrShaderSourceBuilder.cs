@@ -1,3 +1,4 @@
+using Avalonia3D.Rendering;
 using System.Text;
 
 namespace Avalonia3D.Shaders;
@@ -93,15 +94,15 @@ void main()
         if (features.HasFlag(PbrFeatures.Clearcoat)) sb.AppendLine("reflection += ComputeEnvironmentReflection(norm, viewDir, clamp(uClearcoatRoughness*clearcoatRoughnessMapSample,0.0,1.0))*clamp(uClearcoatFactor*clearcoatMapSample*clearcoatNormalInfluence,0.0,1.0);");
         if (features.HasFlag(PbrFeatures.Sheen)) sb.AppendLine("vec3 sheenContribution = max(uSheenColorFactor * sheenColorMapSample, vec3(0.0)) * (1.0 - clamp(uSheenRoughnessFactor*sheenRoughnessMapSample,0.0,1.0));"); else sb.AppendLine("vec3 sheenContribution = vec3(0.0);");
 
-        sb.AppendLine("vec3 totalEmissive = emissive + uEmissionColor; vec3 surfaceResult = resultLight*ao + totalEmissive + reflection + sheenContribution; float sampledAlpha = baseColor.a*uAlpha; if(uAlphaMode==1 && sampledAlpha<uAlphaCutoff){ discard; }");
+        sb.AppendLine($"vec3 totalEmissive = emissive + uEmissionColor; vec3 directLightComponent = resultLight*ao; vec3 iblComponent = reflection; vec3 surfaceResult = directLightComponent + totalEmissive + iblComponent + sheenContribution; vec3 debugSurfaceResult = surfaceResult; if(uPbrDebugViewMode=={(int)PbrDebugViewMode.BaseColorOnly}){{ debugSurfaceResult=baseColor.rgb; }} else if(uPbrDebugViewMode=={(int)PbrDebugViewMode.DirectLightOnly}){{ debugSurfaceResult=directLightComponent; }} else if(uPbrDebugViewMode=={(int)PbrDebugViewMode.IblOnly}){{ debugSurfaceResult=iblComponent; }} else if(uPbrDebugViewMode=={(int)PbrDebugViewMode.EmissiveOnly}){{ debugSurfaceResult=totalEmissive; }} else if(uPbrDebugViewMode=={(int)PbrDebugViewMode.AoOnly}){{ debugSurfaceResult=vec3(ao); }} else if(uPbrDebugViewMode=={(int)PbrDebugViewMode.NormalsOnly}){{ debugSurfaceResult=norm*0.5+0.5; }} float sampledAlpha = baseColor.a*uAlpha; if(uAlphaMode==1 && sampledAlpha<uAlphaCutoff){{ discard; }}");
 
         if (features.HasFlag(PbrFeatures.Transmission))
         {
-            sb.AppendLine("vec3 transmittedLight=vec3(0.0); if(uHasTransmission==1){ float transmission=clamp(uTransmissionFactor*transmissionMapSample,0.0,1.0); vec3 refractedDir=refract(-viewDir,norm,1.0/max(materialIor,1.0)); float frontLighting=clamp(dot(-refractedDir,norm),0.0,1.0); float mappedThickness=max(uTransmissionThickness*thicknessMapSample,0.0); float thicknessFade=exp(-mappedThickness); float attenuationDistance=max(uTransmissionAttenuationDistance,0.0001); vec3 attenuation=exp(-uTransmissionAttenuationColor*(mappedThickness/attenuationDistance)); vec3 backgroundEstimate=vec3(0.5+0.5*frontLighting)*attenuation*thicknessFade; transmittedLight=backgroundEstimate*transmission;} vec3 result=SanitizeHdrColor(mix(surfaceResult, transmittedLight+totalEmissive, uHasTransmission==1?clamp(uTransmissionFactor,0.0,1.0):0.0)); float alphaBase=uAlphaMode==2?sampledAlpha:1.0; float transmissionAlpha=max(alphaBase,sampledAlpha); float alpha=mix(alphaBase, transmissionAlpha, float(uHasTransmission)); FragColor=vec4(result, alpha); EmissiveColor=vec4(SanitizeHdrColor(totalEmissive), alpha);");
+            sb.AppendLine("vec3 transmittedLight=vec3(0.0); if(uHasTransmission==1 && uPbrDebugViewMode==0){ float transmission=clamp(uTransmissionFactor*transmissionMapSample,0.0,1.0); vec3 refractedDir=refract(-viewDir,norm,1.0/max(materialIor,1.0)); float frontLighting=clamp(dot(-refractedDir,norm),0.0,1.0); float mappedThickness=max(uTransmissionThickness*thicknessMapSample,0.0); float thicknessFade=exp(-mappedThickness); float attenuationDistance=max(uTransmissionAttenuationDistance,0.0001); vec3 attenuation=exp(-uTransmissionAttenuationColor*(mappedThickness/attenuationDistance)); vec3 backgroundEstimate=vec3(0.5+0.5*frontLighting)*attenuation*thicknessFade; transmittedLight=backgroundEstimate*transmission;} vec3 finalSurface=uPbrDebugViewMode==0?mix(surfaceResult, transmittedLight+totalEmissive, uHasTransmission==1?clamp(uTransmissionFactor,0.0,1.0):0.0):debugSurfaceResult; vec3 result=SanitizeHdrColor(finalSurface); float alphaBase=uAlphaMode==2?sampledAlpha:1.0; float transmissionAlpha=max(alphaBase,sampledAlpha); float alpha=mix(alphaBase, transmissionAlpha, float(uHasTransmission)); FragColor=vec4(result, alpha); EmissiveColor=vec4(SanitizeHdrColor(totalEmissive), alpha);");
         }
         else
         {
-            sb.AppendLine("float alpha=uAlphaMode==2?sampledAlpha:1.0; FragColor=vec4(SanitizeHdrColor(surfaceResult), alpha); EmissiveColor=vec4(SanitizeHdrColor(totalEmissive), alpha);");
+            sb.AppendLine("float alpha=uAlphaMode==2?sampledAlpha:1.0; vec3 finalSurface=uPbrDebugViewMode==0?surfaceResult:debugSurfaceResult; FragColor=vec4(SanitizeHdrColor(finalSurface), alpha); EmissiveColor=vec4(SanitizeHdrColor(totalEmissive), alpha);");
         }
 
         sb.AppendLine("}");
@@ -120,6 +121,7 @@ void main()
         sb.AppendLine("uniform sampler2D uEnvironmentMap; uniform float uReflectionIntensity; uniform int uHasEnvironmentMap; uniform float uAlpha; uniform float uAlphaCutoff; uniform int uAlphaMode; uniform float uEmissiveIntensity;");
         sb.AppendLine("uniform float uTransmissionFactor; uniform float uTransmissionThickness; uniform float uTransmissionIor; uniform float uTransmissionAttenuationDistance; uniform vec3 uTransmissionAttenuationColor; uniform int uHasTransmission;");
         sb.AppendLine("uniform float uClearcoatFactor; uniform float uClearcoatRoughness; uniform vec3 uSheenColorFactor; uniform float uSheenRoughnessFactor; uniform float uSpecularFactor; uniform vec3 uSpecularColorFactor; uniform float uMaterialIor; uniform float uMaterialEmissiveStrength;");
+        sb.AppendLine(PbrDebugUniformBlock.UniformBlock);
     }
 
     private static void AppendShadowFunction(StringBuilder sb)

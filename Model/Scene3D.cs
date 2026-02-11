@@ -54,6 +54,7 @@ namespace Avalonia3D.Model
         public ShaderSelectionPolicy ShaderSelectionPolicy { get; } = new();
         public string? ActiveShaderId { get; set; }
         public ShaderRenderMode RenderMode { get; set; } = ShaderRenderMode.Default;
+        public PbrDebugViewMode PbrDebugViewMode { get; set; } = PbrDebugViewMode.None;
         public EnvironmentLightingSettings EnvironmentLighting { get; set; } = EnvironmentLightingSettings.FromGraphicsProfile(GraphicsProfile.Medium);
         public GraphicsProfile ActiveGraphicsProfile { get; private set; } = GraphicsProfile.Medium.Validate();
         internal Animator Animator { get; private set; } = new();

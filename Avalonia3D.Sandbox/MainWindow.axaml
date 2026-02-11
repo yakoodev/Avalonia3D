@@ -103,6 +103,10 @@
                 <ComboBox ItemsSource="{Binding EmissiveTextureDebugModes}" SelectedItem="{Binding SelectedEmissiveTextureDebugMode}" HorizontalAlignment="Stretch" />
                 <TextBlock Text="Normal = как в материале; IgnoreTexture = игнор карты; ForceWhite = принудительно белый сэмпл (проверка UV/texture против pipeline)." Foreground="#D6D6D6" TextWrapping="Wrap" />
 
+                <TextBlock Text="PBR debug view mode" FontWeight="SemiBold" Foreground="White" Margin="0,6,0,0" />
+                <ComboBox ItemsSource="{Binding PbrDebugViewModes}" SelectedItem="{Binding SelectedPbrDebugViewMode}" HorizontalAlignment="Stretch" />
+                <TextBlock Text="Централизованный debug-режим PBR (BaseColorOnly, DirectLightOnly, IBLOnly, EmissiveOnly, AOOnly, NormalsOnly)." Foreground="#D6D6D6" TextWrapping="Wrap" />
+
                 <CheckBox Content="Dump PBR material diagnostics" IsChecked="{Binding DumpPbrMaterialDiagnostics}" Foreground="White" Margin="0,6,0,0" />
                 <TextBlock Text="Логирует snapshot материала перед draw (семантики текстур, UV transform, factors и вычисленные PbrFeatures)." Foreground="#D6D6D6" TextWrapping="Wrap" />
 

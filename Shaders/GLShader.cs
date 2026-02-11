@@ -103,6 +103,7 @@ namespace Avalonia3D.Shaders
         private int _materialEmissiveStrengthLocation = -1;
         private int _manualBaseColorSrgbDecodeLocation = -1;
         private int _manualEmissiveSrgbDecodeLocation = -1;
+        private int _pbrDebugViewModeLocation = -1;
 
         public uint Handle => _shaderProgram;
         private GL _gl;
@@ -327,6 +328,7 @@ namespace Avalonia3D.Shaders
             _materialEmissiveStrengthLocation = _gl.GetUniformLocation(_shaderProgram, "uMaterialEmissiveStrength");
             _manualBaseColorSrgbDecodeLocation = _gl.GetUniformLocation(_shaderProgram, "uManualBaseColorSrgbDecode");
             _manualEmissiveSrgbDecodeLocation = _gl.GetUniformLocation(_shaderProgram, "uManualEmissiveSrgbDecode");
+            _pbrDebugViewModeLocation = _gl.GetUniformLocation(_shaderProgram, "uPbrDebugViewMode");
         }
 
         public unsafe void SetUniforms(IRenderContext renderContext, SceneObject sceneObject, Matrix4x4 lightSpaceMatrix = default)
@@ -387,6 +389,9 @@ namespace Avalonia3D.Shaders
 
             if (_viewPosLocation != -1)
                 _gl.Uniform3(_viewPosLocation, camera.Position.X, camera.Position.Y, camera.Position.Z);
+
+            if (_pbrDebugViewModeLocation != -1)
+                _gl.Uniform1(_pbrDebugViewModeLocation, (int)renderContext.FrameState.PbrDebugViewMode);
 
             var material = (sceneObject as Interfaces.IMaterialProvider)?.Material;
             MaterialRenderDiagnostics.DumpIfEnabled(

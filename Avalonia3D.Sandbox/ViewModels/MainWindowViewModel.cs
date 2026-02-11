@@ -43,6 +43,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private bool _isImportDegraded;
     private string _behaviorTargetSemanticId = "door.main";
     private EmissiveTextureDebugMode _selectedEmissiveTextureDebugMode = EmissiveTextureDebugMode.Normal;
+    private PbrDebugViewMode _selectedPbrDebugViewMode = PbrDebugViewMode.None;
     private bool _dumpPbrMaterialDiagnostics;
 
     public MainWindowViewModel(Scene3D scene, CameraController cameraController, string assetsRoot, IRenderThreadScheduler renderThreadScheduler, Action<GraphicsProfile> applyGraphicsProfile)
@@ -99,6 +100,17 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             EmissiveTextureDebugMode.ForceWhite
         });
 
+        PbrDebugViewModes = new ObservableCollection<PbrDebugViewMode>(new[]
+        {
+            PbrDebugViewMode.None,
+            PbrDebugViewMode.BaseColorOnly,
+            PbrDebugViewMode.DirectLightOnly,
+            PbrDebugViewMode.IblOnly,
+            PbrDebugViewMode.EmissiveOnly,
+            PbrDebugViewMode.AoOnly,
+            PbrDebugViewMode.NormalsOnly
+        });
+
         SwitchShaderModeCommand = new RelayCommand(mode =>
         {
             if (mode is ShaderRenderMode renderMode)
@@ -142,6 +154,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _scene.BindRenderMode(ShaderRenderMode.NormalsDebug, ShaderIds.NormalsDebug);
         ApplyShaderMode(ShaderRenderMode.Pbr);
         EmissionUniformResolver.EmissiveTextureMode = _selectedEmissiveTextureDebugMode;
+        _scene.PbrDebugViewMode = _selectedPbrDebugViewMode;
 
         if (scenes.Count > 0)
         {
@@ -154,6 +167,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public ObservableCollection<string> AvailableClips { get; }
     public ObservableCollection<RenderQualityPreset> QualityPresets { get; }
     public ObservableCollection<EmissiveTextureDebugMode> EmissiveTextureDebugModes { get; }
+    public ObservableCollection<PbrDebugViewMode> PbrDebugViewModes { get; }
     public RelayCommand SwitchShaderModeCommand { get; }
     public RelayCommand TogglePbrUnlitCommand { get; }
     public RelayCommand PlayClipCommand { get; }
@@ -336,6 +350,24 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             EmissionUniformResolver.EmissiveTextureMode = value;
             Log.Information("Emissive texture debug mode changed: {Mode}", value);
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedEmissiveTextureDebugMode)));
+        }
+    }
+
+
+    public PbrDebugViewMode SelectedPbrDebugViewMode
+    {
+        get => _selectedPbrDebugViewMode;
+        set
+        {
+            if (_selectedPbrDebugViewMode == value)
+            {
+                return;
+            }
+
+            _selectedPbrDebugViewMode = value;
+            _scene.PbrDebugViewMode = value;
+            Log.Information("PBR debug view mode changed: {Mode}", value);
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedPbrDebugViewMode)));
         }
     }
 
