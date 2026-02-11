@@ -39,6 +39,7 @@ namespace Avalonia3D.Rendering
         Medium,
         High,
         Ultra,
+        PbrDebugNeutral,
         Custom
     }
 

@@ -147,4 +147,19 @@ public class PbrShaderSourceBuilderTests
         Assert.Contains("ApplyManualSheenColorDecode(texture(uSheenColorMap, baseTexCoord).rgb)", fragmentSource);
         Assert.Contains("ApplyManualSpecularColorDecode(texture(uSpecularColorMap, baseTexCoord).rgb)", fragmentSource);
     }
+
+    [Fact]
+    public void Build_WithIblReflections_IncludesSplitIntensityAndClampUniforms()
+    {
+        var builder = new PbrShaderSourceBuilder();
+
+        var (_, fragmentSource) = builder.Build(PbrFeatures.ReflectionsIbl, maxLights: 4);
+
+        Assert.Contains("uIblDiffuseIntensity", fragmentSource);
+        Assert.Contains("uIblSpecularIntensity", fragmentSource);
+        Assert.Contains("uReflectionContributionClamp", fragmentSource);
+        Assert.Contains("uAmbientStrengthClamp", fragmentSource);
+        Assert.Contains("iblDiffuse", fragmentSource);
+        Assert.Contains("min(reflection + iblDiffuse", fragmentSource);
+    }
 }

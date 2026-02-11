@@ -14,6 +14,10 @@ namespace Avalonia3D.Rendering
         public Matrix4x4 LightSpaceMatrix { get; set; } = Matrix4x4.Identity;
         public uint? EnvironmentReflectionTextureId { get; set; }
         public float ReflectionIntensity { get; set; }
+        public float IblDiffuseIntensity { get; set; } = 0.2f;
+        public float IblSpecularIntensity { get; set; } = 1.0f;
+        public float ReflectionContributionClamp { get; set; } = 1.25f;
+        public float AmbientStrengthClamp { get; set; } = 0.35f;
         public bool ReflectionsEnabled { get; set; }
         public ReflectionMode ReflectionMode { get; set; } = ReflectionMode.Off;
         public PbrDebugViewMode PbrDebugViewMode { get; set; } = PbrDebugViewMode.None;

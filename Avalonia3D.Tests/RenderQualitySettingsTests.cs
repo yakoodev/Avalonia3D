@@ -162,7 +162,15 @@ public class RenderQualitySettingsTests
         var profile = GraphicsProfile.High with
         {
             Name = "QA-High",
-            PbrTuning = GraphicsProfile.High.PbrTuning with { Exposure = 1.35f, IblIntensity = 1.7f },
+            PbrTuning = GraphicsProfile.High.PbrTuning with
+            {
+                Exposure = 1.35f,
+                PbrWhitePoint = 1.5f,
+                IblDiffuseIntensity = 0.33f,
+                IblSpecularIntensity = 1.7f,
+                ReflectionContributionClamp = 0.95f,
+                AmbientStrengthClamp = 0.29f
+            },
             Background = new BackgroundProfile { Red = 0.2f, Green = 0.25f, Blue = 0.3f },
             MaxLights = 6
         };
@@ -173,10 +181,28 @@ public class RenderQualitySettingsTests
         Assert.Equal("QA-High", restored.Name);
         Assert.Equal(RenderQualityPreset.High, restored.QualityPreset);
         Assert.Equal(1.35f, restored.PbrTuning.Exposure);
-        Assert.Equal(1.7f, restored.PbrTuning.IblIntensity);
+        Assert.Equal(1.5f, restored.PbrTuning.PbrWhitePoint);
+        Assert.Equal(0.33f, restored.PbrTuning.IblDiffuseIntensity);
+        Assert.Equal(1.7f, restored.PbrTuning.IblSpecularIntensity);
+        Assert.Equal(0.95f, restored.PbrTuning.ReflectionContributionClamp);
+        Assert.Equal(0.29f, restored.PbrTuning.AmbientStrengthClamp);
         Assert.Equal(0.2f, restored.Background.Red);
         Assert.Equal(0.25f, restored.Background.Green);
         Assert.Equal(0.3f, restored.Background.Blue);
         Assert.Equal(6, restored.MaxLights);
+    }
+
+    [Fact]
+    public void PbrDebugNeutralPreset_DisablesBloomWithModerateToneMapping()
+    {
+        var profile = GraphicsProfile.PbrDebugNeutral.Validate();
+
+        Assert.Equal(RenderQualityPreset.PbrDebugNeutral, profile.QualityPreset);
+        Assert.False(profile.PostFx.Bloom.Enabled);
+        Assert.False(profile.PostFx.Effects.HasFlag(PostEffectsFlags.Bloom));
+        Assert.True(profile.PostFx.Effects.HasFlag(PostEffectsFlags.ToneMapping));
+        Assert.True(profile.PostFx.Effects.HasFlag(PostEffectsFlags.GammaCorrection));
+        Assert.InRange(profile.PbrTuning.Exposure, 0.9f, 1.1f);
+        Assert.InRange(profile.PbrTuning.ReflectionContributionClamp, 0.5f, 1.25f);
     }
 }

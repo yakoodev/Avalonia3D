@@ -112,5 +112,8 @@
 		<None Update="Assets\gltf\wheel_normal.png">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</None>
+		<None Update="Assets\Environment\neutral_studio_fallback.ppm">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
 	</ItemGroup>
 </Project>

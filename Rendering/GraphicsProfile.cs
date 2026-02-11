@@ -43,7 +43,11 @@ namespace Avalonia3D.Rendering
     public sealed record PbrTuningProfile
     {
         public float Exposure { get; init; } = 1.0f;
-        public float IblIntensity { get; init; } = 1.0f;
+        public float PbrWhitePoint { get; init; } = 1.0f;
+        public float IblDiffuseIntensity { get; init; } = 0.2f;
+        public float IblSpecularIntensity { get; init; } = 1.0f;
+        public float ReflectionContributionClamp { get; init; } = 1.25f;
+        public float AmbientStrengthClamp { get; init; } = 0.35f;
         public float AmbientOcclusionStrength { get; init; } = 1.0f;
     }
 
@@ -56,7 +60,7 @@ namespace Avalonia3D.Rendering
 
     public sealed record GraphicsProfile
     {
-        public const string DefaultEnvironmentMapPath = "Assets/TestScenes/car/textures/wheel_baseColor.png";
+        public const string DefaultEnvironmentMapPath = "Assets/Environment/neutral_studio_fallback.ppm";
 
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
@@ -109,7 +113,11 @@ namespace Avalonia3D.Rendering
             PbrTuning = new PbrTuningProfile
             {
                 Exposure = 0.95f,
-                IblIntensity = 0.6f,
+                PbrWhitePoint = 1.15f,
+                IblDiffuseIntensity = 0f,
+                IblSpecularIntensity = 0f,
+                ReflectionContributionClamp = 0.7f,
+                AmbientStrengthClamp = 0.25f,
                 AmbientOcclusionStrength = 0.8f
             },
             Background = new BackgroundProfile { Red = 0.09f, Green = 0.09f, Blue = 0.10f },
@@ -151,7 +159,11 @@ namespace Avalonia3D.Rendering
             PbrTuning = new PbrTuningProfile
             {
                 Exposure = 1.0f,
-                IblIntensity = 0.75f,
+                PbrWhitePoint = 1.2f,
+                IblDiffuseIntensity = 0.2f,
+                IblSpecularIntensity = 0.75f,
+                ReflectionContributionClamp = 1.05f,
+                AmbientStrengthClamp = 0.30f,
                 AmbientOcclusionStrength = 1.0f
             },
             Background = new BackgroundProfile { Red = 0.06f, Green = 0.06f, Blue = 0.08f },
@@ -193,7 +205,11 @@ namespace Avalonia3D.Rendering
             PbrTuning = new PbrTuningProfile
             {
                 Exposure = 1.08f,
-                IblIntensity = 1.25f,
+                PbrWhitePoint = 1.28f,
+                IblDiffuseIntensity = 0.25f,
+                IblSpecularIntensity = 1.0f,
+                ReflectionContributionClamp = 1.2f,
+                AmbientStrengthClamp = 0.35f,
                 AmbientOcclusionStrength = 1.05f
             },
             Background = new BackgroundProfile { Red = 0.04f, Green = 0.05f, Blue = 0.07f },
@@ -237,11 +253,49 @@ namespace Avalonia3D.Rendering
             PbrTuning = new PbrTuningProfile
             {
                 Exposure = 1.15f,
-                IblIntensity = 1.4f,
+                PbrWhitePoint = 1.35f,
+                IblDiffuseIntensity = 0.3f,
+                IblSpecularIntensity = 1.15f,
+                ReflectionContributionClamp = 1.35f,
+                AmbientStrengthClamp = 0.42f,
                 AmbientOcclusionStrength = 1.2f
             },
             Background = new BackgroundProfile { Red = 0.02f, Green = 0.03f, Blue = 0.05f },
             MaxLights = RenderQualitySettings.MaxSupportedLights
+        };
+
+        public static GraphicsProfile PbrDebugNeutral => new()
+        {
+            Name = "PBR Debug Neutral",
+            QualityPreset = RenderQualityPreset.PbrDebugNeutral,
+            MsaaPolicy = MsaaPolicy.X2,
+            Shadows = new ShadowProfile { Enabled = true, MapSize = 2048 },
+            PostFx = new PostFxProfile
+            {
+                Effects = PostEffectsFlags.ToneMapping | PostEffectsFlags.GammaCorrection,
+                ToneMapping = ToneMappingOperator.Reinhard,
+                Gamma = 2.2f,
+                Bloom = new BloomProfile { Enabled = false }
+            },
+            Reflections = new ReflectionProfile
+            {
+                Enabled = true,
+                Mode = ReflectionMode.IBL,
+                Intensity = 0.4f,
+                EnvironmentMapPath = DefaultEnvironmentMapPath
+            },
+            PbrTuning = new PbrTuningProfile
+            {
+                Exposure = 1.0f,
+                PbrWhitePoint = 1.15f,
+                IblDiffuseIntensity = 0.15f,
+                IblSpecularIntensity = 0.6f,
+                ReflectionContributionClamp = 0.9f,
+                AmbientStrengthClamp = 0.25f,
+                AmbientOcclusionStrength = 1.0f
+            },
+            Background = new BackgroundProfile { Red = 0.05f, Green = 0.05f, Blue = 0.06f },
+            MaxLights = 4
         };
 
         public GraphicsProfile Validate()
@@ -290,7 +344,11 @@ namespace Avalonia3D.Rendering
             var validatedPbr = (PbrTuning ?? new PbrTuningProfile()) with
             {
                 Exposure = Math.Clamp(PbrTuning?.Exposure ?? 1.0f, 0.1f, 8.0f),
-                IblIntensity = Math.Clamp(PbrTuning?.IblIntensity ?? 1.0f, 0f, 8.0f),
+                PbrWhitePoint = Math.Clamp(PbrTuning?.PbrWhitePoint ?? 1.0f, 0.5f, 16.0f),
+                IblDiffuseIntensity = Math.Clamp(PbrTuning?.IblDiffuseIntensity ?? 0.2f, 0f, 4.0f),
+                IblSpecularIntensity = Math.Clamp(PbrTuning?.IblSpecularIntensity ?? 1.0f, 0f, 8.0f),
+                ReflectionContributionClamp = Math.Clamp(PbrTuning?.ReflectionContributionClamp ?? 1.25f, 0f, 8.0f),
+                AmbientStrengthClamp = Math.Clamp(PbrTuning?.AmbientStrengthClamp ?? 0.35f, 0f, 2.0f),
                 AmbientOcclusionStrength = Math.Clamp(PbrTuning?.AmbientOcclusionStrength ?? 1.0f, 0f, 4.0f)
             };
 
@@ -329,13 +387,14 @@ namespace Avalonia3D.Rendering
                 RenderQualityPreset.Medium => Medium,
                 RenderQualityPreset.High => High,
                 RenderQualityPreset.Ultra => Ultra,
+                RenderQualityPreset.PbrDebugNeutral => PbrDebugNeutral,
                 RenderQualityPreset.Custom => current ?? Medium,
                 _ => Medium
             };
         }
 
         public string ToSummary() =>
-            $"Profile={Name} ({QualityPreset}), shadows={Shadows.Enabled}:{Shadows.MapSize}, postfx={PostFx.Effects}, gamma={PostFx.Gamma:0.00}, bloom={PostFx.Bloom.Enabled}:{PostFx.Bloom.Threshold:0.00}/{PostFx.Bloom.Intensity:0.00}/{PostFx.Bloom.Radius:0.00}x{PostFx.Bloom.Iterations}, refl={Reflections.Mode}:{Reflections.Intensity:0.00}, exposure={PbrTuning.Exposure:0.00}, ibl={PbrTuning.IblIntensity:0.00}, lights={MaxLights}, msaa={MsaaPolicy}, bg=({Background.Red:0.00},{Background.Green:0.00},{Background.Blue:0.00})";
+            $"Profile={Name} ({QualityPreset}), shadows={Shadows.Enabled}:{Shadows.MapSize}, postfx={PostFx.Effects}, gamma={PostFx.Gamma:0.00}, bloom={PostFx.Bloom.Enabled}:{PostFx.Bloom.Threshold:0.00}/{PostFx.Bloom.Intensity:0.00}/{PostFx.Bloom.Radius:0.00}x{PostFx.Bloom.Iterations}, refl={Reflections.Mode}:{Reflections.Intensity:0.00}, exposure={PbrTuning.Exposure:0.00}, wp={PbrTuning.PbrWhitePoint:0.00}, ibl(diff/spec)={PbrTuning.IblDiffuseIntensity:0.00}/{PbrTuning.IblSpecularIntensity:0.00}, reflClamp={PbrTuning.ReflectionContributionClamp:0.00}, ambientClamp={PbrTuning.AmbientStrengthClamp:0.00}, lights={MaxLights}, msaa={MsaaPolicy}, bg=({Background.Red:0.00},{Background.Green:0.00},{Background.Blue:0.00})";
 
         private static string? ResolveDefaultEnvironmentMapPath(bool reflectionsEnabled, ReflectionMode mode)
         {

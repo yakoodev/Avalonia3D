@@ -17,6 +17,20 @@ namespace Avalonia3D.Rendering
         public void Execute(RenderPipelineContext context)
         {
             var gl = context.Gl;
+            var frameState = context.RenderContext.FrameState;
+            frameState.AmbientStrengthClamp = _settings.PbrTuning.AmbientStrengthClamp;
+
+            if (!_settings.Reflections.Enabled || _settings.Reflections.Mode == ReflectionMode.Off)
+            {
+                frameState.EnvironmentReflectionTextureId = null;
+                frameState.ReflectionIntensity = 0f;
+                frameState.IblDiffuseIntensity = 0f;
+                frameState.IblSpecularIntensity = 0f;
+                frameState.ReflectionContributionClamp = 0f;
+                frameState.ReflectionsEnabled = false;
+                frameState.ReflectionMode = ReflectionMode.Off;
+            }
+
             gl.Viewport(0, 0, (uint)context.Width, (uint)context.Height);
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, context.RenderContext.FrameState.OutputFramebufferId);
             gl.Enable(EnableCap.DepthTest);
