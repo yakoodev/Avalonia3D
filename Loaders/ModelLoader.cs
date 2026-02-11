@@ -324,11 +324,14 @@ namespace Avalonia3D.Loaders
             result.ExtensionTextures.VolumeThicknessTexture = LoadTextureFromChannel(extensionChannels.VolumeThickness);
 
             var sourceAlphaMode = result.SourceAlphaMode;
+            var resolvedSceneOverride = MaterialImportOverrideConfiguration.ResolveForMaterial(policyContext.AssetPath, material.Name)
+                ?? policyContext.SceneOverride;
+
             var effectivePolicyContext = new MaterialImportPolicyContext
             {
                 AssetPath = policyContext.AssetPath,
                 AlphaProfile = policyContext.AlphaProfile,
-                SceneOverride = policyContext.SceneOverride,
+                SceneOverride = resolvedSceneOverride,
                 SourceAlphaMode = sourceAlphaMode,
                 MaterialName = material.Name,
                 MeshName = prim.LogicalParent?.Name,

@@ -63,10 +63,12 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
         }
 
         var emissiveBehavior = ResolveEmissiveBehavior(material, context);
-        if (alphaProfile == MaterialAlphaImportProfile.Balanced && emissiveBehavior == MaterialEmissiveBehavior.TreatAsTransparencySignal)
+        if (emissiveBehavior == MaterialEmissiveBehavior.TreatAsTransparencySignal)
         {
             resolved = MaterialAlphaMode.Blend;
-            reasonCode = "profile_balanced_emissive_signal";
+            reasonCode = context.IsAnimatedMaterial
+                ? "animated_emissive_contract"
+                : $"profile_{alphaProfile.ToString().ToLowerInvariant()}_emissive_signal";
             LogAlphaDecision(material, context, sourceAlphaMode, resolved, reasonCode);
             return resolved;
         }

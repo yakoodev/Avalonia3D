@@ -384,7 +384,7 @@ public sealed class MaterialAlphaAndLoaderTests
     }
 
     [Fact]
-    public void MaterialAlphaImportPolicy_Legacy_FallsBackToOpaqueEvenForEmissiveMaterials()
+    public void MaterialAlphaImportPolicy_Legacy_PreservesBlendForEmissiveMaterials()
     {
         var material = new Avalonia3D.Model.Material
         {
@@ -397,7 +397,7 @@ public sealed class MaterialAlphaAndLoaderTests
         var policy = new MaterialAlphaImportPolicy();
         policy.Apply(material, MaterialAlphaImportProfile.Legacy);
 
-        Assert.Equal(MaterialAlphaMode.Opaque, material.AlphaMode);
+        Assert.Equal(MaterialAlphaMode.Blend, material.AlphaMode);
     }
 
     [Fact]
@@ -443,7 +443,7 @@ public sealed class MaterialAlphaAndLoaderTests
     }
 
     [Fact]
-    public void LoadModels_BlendWithoutAlphaSignal_LegacyProfile_FallsBackToOpaqueForEmissive()
+    public void LoadModels_BlendWithoutAlphaSignal_LegacyProfile_PreservesEmissiveBlend()
     {
         var previous = MaterialAlphaImportConfiguration.CurrentProfile;
         MaterialAlphaImportConfiguration.Configure(MaterialAlphaImportProfile.Legacy);
@@ -459,8 +459,8 @@ public sealed class MaterialAlphaAndLoaderTests
             var material = Assert.Single(models).Material;
 
             Assert.NotNull(material);
-            Assert.Equal(MaterialAlphaMode.Opaque, material!.AlphaMode);
-            Assert.False(material.IsTransparent);
+            Assert.Equal(MaterialAlphaMode.Blend, material!.AlphaMode);
+            Assert.True(material.IsTransparent);
         }
         finally
         {
@@ -640,6 +640,60 @@ public sealed class MaterialAlphaAndLoaderTests
         {
             MaterialImportOverrideConfiguration.Configure(null);
         }
+    }
+
+    [Fact]
+    public void MaterialImportOverrideConfiguration_ResolveForMaterial_UsesMaterialLevelOverride()
+    {
+        MaterialImportOverrideConfiguration.ConfigureAssetOverrides(new System.Collections.Generic.Dictionary<string, MaterialAssetImportOverride>
+        {
+            ["Assets/TestScenes/droid/scene.gltf"] = new()
+            {
+                AlphaProfile = MaterialAlphaImportProfile.Balanced,
+                Materials = new System.Collections.Generic.Dictionary<string, MaterialSceneImportOverride>
+                {
+                    ["Glow"] = new() { ForceAlphaMode = MaterialAlphaMode.Mask }
+                }
+            }
+        });
+
+        try
+        {
+            var resolved = MaterialImportOverrideConfiguration.ResolveForMaterial(
+                "/workspace/Avalonia3D/Avalonia3D.Sandbox/Assets/TestScenes/droid/scene.gltf",
+                "Glow");
+
+            Assert.NotNull(resolved);
+            Assert.Equal(MaterialAlphaMode.Mask, resolved!.ForceAlphaMode);
+            Assert.Equal(MaterialAlphaImportProfile.Balanced, resolved.AlphaProfile);
+        }
+        finally
+        {
+            MaterialImportOverrideConfiguration.Configure(null);
+        }
+    }
+
+    [Fact]
+    public void DefaultMaterialImportPolicy_AnimatedEmissiveContract_PreservesBlendInLegacy()
+    {
+        var material = new Avalonia3D.Model.Material
+        {
+            AlphaMode = MaterialAlphaMode.Blend,
+            BaseColorFactor = new Vector4(1f, 1f, 1f, 1f),
+            EmissiveFactor = new Vector3(0.3f, 0f, 0f)
+        };
+
+        var context = new MaterialImportPolicyContext
+        {
+            AlphaProfile = MaterialAlphaImportProfile.Legacy,
+            SourceAlphaMode = MaterialAlphaMode.Blend,
+            IsAnimatedMaterial = true
+        };
+
+        var policy = new DefaultMaterialImportPolicy();
+        var mode = policy.ResolveAlphaMode(material, context);
+
+        Assert.Equal(MaterialAlphaMode.Blend, mode);
     }
 
     [Fact]
