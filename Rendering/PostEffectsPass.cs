@@ -52,6 +52,8 @@ namespace Avalonia3D.Rendering
             gl.Uniform1(gl.GetUniformLocation(_program, "uToneMappingOperator"), (int)_settings.PostFx.ToneMapping);
             gl.Uniform1(gl.GetUniformLocation(_program, "uApplyGamma"), _settings.PostFx.Effects.HasFlag(PostEffectsFlags.GammaCorrection) ? 1 : 0);
             gl.Uniform1(gl.GetUniformLocation(_program, "uGamma"), _settings.PostFx.Gamma);
+            gl.Uniform1(gl.GetUniformLocation(_program, "uExposure"), _settings.PbrTuning.Exposure);
+            gl.Uniform1(gl.GetUniformLocation(_program, "uWhitePoint"), _settings.PbrTuning.PbrWhitePoint);
 
             gl.BindVertexArray(_vao);
             gl.DrawArrays(PrimitiveType.Triangles, 0, 6);
@@ -114,6 +116,8 @@ uniform int uApplyToneMapping;
 uniform int uToneMappingOperator;
 uniform int uApplyGamma;
 uniform float uGamma;
+uniform float uExposure;
+uniform float uWhitePoint;
 
 vec3 ApplyToneMapping(vec3 color)
 {
@@ -127,11 +131,12 @@ vec3 ApplyToneMapping(vec3 color)
 
 void main()
 {
-    vec3 color = max(texture(uSceneTexture, vUv).rgb, vec3(0.0));
+    vec3 color = max(texture(uSceneTexture, vUv).rgb, vec3(0.0)) * max(uExposure, 0.0001);
 
     if (uApplyToneMapping == 1)
     {
         color = ApplyToneMapping(color);
+        color *= max(uWhitePoint, 0.0001);
     }
 
     color = max(color, vec3(0.0));

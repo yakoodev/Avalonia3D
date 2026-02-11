@@ -51,6 +51,10 @@ namespace Avalonia3D.Rendering
 
             context.RenderContext.FrameState.EnvironmentReflectionTextureId = _environmentMapTexture;
             context.RenderContext.FrameState.ReflectionIntensity = _settings.Reflections.Intensity;
+            context.RenderContext.FrameState.IblDiffuseIntensity = _settings.PbrTuning.IblDiffuseIntensity;
+            context.RenderContext.FrameState.IblSpecularIntensity = _settings.PbrTuning.IblSpecularIntensity;
+            context.RenderContext.FrameState.ReflectionContributionClamp = _settings.PbrTuning.ReflectionContributionClamp;
+            context.RenderContext.FrameState.AmbientStrengthClamp = _settings.PbrTuning.AmbientStrengthClamp;
             context.RenderContext.FrameState.ReflectionsEnabled = true;
             context.RenderContext.FrameState.ReflectionMode = _settings.Reflections.Mode;
         }
@@ -184,6 +188,10 @@ namespace Avalonia3D.Rendering
         {
             context.RenderContext.FrameState.EnvironmentReflectionTextureId = null;
             context.RenderContext.FrameState.ReflectionIntensity = 0f;
+            context.RenderContext.FrameState.IblDiffuseIntensity = 0f;
+            context.RenderContext.FrameState.IblSpecularIntensity = 0f;
+            context.RenderContext.FrameState.ReflectionContributionClamp = 0f;
+            context.RenderContext.FrameState.AmbientStrengthClamp = 0f;
             context.RenderContext.FrameState.ReflectionsEnabled = false;
             context.RenderContext.FrameState.ReflectionMode = ReflectionMode.Off;
         }

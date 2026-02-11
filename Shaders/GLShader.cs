@@ -86,6 +86,10 @@ namespace Avalonia3D.Shaders
         private int _emissiveTexCoordSetLocation = -1;
         private int _environmentMapLocation = -1;
         private int _reflectionIntensityLocation = -1;
+        private int _iblDiffuseIntensityLocation = -1;
+        private int _iblSpecularIntensityLocation = -1;
+        private int _reflectionContributionClampLocation = -1;
+        private int _ambientStrengthClampLocation = -1;
         private int _hasEnvironmentMapLocation = -1;
         private int _transmissionFactorLocation = -1;
         private int _transmissionThicknessLocation = -1;
@@ -311,6 +315,10 @@ namespace Avalonia3D.Shaders
             _emissiveIntensityLocation = _gl.GetUniformLocation(_shaderProgram, "uEmissiveIntensity");
             _environmentMapLocation = _gl.GetUniformLocation(_shaderProgram, "uEnvironmentMap");
             _reflectionIntensityLocation = _gl.GetUniformLocation(_shaderProgram, "uReflectionIntensity");
+            _iblDiffuseIntensityLocation = _gl.GetUniformLocation(_shaderProgram, "uIblDiffuseIntensity");
+            _iblSpecularIntensityLocation = _gl.GetUniformLocation(_shaderProgram, "uIblSpecularIntensity");
+            _reflectionContributionClampLocation = _gl.GetUniformLocation(_shaderProgram, "uReflectionContributionClamp");
+            _ambientStrengthClampLocation = _gl.GetUniformLocation(_shaderProgram, "uAmbientStrengthClamp");
             _hasEnvironmentMapLocation = _gl.GetUniformLocation(_shaderProgram, "uHasEnvironmentMap");
             _transmissionFactorLocation = _gl.GetUniformLocation(_shaderProgram, "uTransmissionFactor");
             _transmissionThicknessLocation = _gl.GetUniformLocation(_shaderProgram, "uTransmissionThickness");
@@ -523,6 +531,18 @@ namespace Avalonia3D.Shaders
 
             if (_reflectionIntensityLocation != -1)
                 _gl.Uniform1(_reflectionIntensityLocation, frameState.ReflectionsEnabled ? frameState.ReflectionIntensity : 0f);
+
+            if (_iblDiffuseIntensityLocation != -1)
+                _gl.Uniform1(_iblDiffuseIntensityLocation, frameState.ReflectionsEnabled ? frameState.IblDiffuseIntensity : 0f);
+
+            if (_iblSpecularIntensityLocation != -1)
+                _gl.Uniform1(_iblSpecularIntensityLocation, frameState.ReflectionsEnabled ? frameState.IblSpecularIntensity : 0f);
+
+            if (_reflectionContributionClampLocation != -1)
+                _gl.Uniform1(_reflectionContributionClampLocation, frameState.ReflectionsEnabled ? frameState.ReflectionContributionClamp : 0f);
+
+            if (_ambientStrengthClampLocation != -1)
+                _gl.Uniform1(_ambientStrengthClampLocation, frameState.AmbientStrengthClamp);
 
             if (_hasEnvironmentMapLocation != -1)
                 _gl.Uniform1(_hasEnvironmentMapLocation, frameState.ReflectionsEnabled && frameState.EnvironmentReflectionTextureId.HasValue ? 1 : 0);

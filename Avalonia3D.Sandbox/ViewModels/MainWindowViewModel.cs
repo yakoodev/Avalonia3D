@@ -90,6 +90,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             RenderQualityPreset.Medium,
             RenderQualityPreset.High,
             RenderQualityPreset.Ultra,
+            RenderQualityPreset.PbrDebugNeutral,
             RenderQualityPreset.Custom
         });
 
