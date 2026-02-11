@@ -95,6 +95,7 @@ namespace Avalonia3D.Model.StandObjects
         }
 
         public Material? Material => _model?.Material;
+        public RenderResources? Resources => _resources;
         public string MaterialKey => _model?.MaterialKey ?? string.Empty;
         public bool SupportsMorphTargets => _model?.HasMorphTargets == true;
         public bool HasAdditiveSceneEmission => _hasAdditiveSceneEmissionOverride;

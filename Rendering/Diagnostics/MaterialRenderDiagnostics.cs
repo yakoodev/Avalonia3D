@@ -4,6 +4,7 @@ using Serilog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 
@@ -29,14 +30,14 @@ public static class MaterialRenderDiagnostics
         }
     }
 
-    public static void DumpIfEnabled(Material? material, Scene3D scene, string materialKey)
+    public static void DumpIfEnabled(Material? material, RenderResources? resources, Scene3D scene, string materialKey)
     {
         if (!Enabled || material == null)
         {
             return;
         }
 
-        var snapshot = Capture(material, scene);
+        var snapshot = Capture(material, resources, scene);
         var serialized = JsonSerializer.Serialize(snapshot, JsonOptions);
 
         if (LastSnapshotByMaterialKey.TryGetValue(materialKey, out var previous) && string.Equals(previous, serialized, StringComparison.Ordinal))
@@ -48,7 +49,7 @@ public static class MaterialRenderDiagnostics
         Log.Information("PBR material diagnostics [{MaterialKey}]: {Snapshot}", materialKey, serialized);
     }
 
-    public static MaterialRenderSnapshot Capture(Material material, Scene3D scene)
+    public static MaterialRenderSnapshot Capture(Material material, RenderResources? resources, Scene3D scene)
     {
         var textureStates = new List<TextureSemanticState>
         {
@@ -75,7 +76,23 @@ public static class MaterialRenderDiagnostics
             material.RoughnessFactor,
             material.OcclusionStrength,
             ShaderSelectionPolicy.BuildPbrFeatures(material, scene),
-            scene.PbrDebugViewMode);
+            scene.PbrDebugViewMode,
+            BuildGpuSnapshot(resources));
+    }
+
+    private static MaterialGpuSnapshot BuildGpuSnapshot(RenderResources? resources)
+    {
+        if (resources == null)
+        {
+            return new MaterialGpuSnapshot(Array.Empty<TextureBindingStateSnapshot>());
+        }
+
+        var bindings = resources.TextureBindings
+            .OrderBy(kvp => kvp.Key)
+            .Select(kvp => TextureBindingStateSnapshot.From(kvp.Value))
+            .ToArray();
+
+        return new MaterialGpuSnapshot(bindings);
     }
 
     private static TextureSemanticState CreateTextureState(Material material, TextureSemantic semantic, TextureData? texture)
@@ -98,7 +115,8 @@ public static class MaterialRenderDiagnostics
         float RoughnessFactor,
         float OcclusionStrength,
         PbrFeatures ComputedPbrFeatures,
-        PbrDebugViewMode ActivePbrDebugViewMode);
+        PbrDebugViewMode ActivePbrDebugViewMode,
+        MaterialGpuSnapshot GpuSnapshot);
 
     public sealed record TextureSemanticState(
         TextureSemantic Semantic,
@@ -107,4 +125,35 @@ public static class MaterialRenderDiagnostics
         Vector2 UvOffset,
         Vector2 UvScale,
         float UvRotation);
+
+    public sealed record MaterialGpuSnapshot(
+        IReadOnlyList<TextureBindingStateSnapshot> Bindings);
+
+    public sealed record TextureBindingStateSnapshot(
+        TextureSemantic Semantic,
+        uint TextureId,
+        bool IsLoaded,
+        TextureColorFlags FormatFlags,
+        string? PreferredInternalFormat,
+        string? UsedInternalFormat,
+        string GlError,
+        int Width,
+        int Height,
+        bool WasBoundToGpu,
+        int? LastBoundTextureUnit)
+    {
+        public static TextureBindingStateSnapshot From(TextureBindingState state)
+            => new(
+                state.Semantic,
+                state.TextureId,
+                state.IsLoaded,
+                state.FormatFlags,
+                state.PreferredInternalFormat?.ToString(),
+                state.UsedInternalFormat?.ToString(),
+                state.GlError.ToString(),
+                state.Width,
+                state.Height,
+                state.WasBoundToGpu,
+                state.LastBoundTextureUnit);
+    }
 }
