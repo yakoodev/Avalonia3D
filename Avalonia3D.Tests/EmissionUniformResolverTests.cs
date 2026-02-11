@@ -1,5 +1,6 @@
 using System.Numerics;
 using Avalonia3D.Interfaces;
+using Avalonia3D.Loaders;
 using Avalonia3D.Model;
 using Avalonia3D.Model.StandObjects;
 using Avalonia3D.Shaders;
@@ -54,6 +55,29 @@ public class EmissionUniformResolverTests
     }
 
 
+
+    [Fact]
+    public void EmissiveStrengthExtension_ProducesComparableEmissiveBrightness_ForPbrAndUnlit()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"emissive-strength-parity-{Guid.NewGuid():N}.gltf");
+        File.WriteAllText(path, GetEmissiveStrengthGltfJson());
+
+        var gltf = SharpGLTF.Schema2.ModelRoot.Load(path);
+        var material = Assert.Single(ModelLoader.LoadModels(gltf)).Material;
+        File.Delete(path);
+
+        Assert.NotNull(material);
+
+        var emissiveFactor = material!.EmissiveFactor;
+        var pbrEmissive = emissiveFactor * MathF.Max(material.EmissiveIntensity, 0f) * MathF.Max(material.EmissiveStrength, 0f);
+        var unlitEmissive = emissiveFactor * MathF.Max(material.EmissiveIntensity, 0f) * MathF.Max(material.EmissiveStrength, 0f);
+
+        Assert.InRange(Vector3.Distance(pbrEmissive, unlitEmissive), 0f, 0.00001f);
+        var (_, pbrFragmentSource) = new PbrShaderSourceBuilder().Build(PbrFeatures.EmissiveStrength, maxLights: 1);
+        Assert.Contains("emissive*=max(uMaterialEmissiveStrength,0.0);", pbrFragmentSource);
+        Assert.Contains("emissive *= max(uMaterialEmissiveStrength, 0.0);", UnlitShader.FragmentShaderSource);
+    }
+
     [Fact]
     public void EmissiveTextureDebugMode_IgnoreTexture_DisablesTextureSampling()
     {
@@ -75,6 +99,58 @@ public class EmissionUniformResolverTests
 
         EmissionUniformResolver.EmissiveTextureMode = EmissiveTextureDebugMode.Normal;
     }
+
+
+    private static string GetEmissiveStrengthGltfJson() =>
+        """
+        {
+          "asset": { "version": "2.0" },
+          "extensionsUsed": ["KHR_materials_emissive_strength"],
+          "scenes": [ { "nodes": [0] } ],
+          "nodes": [ { "mesh": 0, "name": "n" } ],
+          "meshes": [
+            {
+              "primitives": [
+                {
+                  "attributes": { "POSITION": 0 },
+                  "indices": 1,
+                  "material": 0
+                }
+              ]
+            }
+          ],
+          "materials": [
+            {
+              "emissiveFactor": [0.5, 0.25, 0.75],
+              "extensions": {
+                "KHR_materials_emissive_strength": {
+                  "emissiveStrength": 2.5
+                }
+              },
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [1,1,1,1],
+                "metallicFactor": 0,
+                "roughnessFactor": 1
+              }
+            }
+          ],
+          "buffers": [
+            {
+              "uri": "data:application/octet-stream;base64,AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAABAAIA",
+              "byteLength": 42
+            }
+          ],
+          "bufferViews": [
+            { "buffer": 0, "byteOffset": 0, "byteLength": 36, "target": 34962 },
+            { "buffer": 0, "byteOffset": 36, "byteLength": 6, "target": 34963 }
+          ],
+          "accessors": [
+            { "bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3", "min": [0,0,0], "max": [1,1,0] },
+            { "bufferView": 1, "componentType": 5123, "count": 3, "type": "SCALAR" }
+          ]
+        }
+        """;
+
     private sealed class AdditiveEmissionSceneObject : SceneObject, IAdditiveSceneEmissionProvider
     {
         public bool HasAdditiveSceneEmission { get; set; }
