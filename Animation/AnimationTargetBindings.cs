@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using Avalonia3D.Model;
 using Avalonia3D.Model.StandObjects;
+using Avalonia3D.Rendering;
 using Serilog;
 
 namespace Avalonia3D.Animation
@@ -231,24 +232,54 @@ namespace Avalonia3D.Animation
                     continue;
                 }
 
+                var runtimeTransform = target.Material?.TextureRuntime.GetOrCreate(MapTextureSemantic(_slot));
+
                 switch (_property)
                 {
                     case AnimationTargetProperty.TextureTransformOffset when channel.Vector3Keyframes.Count > 0:
                         var offset = channel.SampleVector3(time);
-                        texture.Transform.Offset = new Vector2(offset.X, offset.Y);
+                        var uvOffset = new Vector2(offset.X, offset.Y);
+                        texture.Transform.Offset = uvOffset;
+                        if (runtimeTransform != null)
+                        {
+                            runtimeTransform.UvOffset = uvOffset;
+                        }
                         break;
                     case AnimationTargetProperty.TextureTransformScale when channel.Vector3Keyframes.Count > 0:
                         var scale = channel.SampleVector3(time);
-                        texture.Transform.Scale = new Vector2(scale.X, scale.Y);
+                        var uvScale = new Vector2(scale.X, scale.Y);
+                        texture.Transform.Scale = uvScale;
+                        if (runtimeTransform != null)
+                        {
+                            runtimeTransform.UvScale = uvScale;
+                        }
                         break;
                     case AnimationTargetProperty.TextureTransformRotation when channel.FloatKeyframes.Count > 0:
-                        texture.Transform.Rotation = channel.SampleFloat(time);
+                        var rotation = channel.SampleFloat(time);
+                        texture.Transform.Rotation = rotation;
+                        if (runtimeTransform != null)
+                        {
+                            runtimeTransform.UvRotation = rotation;
+                        }
                         break;
                     case AnimationTargetProperty.TextureTransformTexCoord when channel.FloatKeyframes.Count > 0:
                         texture.Transform.TexCoord = (int)MathF.Round(channel.SampleFloat(time));
                         break;
                 }
             }
+        }
+
+        private static TextureSemantic MapTextureSemantic(TextureSlot slot)
+        {
+            return slot switch
+            {
+                TextureSlot.BaseColor => TextureSemantic.BaseColor,
+                TextureSlot.Emissive => TextureSemantic.Emissive,
+                TextureSlot.Normal => TextureSemantic.Normal,
+                TextureSlot.MetallicRoughness => TextureSemantic.MetallicRoughness,
+                TextureSlot.Occlusion => TextureSemantic.Occlusion,
+                _ => TextureSemantic.Extension
+            };
         }
 
         private TextureData? ResolveTexture(Material? material)

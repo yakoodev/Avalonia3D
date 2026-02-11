@@ -72,6 +72,12 @@ namespace Avalonia3D.Shaders
         private int _roughnessFactorLocation = -1;
         private int _occlusionStrengthLocation = -1;
         private int _emissiveFactorLocation = -1;
+        private int _baseColorUvOffsetLocation = -1;
+        private int _baseColorUvScaleLocation = -1;
+        private int _baseColorUvRotationLocation = -1;
+        private int _emissiveUvOffsetLocation = -1;
+        private int _emissiveUvScaleLocation = -1;
+        private int _emissiveUvRotationLocation = -1;
         private int _environmentMapLocation = -1;
         private int _reflectionIntensityLocation = -1;
         private int _hasEnvironmentMapLocation = -1;
@@ -275,6 +281,12 @@ namespace Avalonia3D.Shaders
             _roughnessFactorLocation = _gl.GetUniformLocation(_shaderProgram, "uRoughnessFactor");
             _occlusionStrengthLocation = _gl.GetUniformLocation(_shaderProgram, "uOcclusionStrength");
             _emissiveFactorLocation = _gl.GetUniformLocation(_shaderProgram, "uEmissiveFactor");
+            _baseColorUvOffsetLocation = _gl.GetUniformLocation(_shaderProgram, "uBaseColorUvOffset");
+            _baseColorUvScaleLocation = _gl.GetUniformLocation(_shaderProgram, "uBaseColorUvScale");
+            _baseColorUvRotationLocation = _gl.GetUniformLocation(_shaderProgram, "uBaseColorUvRotation");
+            _emissiveUvOffsetLocation = _gl.GetUniformLocation(_shaderProgram, "uEmissiveUvOffset");
+            _emissiveUvScaleLocation = _gl.GetUniformLocation(_shaderProgram, "uEmissiveUvScale");
+            _emissiveUvRotationLocation = _gl.GetUniformLocation(_shaderProgram, "uEmissiveUvRotation");
             _ambientLocation = _gl.GetUniformLocation(_shaderProgram, "uAmbientStrength");
             _specularLocation = _gl.GetUniformLocation(_shaderProgram, "uSpecularStrength");
             _intensityLocation = _gl.GetUniformLocation(_shaderProgram, "uIntensity[0]");
@@ -404,6 +416,27 @@ namespace Avalonia3D.Shaders
 
             if (_emissiveFactorLocation != -1)
                 _gl.Uniform3(_emissiveFactorLocation, emissiveFactor.X, emissiveFactor.Y, emissiveFactor.Z);
+
+            var baseColorUv = material?.TextureRuntime.BaseColor ?? new MaterialTextureTransformRuntime();
+            var emissiveUv = material?.TextureRuntime.Emissive ?? new MaterialTextureTransformRuntime();
+
+            if (_baseColorUvOffsetLocation != -1)
+                _gl.Uniform2(_baseColorUvOffsetLocation, baseColorUv.UvOffset.X, baseColorUv.UvOffset.Y);
+
+            if (_baseColorUvScaleLocation != -1)
+                _gl.Uniform2(_baseColorUvScaleLocation, baseColorUv.UvScale.X, baseColorUv.UvScale.Y);
+
+            if (_baseColorUvRotationLocation != -1)
+                _gl.Uniform1(_baseColorUvRotationLocation, baseColorUv.UvRotation);
+
+            if (_emissiveUvOffsetLocation != -1)
+                _gl.Uniform2(_emissiveUvOffsetLocation, emissiveUv.UvOffset.X, emissiveUv.UvOffset.Y);
+
+            if (_emissiveUvScaleLocation != -1)
+                _gl.Uniform2(_emissiveUvScaleLocation, emissiveUv.UvScale.X, emissiveUv.UvScale.Y);
+
+            if (_emissiveUvRotationLocation != -1)
+                _gl.Uniform1(_emissiveUvRotationLocation, emissiveUv.UvRotation);
 
             if (_metallicFactorLocation != -1)
                 _gl.Uniform1(_metallicFactorLocation, metallicFactor);

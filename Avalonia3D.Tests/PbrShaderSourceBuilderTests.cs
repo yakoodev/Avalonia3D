@@ -15,6 +15,7 @@ public class PbrShaderSourceBuilderTests
 
         Assert.Contains("precision highp float;", fragmentSource);
     }
+
     [Fact]
     public void Build_IncludesHdrSanitizationForOutputSafety()
     {
@@ -25,7 +26,6 @@ public class PbrShaderSourceBuilderTests
         Assert.Contains("CompressHighlights", fragmentSource);
         Assert.Contains("SanitizeHdrColor", fragmentSource);
     }
-
 
     [Fact]
     public void Build_WithEmissiveMap_IncludesForceWhiteDebugSwitch()
@@ -38,4 +38,20 @@ public class PbrShaderSourceBuilderTests
         Assert.Contains("uForceWhiteEmissiveMap==1?vec3(1.0)", fragmentSource);
     }
 
+    [Fact]
+    public void Build_WithBaseColorAndEmissiveMaps_AppliesPerSemanticUvTransforms()
+    {
+        var builder = new PbrShaderSourceBuilder();
+
+        var (_, fragmentSource) = builder.Build(PbrFeatures.BaseColorMap | PbrFeatures.EmissiveMap, maxLights: 4);
+
+        Assert.Contains("uBaseColorUvOffset", fragmentSource);
+        Assert.Contains("uBaseColorUvScale", fragmentSource);
+        Assert.Contains("uBaseColorUvRotation", fragmentSource);
+        Assert.Contains("uEmissiveUvOffset", fragmentSource);
+        Assert.Contains("uEmissiveUvScale", fragmentSource);
+        Assert.Contains("uEmissiveUvRotation", fragmentSource);
+        Assert.Contains("texture(uBaseColorMap, baseColorUv)", fragmentSource);
+        Assert.Contains("texture(uEmissiveMap, emissiveUv)", fragmentSource);
+    }
 }

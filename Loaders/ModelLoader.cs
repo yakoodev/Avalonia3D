@@ -1,5 +1,6 @@
 ﻿// File: ModelLoader.cs - Optimized Version
 using Avalonia3D.Model;
+using Avalonia3D.Rendering;
 using Serilog;
 using SharpGLTF.Schema2;
 using SixLabors.ImageSharp;
@@ -296,6 +297,7 @@ namespace Avalonia3D.Loaders
 
             var baseColorChannel = material.FindChannel("BaseColor");
             result.BaseColorTexture = LoadTextureFromChannel(baseColorChannel);
+            SyncTextureRuntimeTransform(result, TextureSemantic.BaseColor, result.BaseColorTexture);
             if (baseColorChannel != null)
             {
                 var baseColor = GetChannelColor(baseColorChannel, result.BaseColorFactor);
@@ -305,12 +307,15 @@ namespace Avalonia3D.Loaders
 
             var normalChannel = material.FindChannel("Normal");
             result.NormalTexture = LoadTextureFromChannel(normalChannel);
+            SyncTextureRuntimeTransform(result, TextureSemantic.Normal, result.NormalTexture);
 
             var metallicRoughnessChannel = material.FindChannel("MetallicRoughness");
             result.MetallicRoughnessTexture = LoadTextureFromChannel(metallicRoughnessChannel);
+            SyncTextureRuntimeTransform(result, TextureSemantic.MetallicRoughness, result.MetallicRoughnessTexture);
 
             var occlusionChannel = material.FindChannel("Occlusion");
             result.OcclusionTexture = LoadTextureFromChannel(occlusionChannel);
+            SyncTextureRuntimeTransform(result, TextureSemantic.Occlusion, result.OcclusionTexture);
             if (occlusionChannel != null)
             {
                 result.OcclusionStrength = GetChannelStrength(occlusionChannel, result.OcclusionStrength);
@@ -320,6 +325,7 @@ namespace Avalonia3D.Loaders
 
             var emissiveChannel = material.FindChannel("Emissive");
             result.EmissiveTexture = LoadTextureFromChannel(emissiveChannel);
+            SyncTextureRuntimeTransform(result, TextureSemantic.Emissive, result.EmissiveTexture);
             if (emissiveChannel != null)
             {
                 var emissiveColor = GetChannelColor(emissiveChannel, new Vector4(result.EmissiveFactor, 1f));
@@ -484,6 +490,27 @@ namespace Avalonia3D.Loaders
 
             var softTransparentRatio = softTransparent / (float)sampled;
             return softTransparentRatio >= TextureAlphaHeuristics.MinSoftTransparentRatio;
+        }
+
+        private static void SyncTextureRuntimeTransform(Avalonia3D.Model.Material material, TextureSemantic semantic, TextureData? texture)
+        {
+            if (material == null)
+            {
+                return;
+            }
+
+            var runtime = material.TextureRuntime.GetOrCreate(semantic);
+            if (texture == null)
+            {
+                runtime.UvOffset = Vector2.Zero;
+                runtime.UvScale = Vector2.One;
+                runtime.UvRotation = 0f;
+                return;
+            }
+
+            runtime.UvOffset = texture.Transform.Offset;
+            runtime.UvScale = texture.Transform.Scale;
+            runtime.UvRotation = texture.Transform.Rotation;
         }
 
         private static TextureData? LoadTextureFromChannel(MaterialChannel? channel)

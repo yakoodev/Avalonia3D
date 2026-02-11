@@ -397,6 +397,81 @@ public class AnimationTests
         Assert.True(mesh.EmissionColor.X > 0.2f);
     }
 
+
+    [Fact]
+    public void AnimationClipPlayer_TextureUvOffset_ChangesSampledEmissiveChannel()
+    {
+        var graph = new SceneGraph();
+        var group = new MeshGroup { Name = "Arm" };
+        group.Node.StableId = "node:arm";
+        graph.AddRoot(group);
+
+        var material = new Material
+        {
+            EmissiveFactor = Vector3.One,
+            EmissiveTexture = new TextureData
+            {
+                Width = 2,
+                Height = 1,
+                Data =
+                [
+                    255, 0, 0, 255,
+                    0, 255, 0, 255
+                ]
+            }
+        };
+
+        var model = new Avalonia3D.Model.Model
+        {
+            Name = "mesh",
+            MaterialKey = "material:uv",
+            Vertices =
+            [
+                new Vertex { Position = Vector3.Zero, TexCoord = new Vector2(0.25f, 0.5f) }
+            ],
+            Material = material
+        };
+
+        var mesh = new MeshObject { Name = "ArmMesh" };
+        mesh.AssignModel(model);
+        group.Add(mesh);
+
+        var before = SampleNearestRgb(material.EmissiveTexture!, material.TextureRuntime.Emissive.Apply(model.Vertices[0].TexCoord));
+
+        var clip = new AnimationClip("EmissiveUvOffset");
+        var channel = new AnimationChannel("node:arm", AnimationTargetProperty.TextureTransformOffset)
+        {
+            Binding = new TexturePropertyBinding("material:uv", TextureSlot.Emissive, AnimationTargetProperty.TextureTransformOffset)
+        };
+        channel.AddKeyframe(0f, Vector3.Zero);
+        channel.AddKeyframe(1f, new Vector3(0.5f, 0f, 0f));
+        clip.Channels.Add(channel);
+
+        var player = new AnimationClipPlayer(clip, graph);
+        player.Play(loop: false, speed: 1f);
+        Assert.True(player.Update(0.5f));
+
+        var after = SampleNearestRgb(material.EmissiveTexture!, material.TextureRuntime.Emissive.Apply(model.Vertices[0].TexCoord));
+
+        Assert.True(before.X > 0.99f && before.Y < 0.01f);
+        Assert.True(after.X < 0.01f && after.Y > 0.99f);
+    }
+
+
+    private static Vector3 SampleNearestRgb(TextureData texture, Vector2 uv)
+    {
+        var wrappedU = uv.X - MathF.Floor(uv.X);
+        var wrappedV = uv.Y - MathF.Floor(uv.Y);
+        var x = Math.Clamp((int)MathF.Floor(wrappedU * texture.Width), 0, texture.Width - 1);
+        var y = Math.Clamp((int)MathF.Floor(wrappedV * texture.Height), 0, texture.Height - 1);
+        var index = (y * texture.Width + x) * 4;
+
+        return new Vector3(
+            texture.Data[index] / 255f,
+            texture.Data[index + 1] / 255f,
+            texture.Data[index + 2] / 255f);
+    }
+
     private static void AssertVectorEqual(Vector3 expected, Vector3 actual, float epsilon = 0.0001f)
     {
         Assert.True(Vector3.Distance(expected, actual) <= epsilon,

@@ -596,6 +596,23 @@ namespace Avalonia3D.Loaders
             };
         }
 
+        private static readonly (string PathToken, TextureSlot Slot)[] TextureSlotPathRegistry =
+        [
+            ("/pbrMetallicRoughness/baseColorTexture", TextureSlot.BaseColor),
+            ("/emissiveTexture", TextureSlot.Emissive),
+            ("/normalTexture", TextureSlot.Normal),
+            ("/occlusionTexture", TextureSlot.Occlusion),
+            ("/pbrMetallicRoughness/metallicRoughnessTexture", TextureSlot.MetallicRoughness)
+        ];
+
+        private static readonly (string Suffix, AnimationTargetProperty Property)[] TextureTransformPropertyRegistry =
+        [
+            ("/offset", AnimationTargetProperty.TextureTransformOffset),
+            ("/scale", AnimationTargetProperty.TextureTransformScale),
+            ("/rotation", AnimationTargetProperty.TextureTransformRotation),
+            ("/texCoord", AnimationTargetProperty.TextureTransformTexCoord)
+        ];
+
         private static ChannelTargetDescriptor? MapPointerTargetProperty(string? pointerPath)
         {
             if (string.IsNullOrWhiteSpace(pointerPath) || !pointerPath.Contains("/materials/", StringComparison.OrdinalIgnoreCase))
@@ -639,52 +656,32 @@ namespace Avalonia3D.Loaders
                 return false;
             }
 
-            if (pointerPath.Contains("/pbrMetallicRoughness/baseColorTexture", StringComparison.OrdinalIgnoreCase))
+            var slotResolved = false;
+            foreach (var entry in TextureSlotPathRegistry)
             {
-                textureSlot = TextureSlot.BaseColor;
+                if (!pointerPath.Contains(entry.PathToken, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                textureSlot = entry.Slot;
+                slotResolved = true;
+                break;
             }
-            else if (pointerPath.Contains("/emissiveTexture", StringComparison.OrdinalIgnoreCase))
-            {
-                textureSlot = TextureSlot.Emissive;
-            }
-            else if (pointerPath.Contains("/normalTexture", StringComparison.OrdinalIgnoreCase))
-            {
-                textureSlot = TextureSlot.Normal;
-            }
-            else if (pointerPath.Contains("/occlusionTexture", StringComparison.OrdinalIgnoreCase))
-            {
-                textureSlot = TextureSlot.Occlusion;
-            }
-            else if (pointerPath.Contains("/pbrMetallicRoughness/metallicRoughnessTexture", StringComparison.OrdinalIgnoreCase))
-            {
-                textureSlot = TextureSlot.MetallicRoughness;
-            }
-            else
+
+            if (!slotResolved)
             {
                 return false;
             }
 
-            if (pointerPath.EndsWith("/offset", StringComparison.OrdinalIgnoreCase))
+            foreach (var entry in TextureTransformPropertyRegistry)
             {
-                textureProperty = AnimationTargetProperty.TextureTransformOffset;
-                return true;
-            }
+                if (!pointerPath.EndsWith(entry.Suffix, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
 
-            if (pointerPath.EndsWith("/scale", StringComparison.OrdinalIgnoreCase))
-            {
-                textureProperty = AnimationTargetProperty.TextureTransformScale;
-                return true;
-            }
-
-            if (pointerPath.EndsWith("/rotation", StringComparison.OrdinalIgnoreCase))
-            {
-                textureProperty = AnimationTargetProperty.TextureTransformRotation;
-                return true;
-            }
-
-            if (pointerPath.EndsWith("/texCoord", StringComparison.OrdinalIgnoreCase))
-            {
-                textureProperty = AnimationTargetProperty.TextureTransformTexCoord;
+                textureProperty = entry.Property;
                 return true;
             }
 
