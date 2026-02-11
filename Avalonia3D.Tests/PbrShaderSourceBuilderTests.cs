@@ -63,6 +63,9 @@ public class PbrShaderSourceBuilderTests
 
         Assert.Contains("uManualBaseColorSrgbDecode", fragmentSource);
         Assert.Contains("uManualEmissiveSrgbDecode", fragmentSource);
+        Assert.Contains("uManualSheenColorSrgbDecode", fragmentSource);
+        Assert.Contains("uManualSpecularColorSrgbDecode", fragmentSource);
+        Assert.Contains("ApplyManualSrgbDecode", fragmentSource);
         Assert.Contains("ApplyManualBaseColorDecode", fragmentSource);
         Assert.Contains("ApplyManualEmissiveDecode", fragmentSource);
     }
@@ -133,4 +136,15 @@ public class PbrShaderSourceBuilderTests
         Assert.Contains("norm*0.5+0.5", fragmentSource);
     }
 
+
+    [Fact]
+    public void Build_WithSheenAndSpecularColorMaps_UsesCentralizedDecodeFunctions()
+    {
+        var builder = new PbrShaderSourceBuilder();
+
+        var (_, fragmentSource) = builder.Build(PbrFeatures.SheenColorMap | PbrFeatures.SpecularColorMap, maxLights: 4);
+
+        Assert.Contains("ApplyManualSheenColorDecode(texture(uSheenColorMap, baseTexCoord).rgb)", fragmentSource);
+        Assert.Contains("ApplyManualSpecularColorDecode(texture(uSpecularColorMap, baseTexCoord).rgb)", fragmentSource);
+    }
 }
