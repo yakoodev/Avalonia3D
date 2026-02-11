@@ -1,5 +1,6 @@
 using Avalonia3D.Model;
 using Avalonia3D.Rendering;
+using Serilog;
 using System;
 
 namespace Avalonia3D.Loaders.Policies;
@@ -17,15 +18,25 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
             return MaterialAlphaMode.Opaque;
         }
 
+        var sourceAlphaMode = context.SourceAlphaMode;
         var sceneOverride = context.SceneOverride;
+        MaterialAlphaMode resolved;
+        var reasonCode = "default";
+
         if (sceneOverride?.ForceAlphaMode.HasValue == true)
         {
-            return sceneOverride.ForceAlphaMode.Value;
+            resolved = sceneOverride.ForceAlphaMode.Value;
+            reasonCode = "scene_force_alpha_mode";
+            LogAlphaDecision(material, context, sourceAlphaMode, resolved, reasonCode);
+            return resolved;
         }
 
         if (material.AlphaMode != MaterialAlphaMode.Blend)
         {
-            return material.AlphaMode;
+            resolved = material.AlphaMode;
+            reasonCode = "source_non_blend";
+            LogAlphaDecision(material, context, sourceAlphaMode, resolved, reasonCode);
+            return resolved;
         }
 
         var textureTransparencySignal = sceneOverride?.ForceTextureTransparencySignal ?? HasMeaningfulTextureTransparency(material.BaseColorTexture);
@@ -34,21 +45,36 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
 
         if (hasAlphaSignal)
         {
-            return MaterialAlphaMode.Blend;
+            resolved = MaterialAlphaMode.Blend;
+            reasonCode = material.BaseColorFactor.W < AlphaSignalThreshold
+                ? "base_color_alpha_signal"
+                : "texture_alpha_signal";
+            LogAlphaDecision(material, context, sourceAlphaMode, resolved, reasonCode);
+            return resolved;
         }
 
         var alphaProfile = sceneOverride?.AlphaProfile ?? context.AlphaProfile;
         if (alphaProfile == MaterialAlphaImportProfile.Strict)
         {
-            return MaterialAlphaMode.Blend;
+            resolved = MaterialAlphaMode.Blend;
+            reasonCode = "profile_strict_preserve_blend";
+            LogAlphaDecision(material, context, sourceAlphaMode, resolved, reasonCode);
+            return resolved;
         }
 
-        if (alphaProfile == MaterialAlphaImportProfile.Balanced && ResolveEmissiveBehavior(material, context) == MaterialEmissiveBehavior.TreatAsTransparencySignal)
+        var emissiveBehavior = ResolveEmissiveBehavior(material, context);
+        if (alphaProfile == MaterialAlphaImportProfile.Balanced && emissiveBehavior == MaterialEmissiveBehavior.TreatAsTransparencySignal)
         {
-            return MaterialAlphaMode.Blend;
+            resolved = MaterialAlphaMode.Blend;
+            reasonCode = "profile_balanced_emissive_signal";
+            LogAlphaDecision(material, context, sourceAlphaMode, resolved, reasonCode);
+            return resolved;
         }
 
-        return MaterialAlphaMode.Opaque;
+        resolved = MaterialAlphaMode.Opaque;
+        reasonCode = "fallback_opaque";
+        LogAlphaDecision(material, context, sourceAlphaMode, resolved, reasonCode);
+        return resolved;
     }
 
     public MaterialColorSpaceHandling ResolveColorSpaceHandling(Material material, TextureSemantic semantic, MaterialImportPolicyContext context)
@@ -82,6 +108,56 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
         return material.EmissiveStrength > EmissiveStrengthThreshold
             ? MaterialEmissiveBehavior.TreatAsTransparencySignal
             : MaterialEmissiveBehavior.IgnoreForTransparencyFallback;
+    }
+
+    private static void LogAlphaDecision(
+        Material material,
+        MaterialImportPolicyContext context,
+        MaterialAlphaMode sourceAlphaMode,
+        MaterialAlphaMode resolvedAlphaMode,
+        string reasonCode)
+    {
+        var hasEmissiveTexture = material.EmissiveTexture != null;
+        var hasElevatedEmissiveStrength = material.EmissiveStrength > EmissiveStrengthThreshold;
+        var debugLabel = BuildDebugLabel(context);
+
+        Log.Debug(
+            "Material import alpha policy: {DebugLabel}. sourceAlphaMode={SourceAlphaMode}, resolvedAlphaMode={ResolvedAlphaMode}, hasTextureTransparency={HasTextureTransparency}, hasEmissiveTexture={HasEmissiveTexture}, hasElevatedEmissiveStrength={HasElevatedEmissiveStrength}, reasonCode={ReasonCode}",
+            debugLabel,
+            sourceAlphaMode,
+            resolvedAlphaMode,
+            material.HasTextureTransparency,
+            hasEmissiveTexture,
+            hasElevatedEmissiveStrength,
+            reasonCode);
+    }
+
+    private static string BuildDebugLabel(MaterialImportPolicyContext context)
+    {
+        if (!context.IsAnimatedMaterial &&
+            !ContainsDroid(context.AssetPath) &&
+            !ContainsDroid(context.MaterialName) &&
+            !ContainsDroid(context.MeshName) &&
+            !ContainsDroid(context.NodeName))
+        {
+            return string.Empty;
+        }
+
+        var material = string.IsNullOrWhiteSpace(context.MaterialName) ? "material:?" : $"material:{context.MaterialName}";
+        var mesh = string.IsNullOrWhiteSpace(context.MeshName) ? "mesh:?" : $"mesh:{context.MeshName}";
+        var node = string.IsNullOrWhiteSpace(context.NodeStableId)
+            ? (string.IsNullOrWhiteSpace(context.NodeName) ? "node:?" : $"node:{context.NodeName}")
+            : context.NodeStableId.StartsWith("node:", StringComparison.OrdinalIgnoreCase)
+                ? context.NodeStableId
+                : $"node:{context.NodeStableId}";
+        var type = context.IsAnimatedMaterial ? "animated" : "droid";
+
+        return $"[{type}] {material}, {mesh}, {node}";
+    }
+
+    private static bool ContainsDroid(string? value)
+    {
+        return !string.IsNullOrWhiteSpace(value) && value.Contains("droid", StringComparison.OrdinalIgnoreCase);
     }
 
     private enum TextureAlphaHeuristicProfile

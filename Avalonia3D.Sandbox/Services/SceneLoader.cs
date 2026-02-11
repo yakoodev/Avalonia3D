@@ -119,6 +119,7 @@ public sealed class SceneLoader
         var roots = _scene.SceneGraph.RootObjects;
         var meshes = CollectMeshes(roots);
         var transparent = meshes.Count(m => m.Material?.IsTransparent == true || m.Opacity < 1f);
+        var sourceBlendMaterials = meshes.Count(m => m.Material?.SourceAlphaMode == MaterialAlphaMode.Blend);
         var opaque = meshes.Count - transparent;
 
         var hasBounds = SceneCameraFramer.TryComputeWorldBounds(_scene.SceneGraph, out var min, out var max);
@@ -127,12 +128,13 @@ public sealed class SceneLoader
             : "no-geometry-bounds";
 
         Log.Information(
-            "Scene diagnostics: {SceneId}. Roots={Roots}, Meshes={Meshes} (opaque={Opaque}, transparent={Transparent}), Lights={Lights}, CameraPos={CameraPos}, CameraTarget={CameraTarget}, Bounds={Bounds}",
+            "Scene diagnostics: {SceneId}. Roots={Roots}, Meshes={Meshes} (opaque={Opaque}, transparent={Transparent}, sourceAlphaBlend={SourceAlphaBlend}), Lights={Lights}, CameraPos={CameraPos}, CameraTarget={CameraTarget}, Bounds={Bounds}",
             scene.Id,
             roots.Count,
             meshes.Count,
             opaque,
             transparent,
+            sourceBlendMaterials,
             _scene.Lights.Count,
             _scene.Camera.Position,
             _scene.Camera.Target,

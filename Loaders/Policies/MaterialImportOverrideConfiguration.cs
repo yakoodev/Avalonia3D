@@ -13,6 +13,12 @@ public sealed class MaterialImportPolicyContext
     public string? AssetPath { get; init; }
     public MaterialAlphaImportProfile AlphaProfile { get; init; } = MaterialAlphaImportProfile.Balanced;
     public MaterialSceneImportOverride? SceneOverride { get; init; }
+    public MaterialAlphaMode SourceAlphaMode { get; init; } = MaterialAlphaMode.Opaque;
+    public string? MaterialName { get; init; }
+    public string? MeshName { get; init; }
+    public string? NodeName { get; init; }
+    public string? NodeStableId { get; init; }
+    public bool IsAnimatedMaterial { get; init; }
 }
 
 public sealed class MaterialSceneImportOverride
