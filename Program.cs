@@ -16,6 +16,7 @@ namespace Avalonia3D
         public static int Main(string[] args)
         {
             ImportValidationConfiguration.Configure(ImportValidationConfiguration.ResolveFrom(args));
+            MaterialAlphaImportConfiguration.Configure(MaterialAlphaImportConfiguration.ResolveFrom(args));
 
             if (OperatingSystem.IsLinux())
                 return StartDRM(args);
