@@ -200,7 +200,7 @@ namespace Avalonia3D.Loaders
             }
 
             // Загрузка материала и текстур с кешированием
-            LoadMaterialForModel(model, prim, policyContext);
+            LoadMaterialForModel(model, prim, node, policyContext);
 
             return model;
         }
@@ -250,7 +250,7 @@ namespace Avalonia3D.Loaders
             return targets;
         }
 
-        private static void LoadMaterialForModel(Model.Model model, MeshPrimitive prim, MaterialImportPolicyContext? policyContext)
+        private static void LoadMaterialForModel(Model.Model model, MeshPrimitive prim, Node node, MaterialImportPolicyContext? policyContext)
         {
             if (model == null)
             {
@@ -323,9 +323,25 @@ namespace Avalonia3D.Loaders
             result.ExtensionTextures.TransmissionTexture = LoadTextureFromChannel(extensionChannels.Transmission);
             result.ExtensionTextures.VolumeThicknessTexture = LoadTextureFromChannel(extensionChannels.VolumeThickness);
 
-            _ = _materialImportPolicy.ResolveColorSpaceHandling(result, TextureSemantic.BaseColor, policyContext);
-            _ = _materialImportPolicy.ResolveColorSpaceHandling(result, TextureSemantic.Emissive, policyContext);
-            result.AlphaMode = _materialImportPolicy.ResolveAlphaMode(result, policyContext);
+            var sourceAlphaMode = result.SourceAlphaMode;
+            var effectivePolicyContext = new MaterialImportPolicyContext
+            {
+                AssetPath = policyContext.AssetPath,
+                AlphaProfile = policyContext.AlphaProfile,
+                SceneOverride = policyContext.SceneOverride,
+                SourceAlphaMode = sourceAlphaMode,
+                MaterialName = material.Name,
+                MeshName = prim.LogicalParent?.Name,
+                NodeName = node?.Name,
+                NodeStableId = node != null ? $"node:{node.LogicalIndex}" : null,
+                IsAnimatedMaterial = model.HasMorphTargets ||
+                    (node?.MorphWeights?.Count ?? 0) > 0 ||
+                    (!string.IsNullOrWhiteSpace(policyContext.AssetPath) && policyContext.AssetPath.Contains("anim", StringComparison.OrdinalIgnoreCase))
+            };
+
+            _ = _materialImportPolicy.ResolveColorSpaceHandling(result, TextureSemantic.BaseColor, effectivePolicyContext);
+            _ = _materialImportPolicy.ResolveColorSpaceHandling(result, TextureSemantic.Emissive, effectivePolicyContext);
+            result.AlphaMode = _materialImportPolicy.ResolveAlphaMode(result, effectivePolicyContext);
 
             result.IsTransparent = result.AlphaMode == MaterialAlphaMode.Blend;
 
@@ -342,6 +358,7 @@ namespace Avalonia3D.Loaders
             }
 
             target.AlphaMode = ParseAlphaMode(material.Alpha);
+            target.SourceAlphaMode = target.AlphaMode;
             target.AlphaCutoff = material.AlphaCutoff;
             target.DoubleSided = material.DoubleSided;
             target.EmissiveStrength = extensionPayload.EmissiveStrength.Value;

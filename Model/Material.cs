@@ -22,6 +22,7 @@ namespace Avalonia3D.Model
         public float EmissiveIntensity { get; set; } = 1f;
         public float EmissiveStrength { get; set; } = 1f;
         public bool HasTextureTransparency { get; set; }
+        public MaterialAlphaMode SourceAlphaMode { get; set; } = MaterialAlphaMode.Opaque;
     }
 
     public sealed class MaterialSurfaceAdvancedSettings
@@ -182,6 +183,12 @@ namespace Avalonia3D.Model
         {
             get => Surface.HasTextureTransparency;
             set => Surface.HasTextureTransparency = value;
+        }
+
+        public MaterialAlphaMode SourceAlphaMode
+        {
+            get => Surface.SourceAlphaMode;
+            set => Surface.SourceAlphaMode = value;
         }
 
         public bool HasTransmission
