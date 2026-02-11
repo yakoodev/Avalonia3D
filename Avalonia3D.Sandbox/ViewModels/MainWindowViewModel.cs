@@ -9,6 +9,7 @@ using Avalonia3D.Sandbox.Scenes;
 using Avalonia3D.Sandbox.Services;
 using Avalonia3D.Sandbox.Utilities;
 using Avalonia3D.Shaders;
+using Serilog;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -40,6 +41,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private string _importStatusText = "Import: OK";
     private bool _isImportDegraded;
     private string _behaviorTargetSemanticId = "door.main";
+    private EmissiveTextureDebugMode _selectedEmissiveTextureDebugMode = EmissiveTextureDebugMode.Normal;
 
     public MainWindowViewModel(Scene3D scene, CameraController cameraController, string assetsRoot, IRenderThreadScheduler renderThreadScheduler, Action<GraphicsProfile> applyGraphicsProfile)
     {
@@ -55,6 +57,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 CurrentSceneTitle = sceneInfo.Title;
                 UpdateImportStatus();
                 RefreshClips();
+                AutoPlayFirstClipIfAvailable();
                 ExecuteOnRenderThread(() => _cameraController.CaptureHomeView());
             });
         };
@@ -85,6 +88,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             RenderQualityPreset.High,
             RenderQualityPreset.Ultra,
             RenderQualityPreset.Custom
+        });
+
+        EmissiveTextureDebugModes = new ObservableCollection<EmissiveTextureDebugMode>(new[]
+        {
+            EmissiveTextureDebugMode.Normal,
+            EmissiveTextureDebugMode.IgnoreTexture,
+            EmissiveTextureDebugMode.ForceWhite
         });
 
         SwitchShaderModeCommand = new RelayCommand(mode =>
@@ -121,6 +131,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _scene.BindRenderMode(ShaderRenderMode.Unlit, ShaderIds.Unlit);
         _scene.BindRenderMode(ShaderRenderMode.NormalsDebug, ShaderIds.NormalsDebug);
         ApplyShaderMode(ShaderRenderMode.Pbr);
+        EmissionUniformResolver.EmissiveTextureMode = _selectedEmissiveTextureDebugMode;
 
         if (scenes.Count > 0)
         {
@@ -132,6 +143,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public ObservableCollection<ShaderRenderMode> ShaderModes { get; }
     public ObservableCollection<string> AvailableClips { get; }
     public ObservableCollection<RenderQualityPreset> QualityPresets { get; }
+    public ObservableCollection<EmissiveTextureDebugMode> EmissiveTextureDebugModes { get; }
     public RelayCommand SwitchShaderModeCommand { get; }
     public RelayCommand PlayClipCommand { get; }
     public RelayCommand PauseClipCommand { get; }
@@ -298,6 +310,23 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
+
+    public EmissiveTextureDebugMode SelectedEmissiveTextureDebugMode
+    {
+        get => _selectedEmissiveTextureDebugMode;
+        set
+        {
+            if (_selectedEmissiveTextureDebugMode == value)
+            {
+                return;
+            }
+
+            _selectedEmissiveTextureDebugMode = value;
+            EmissionUniformResolver.EmissiveTextureMode = value;
+            Log.Information("Emissive texture debug mode changed: {Mode}", value);
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedEmissiveTextureDebugMode)));
+        }
+    }
     public ShaderRenderMode SelectedRenderMode
     {
         get => _selectedRenderMode;
@@ -544,7 +573,46 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             AvailableClips.Add(clip);
         }
 
-        SelectedClipName = AvailableClips.FirstOrDefault();
+        SelectedClipName = AvailableClips.FirstOrDefault(c => string.Equals(c, "Start_Liftoff", StringComparison.Ordinal))
+            ?? AvailableClips.FirstOrDefault();
+    }
+
+
+    private void AutoPlayFirstClipIfAvailable()
+    {
+        if (string.IsNullOrWhiteSpace(SelectedClipName))
+        {
+            return;
+        }
+
+        ExecuteOnRenderThread(() =>
+        {
+            var started = _scene.AnimatorComponent.PlayClip(SelectedClipName, loop: true, speed: (float)PlaybackSpeed);
+            Log.Information("AutoPlay clip attempt. Clip={Clip}, Started={Started}", SelectedClipName, started);
+
+            if (!started)
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    Dispatcher.UIThread.Post(() => ExecuteOnRenderThread(() =>
+                    {
+                        var retryStarted = _scene.AnimatorComponent.PlayClip(SelectedClipName, loop: true, speed: (float)PlaybackSpeed);
+                        Log.Information("AutoPlay clip retry. Clip={Clip}, Started={Started}", SelectedClipName, retryStarted);
+                        if (!retryStarted)
+                        {
+                            return;
+                        }
+
+                        var retryState = _scene.AnimatorComponent.GetClipState(SelectedClipName);
+                        Dispatcher.UIThread.Post(() => SelectedClipState = retryState);
+                    }), DispatcherPriority.Background);
+                });
+                return;
+            }
+
+            var state = _scene.AnimatorComponent.GetClipState(SelectedClipName);
+            Dispatcher.UIThread.Post(() => SelectedClipState = state);
+        });
     }
 
     private void UpdateSelectedClipState()

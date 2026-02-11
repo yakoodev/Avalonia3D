@@ -220,7 +220,8 @@ namespace Avalonia3D.Loaders
                 }
             }
 
-            var clips = ExtractAnimationClips(gltf, nodeKeys);
+            var materialTargetMap = BuildMaterialTargetMap(gltf, nodeKeys);
+            var clips = ExtractAnimationClips(gltf, nodeKeys, materialTargetMap);
 
             ModelLoader.ClearAllCaches();
             MemoryManager.PerformAggressiveCleanup();
@@ -337,7 +338,50 @@ namespace Avalonia3D.Loaders
             return null;
         }
 
-        private static List<AnimationClip> ExtractAnimationClips(ModelRoot gltf, IReadOnlyDictionary<Node, string> nodeKeys)
+        private static IReadOnlyDictionary<int, IReadOnlyList<string>> BuildMaterialTargetMap(ModelRoot gltf, IReadOnlyDictionary<Node, string> nodeKeys)
+        {
+            var map = new Dictionary<int, HashSet<string>>();
+
+            foreach (var node in gltf.LogicalNodes)
+            {
+                if (node.Mesh == null)
+                {
+                    continue;
+                }
+
+                if (!nodeKeys.TryGetValue(node, out var nodeKey))
+                {
+                    continue;
+                }
+
+                foreach (var primitive in node.Mesh.Primitives)
+                {
+                    var materialIndex = primitive.Material?.LogicalIndex;
+                    if (materialIndex == null)
+                    {
+                        continue;
+                    }
+
+                    if (!map.TryGetValue(materialIndex.Value, out var targets))
+                    {
+                        targets = new HashSet<string>(StringComparer.Ordinal);
+                        map[materialIndex.Value] = targets;
+                    }
+
+                    targets.Add(nodeKey);
+                }
+            }
+
+            var readonlyMap = new Dictionary<int, IReadOnlyList<string>>();
+            foreach (var (materialIndex, targets) in map)
+            {
+                readonlyMap[materialIndex] = [.. targets];
+            }
+
+            return readonlyMap;
+        }
+
+        private static List<AnimationClip> ExtractAnimationClips(ModelRoot gltf, IReadOnlyDictionary<Node, string> nodeKeys, IReadOnlyDictionary<int, IReadOnlyList<string>> materialTargetMap)
         {
             var clips = new List<AnimationClip>();
             foreach (var animation in gltf.LogicalAnimations)
@@ -350,49 +394,71 @@ namespace Avalonia3D.Loaders
 
                 foreach (var channel in animation.Channels)
                 {
-                    if (channel.TargetNode == null)
+                    var extraction = ResolveExtractionTarget(channel);
+                    if (extraction == null)
                     {
+                        Log.Debug("Skipping unsupported GLTF animation channel '{PointerPath}' in clip '{Clip}'. NodePath='{NodePath}' PointerPath='{TargetPointerPath}'",
+                            channel.TargetPointerPath,
+                            clipName,
+                            channel.TargetNodePath,
+                            channel.TargetPointerPath);
                         continue;
                     }
 
-                    if (!nodeKeys.TryGetValue(channel.TargetNode, out var targetNodeKey))
+                    var resolvedExtraction = extraction.Value;
+                    var targetNodeKeys = ResolveChannelTargetNodeKeys(channel, resolvedExtraction, nodeKeys, materialTargetMap);
+                    if (targetNodeKeys.Count == 0)
                     {
+                        if (resolvedExtraction.IsMaterialTarget)
+                        {
+                            Log.Warning("GLTF animation channel '{PointerPath}' in clip '{Clip}' targets material property '{Property}' but cannot be bound to scene nodes. Use AnimatorComponent.SetNodeMaterialEmissiveIntensity/SetNodeMaterialEmissiveColor as runtime fallback.",
+                                channel.TargetPointerPath,
+                                clipName,
+                                resolvedExtraction.TargetProperty);
+                        }
+
+                        if (resolvedExtraction.TargetProperty == AnimationTargetProperty.MorphWeights)
+                        {
+                            Log.Warning("GLTF morph channel '{PointerPath}' in clip '{Clip}' has no bindable scene node target.",
+                                channel.TargetPointerPath,
+                                clipName);
+                        }
+
                         continue;
                     }
 
-                    var targetProperty = MapTargetProperty(channel.TargetNodePath);
-                    if (targetProperty == null)
+                    if (resolvedExtraction.TargetProperty == AnimationTargetProperty.MorphWeights)
                     {
-                        continue;
+                        Log.Debug("GLTF morph channel '{PointerPath}' in clip '{Clip}' bound to node key(s): {TargetNodeKeys}",
+                            channel.TargetPointerPath,
+                            clipName,
+                            string.Join(", ", targetNodeKeys));
                     }
 
-                    var animChannel = new Avalonia3D.Animation.AnimationChannel(targetNodeKey, targetProperty.Value);
-
-                    switch (targetProperty.Value)
+                    foreach (var targetNodeKey in targetNodeKeys)
                     {
-                        case AnimationTargetProperty.Position:
-                            foreach (var (time, value) in channel.GetTranslationSampler().GetLinearKeys())
-                            {
-                                animChannel.AddKeyframe(time, value);
-                            }
-                            break;
-                        case AnimationTargetProperty.Scale:
-                            foreach (var (time, value) in channel.GetScaleSampler().GetLinearKeys())
-                            {
-                                animChannel.AddKeyframe(time, value);
-                            }
-                            break;
-                        case AnimationTargetProperty.Rotation:
-                            foreach (var (time, value) in channel.GetRotationSampler().GetLinearKeys())
-                            {
-                                animChannel.AddKeyframe(time, value);
-                            }
-                            break;
-                    }
+                        var animChannel = new Avalonia3D.Animation.AnimationChannel(targetNodeKey, resolvedExtraction.TargetProperty);
+                        ExtractChannelKeys(channel, resolvedExtraction, animChannel);
 
-                    if (animChannel.HasData)
-                    {
-                        clip.Channels.Add(animChannel);
+                        if (animChannel.HasData)
+                        {
+                            clip.Channels.Add(animChannel);
+
+                            if (resolvedExtraction.TargetProperty == AnimationTargetProperty.MorphWeights)
+                            {
+                                Log.Debug("Extracted morph keyframes for clip '{Clip}', node '{NodeKey}': {KeyframeCount} keyframes.",
+                                    clipName,
+                                    targetNodeKey,
+                                    animChannel.FloatArrayKeyframes.Count);
+                            }
+                        }
+                        else if (resolvedExtraction.IsMaterialTarget)
+                        {
+                            Log.Warning("GLTF animation channel '{PointerPath}' in clip '{Clip}' targets material property '{Property}' but cannot be extracted. Use AnimatorComponent.SetNodeMaterialEmissiveIntensity/SetNodeMaterialEmissiveColor as runtime fallback.",
+                                channel.TargetPointerPath,
+                                clipName,
+                                resolvedExtraction.TargetProperty);
+                        }
                     }
                 }
 
@@ -400,9 +466,129 @@ namespace Avalonia3D.Loaders
                 {
                     clips.Add(clip);
                 }
+                else if (animation.Channels.Count > 0)
+                {
+                    Log.Warning("GLTF animation '{AnimationName}' has {ChannelCount} channels, but none could be extracted into Avalonia3D clip channels.",
+                        clipName,
+                        animation.Channels.Count);
+                }
             }
 
             return clips;
+        }
+
+        private static IReadOnlyList<string> ResolveChannelTargetNodeKeys(
+            SharpGLTF.Schema2.AnimationChannel channel,
+            ChannelExtractionTarget extraction,
+            IReadOnlyDictionary<Node, string> nodeKeys,
+            IReadOnlyDictionary<int, IReadOnlyList<string>> materialTargetMap)
+        {
+            if (channel.TargetNode != null && nodeKeys.TryGetValue(channel.TargetNode, out var targetNodeKey))
+            {
+                return [targetNodeKey];
+            }
+
+            if (!extraction.IsMaterialTarget)
+            {
+                return [];
+            }
+
+            var materialIndex = TryParseMaterialIndex(channel.TargetPointerPath);
+            if (materialIndex == null)
+            {
+                return [];
+            }
+
+            return materialTargetMap.TryGetValue(materialIndex.Value, out var mappedNodeKeys)
+                ? mappedNodeKeys
+                : [];
+        }
+
+        private static int? TryParseMaterialIndex(string? pointerPath)
+        {
+            if (string.IsNullOrWhiteSpace(pointerPath))
+            {
+                return null;
+            }
+
+            const string prefix = "/materials/";
+            var start = pointerPath.IndexOf(prefix, StringComparison.OrdinalIgnoreCase);
+            if (start < 0)
+            {
+                return null;
+            }
+
+            var indexStart = start + prefix.Length;
+            var indexEnd = pointerPath.IndexOf('/', indexStart);
+            var token = indexEnd > indexStart
+                ? pointerPath[indexStart..indexEnd]
+                : pointerPath[indexStart..];
+
+            return int.TryParse(token, out var materialIndex)
+                ? materialIndex
+                : null;
+        }
+
+        private static void ExtractChannelKeys(SharpGLTF.Schema2.AnimationChannel sourceChannel, ChannelExtractionTarget extraction, Avalonia3D.Animation.AnimationChannel targetChannel)
+        {
+            switch (extraction.TargetProperty)
+            {
+                case AnimationTargetProperty.Position:
+                    foreach (var (time, value) in sourceChannel.GetTranslationSampler().GetLinearKeys())
+                    {
+                        targetChannel.AddKeyframe(time, value);
+                    }
+                    break;
+                case AnimationTargetProperty.Scale:
+                    foreach (var (time, value) in sourceChannel.GetScaleSampler().GetLinearKeys())
+                    {
+                        targetChannel.AddKeyframe(time, value);
+                    }
+                    break;
+                case AnimationTargetProperty.Rotation:
+                    foreach (var (time, value) in sourceChannel.GetRotationSampler().GetLinearKeys())
+                    {
+                        targetChannel.AddKeyframe(time, value);
+                    }
+                    break;
+                case AnimationTargetProperty.EmissiveColor:
+                    if (TryExtractVector3PointerKeys(sourceChannel, out var colorKeys))
+                    {
+                        foreach (var (time, value) in colorKeys)
+                        {
+                            targetChannel.AddKeyframe(time, value);
+                        }
+                    }
+                    break;
+                case AnimationTargetProperty.EmissiveIntensity:
+                    if (TryExtractFloatPointerKeys(sourceChannel, out var intensityKeys))
+                    {
+                        foreach (var (time, value) in intensityKeys)
+                        {
+                            targetChannel.AddKeyframe(time, value);
+                        }
+                    }
+                    break;
+                case AnimationTargetProperty.MorphWeights:
+                    foreach (var (time, value) in sourceChannel.GetMorphSampler().GetLinearKeys())
+                    {
+                        targetChannel.AddKeyframe(time, value);
+                    }
+                    break;
+            }
+        }
+        private static ChannelExtractionTarget? ResolveExtractionTarget(SharpGLTF.Schema2.AnimationChannel channel)
+        {
+            var nodePathTarget = MapTargetProperty(channel.TargetNodePath);
+            if (nodePathTarget != null)
+            {
+                return new ChannelExtractionTarget(nodePathTarget.Value, false);
+            }
+
+            var pointerPathTarget = MapTargetProperty(channel.TargetPointerPath);
+            return pointerPathTarget != null
+                ? new ChannelExtractionTarget(pointerPathTarget.Value, true)
+                : null;
         }
 
         private static AnimationTargetProperty? MapTargetProperty(PropertyPath path)
@@ -412,9 +598,90 @@ namespace Avalonia3D.Loaders
                 PropertyPath.translation => AnimationTargetProperty.Position,
                 PropertyPath.rotation => AnimationTargetProperty.Rotation,
                 PropertyPath.scale => AnimationTargetProperty.Scale,
+                PropertyPath.weights => AnimationTargetProperty.MorphWeights,
                 _ => null
             };
         }
+
+        private static AnimationTargetProperty? MapTargetProperty(string? pointerPath)
+        {
+            if (string.IsNullOrWhiteSpace(pointerPath))
+            {
+                return null;
+            }
+
+            if (pointerPath.Contains("/materials/", StringComparison.OrdinalIgnoreCase))
+            {
+                if (pointerPath.EndsWith("/emissiveFactor", StringComparison.OrdinalIgnoreCase))
+                {
+                    return AnimationTargetProperty.EmissiveColor;
+                }
+
+                if (pointerPath.EndsWith("/extensions/KHR_materials_emissive_strength/emissiveStrength", StringComparison.OrdinalIgnoreCase)
+                    || pointerPath.EndsWith("/emissiveStrength", StringComparison.OrdinalIgnoreCase)
+                    || pointerPath.EndsWith("/emissiveIntensity", StringComparison.OrdinalIgnoreCase))
+                {
+                    return AnimationTargetProperty.EmissiveIntensity;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool TryExtractVector3PointerKeys(SharpGLTF.Schema2.AnimationChannel channel, out List<(float Time, Vector3 Value)> keys)
+        {
+            keys = [];
+            var sampler = channel.GetSamplerOrNull<Vector3>();
+            if (sampler == null)
+            {
+                return false;
+            }
+
+            foreach (var (time, value) in sampler.GetLinearKeys())
+            {
+                keys.Add((time, value));
+            }
+
+            return keys.Count > 0;
+        }
+
+        private static bool TryExtractFloatPointerKeys(SharpGLTF.Schema2.AnimationChannel channel, out List<(float Time, float Value)> keys)
+        {
+            keys = [];
+            var sampler = channel.GetSamplerOrNull<float>();
+            if (sampler != null)
+            {
+                foreach (var (time, value) in sampler.GetLinearKeys())
+                {
+                    keys.Add((time, value));
+                }
+
+                if (keys.Count > 0)
+                {
+                    return true;
+                }
+            }
+
+            var scalarArraySampler = channel.GetSamplerOrNull<float[]>();
+            if (scalarArraySampler == null)
+            {
+                return false;
+            }
+
+            foreach (var (time, value) in scalarArraySampler.GetLinearKeys())
+            {
+                if (value == null || value.Length == 0)
+                {
+                    continue;
+                }
+
+                keys.Add((time, value[0]));
+            }
+
+            return keys.Count > 0;
+        }
+
+        private readonly record struct ChannelExtractionTarget(AnimationTargetProperty TargetProperty, bool IsMaterialTarget);
 
         private List<Model.Model> LoadModelsForPath(string gltfPath)
         {

@@ -5,6 +5,7 @@ using System.Numerics;
 using Avalonia3D.Animation;
 using Avalonia3D.Loaders;
 using Avalonia3D.Model;
+using Avalonia3D.Model.StandObjects;
 using Xunit;
 
 namespace Avalonia3D.Tests;
@@ -128,6 +129,131 @@ public class AnimationTests
     }
 
 
+
+
+    [Fact]
+    public void AnimationClipPlayer_Update_AppliesMorphWeightsToNode()
+    {
+        var graph = new SceneGraph();
+        var node = new SceneNode { Name = "Eye", StableId = "node:eye" };
+        graph.Root.AddChild(node);
+
+        var clip = new AnimationClip("Morph");
+        var channel = new AnimationChannel("node:eye", AnimationTargetProperty.MorphWeights);
+        channel.AddKeyframe(0f, new float[] { 0f, 1f });
+        channel.AddKeyframe(1f, new float[] { 1f, 0f });
+        clip.Channels.Add(channel);
+
+        var player = new AnimationClipPlayer(clip, graph);
+        player.Play(loop: false, speed: 1f);
+
+        Assert.True(player.Update(0.5f));
+        Assert.Equal(2, node.MorphWeights.Length);
+        Assert.InRange(node.MorphWeights[0], 0.49f, 0.51f);
+        Assert.InRange(node.MorphWeights[1], 0.49f, 0.51f);
+    }
+
+    [Fact]
+    public void AnimationClipPlayer_Update_AppliesEmissiveColorToMaterial()
+    {
+        var graph = new SceneGraph();
+        var group = new MeshGroup { Name = "Arm" };
+        group.Node.StableId = "node:arm";
+        graph.AddRoot(group);
+
+        var model = new Avalonia3D.Model.Model
+        {
+            Name = "mesh",
+            Vertices =
+            [
+                new Vertex { Position = Vector3.Zero }
+            ],
+            Material = new Material { EmissiveFactor = Vector3.Zero }
+        };
+
+        var mesh = new MeshObject { Name = "ArmMesh" };
+        mesh.AssignModel(model);
+        group.Add(mesh);
+
+        var clip = new AnimationClip("EmissiveColor");
+        var channel = new AnimationChannel("node:arm", AnimationTargetProperty.EmissiveColor);
+        channel.AddKeyframe(0f, Vector3.Zero);
+        channel.AddKeyframe(1f, new Vector3(0.8f, 0.2f, 0.4f));
+        clip.Channels.Add(channel);
+
+        var player = new AnimationClipPlayer(clip, graph);
+        player.Play(loop: false, speed: 1f);
+
+        Assert.True(player.Update(0.5f));
+        AssertVectorEqual(new Vector3(0.4f, 0.1f, 0.2f), mesh.Material!.EmissiveFactor);
+    }
+
+    [Fact]
+    public void AnimationClipPlayer_Update_AppliesEmissiveIntensityToMaterial()
+    {
+        var graph = new SceneGraph();
+        var group = new MeshGroup { Name = "Arm" };
+        group.Node.StableId = "node:arm";
+        graph.AddRoot(group);
+
+        var model = new Avalonia3D.Model.Model
+        {
+            Name = "mesh",
+            Vertices =
+            [
+                new Vertex { Position = Vector3.Zero }
+            ],
+            Material = new Material { EmissiveIntensity = 1f }
+        };
+
+        var mesh = new MeshObject { Name = "ArmMesh" };
+        mesh.AssignModel(model);
+        group.Add(mesh);
+
+        var clip = new AnimationClip("EmissiveIntensity");
+        var channel = new AnimationChannel("node:arm", AnimationTargetProperty.EmissiveIntensity);
+        channel.AddKeyframe(0f, 1f);
+        channel.AddKeyframe(1f, 3f);
+        clip.Channels.Add(channel);
+
+        var player = new AnimationClipPlayer(clip, graph);
+        player.Play(loop: false, speed: 1f);
+
+        Assert.True(player.Update(0.5f));
+        Assert.InRange(mesh.Material!.EmissiveIntensity, 1.99f, 2.01f);
+    }
+
+    [Fact]
+    public void AnimatorComponent_RuntimeFallback_CanAnimateMaterialEmissive()
+    {
+        var graph = new SceneGraph();
+        var group = new MeshGroup { Name = "Arm" };
+        group.Node.StableId = "node:arm";
+        graph.AddRoot(group);
+
+        var model = new Avalonia3D.Model.Model
+        {
+            Name = "mesh",
+            Vertices =
+            [
+                new Vertex { Position = Vector3.Zero }
+            ],
+            Material = new Material { EmissiveIntensity = 1f, EmissiveFactor = Vector3.Zero }
+        };
+
+        var mesh = new MeshObject();
+        mesh.AssignModel(model);
+        group.Add(mesh);
+
+        var component = new AnimatorComponent(graph, new Animator());
+
+        Assert.True(component.SetNodeMaterialEmissiveIntensity("node:arm", 2.5f));
+        Assert.True(component.SetNodeMaterialEmissiveColor("node:arm", new Vector3(0.1f, 0.3f, 0.5f)));
+
+        Assert.InRange(mesh.Material!.EmissiveIntensity, 2.49f, 2.51f);
+        AssertVectorEqual(new Vector3(0.1f, 0.3f, 0.5f), mesh.Material!.EmissiveFactor);
+    }
+
     [Fact]
     public void AnimatorComponent_RegisterAndPlayClip_UpdatesPlaybackStateInvariant()
     {
@@ -182,6 +308,33 @@ public class AnimationTests
         }
 
         throw new FileNotFoundException($"Test asset {fileName} not found.");
+    }
+
+
+    [Fact]
+    public void MeshObject_SetMorphWeights_WithoutMorphTargets_ButWithEmissiveTexture_AppliesFallbackSignal()
+    {
+        var model = new Model.Model
+        {
+            Vertices = new[]
+            {
+                new Vertex { Position = new Vector3(0f, 0f, 0f), Normal = Vector3.UnitY, TexCoord = Vector2.Zero }
+            },
+            Material = new Material
+            {
+                EmissiveFactor = new Vector3(0.2f, 0.2f, 0.2f),
+                EmissiveIntensity = 1f,
+                EmissiveTexture = new TextureData { Width = 1, Height = 1, Data = new byte[] { 255, 255, 255, 255 } }
+            }
+        };
+
+        var mesh = new MeshObject { Name = "EmissiveReceiver" };
+        mesh.AssignModel(model);
+
+        mesh.SetMorphWeights(new[] { 0.8f, 0.1f });
+
+        Assert.True(mesh.Material!.EmissiveIntensity > 1f);
+        Assert.True(mesh.EmissionColor.X > 0.2f);
     }
 
     private static void AssertVectorEqual(Vector3 expected, Vector3 actual, float epsilon = 0.0001f)

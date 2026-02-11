@@ -184,6 +184,43 @@ namespace Avalonia3D.Animation
             return true;
         }
 
+
+        public bool SetNodeMaterialEmissiveIntensity(string nodeName, float intensity)
+        {
+            if (string.IsNullOrWhiteSpace(nodeName))
+            {
+                return false;
+            }
+
+            var resolver = new AnimationMaterialTargetResolver(_sceneGraph);
+            var target = resolver.ResolveByNodeKey(nodeName);
+            if (target?.Material == null)
+            {
+                return false;
+            }
+
+            target.Material.EmissiveIntensity = intensity;
+            return true;
+        }
+
+        public bool SetNodeMaterialEmissiveColor(string nodeName, Vector3 emissiveColor)
+        {
+            if (string.IsNullOrWhiteSpace(nodeName))
+            {
+                return false;
+            }
+
+            var resolver = new AnimationMaterialTargetResolver(_sceneGraph);
+            var target = resolver.ResolveByNodeKey(nodeName);
+            if (target?.Material == null)
+            {
+                return false;
+            }
+
+            target.Material.EmissiveFactor = emissiveColor;
+            return true;
+        }
+
         private void OnPlayerCompleted(AnimationClipPlayer player)
         {
             if (player == null)

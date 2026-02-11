@@ -24,6 +24,7 @@ public sealed class UnlitShader : IShader3D
     private int _emissionColorLocation = -1;
     private int _emissiveMapLocation = -1;
     private int _hasEmissiveMapLocation = -1;
+    private int _forceWhiteEmissiveMapLocation = -1;
 
     public uint Handle => _program;
 
@@ -57,7 +58,8 @@ public sealed class UnlitShader : IShader3D
         var alphaCutoff = material?.AlphaCutoff ?? 0.5f;
         var emissiveFactor = material?.EmissiveFactor ?? Vector3.Zero;
         var emissiveIntensity = material?.EmissiveIntensity ?? 1f;
-        var emissionColor = material != null ? Vector3.Zero : sceneObject.EmissionColor;
+        var emissionColor = EmissionUniformResolver.ResolveSceneEmissionColor(material, sceneObject);
+        var forceWhiteEmissive = EmissionUniformResolver.ShouldForceWhiteEmissiveTexture();
 
         if (_baseColorFactorLocation != -1)
         {
@@ -93,6 +95,11 @@ public sealed class UnlitShader : IShader3D
         {
             _gl.Uniform3(_emissionColorLocation, emissionColor.X, emissionColor.Y, emissionColor.Z);
         }
+
+        if (_forceWhiteEmissiveMapLocation != -1)
+        {
+            _gl.Uniform1(_forceWhiteEmissiveMapLocation, forceWhiteEmissive ? 1 : 0);
+        }
     }
 
     public void BindMaterial(RenderResources resources, Material? material, uint? shadowMapId = null)
@@ -112,10 +119,11 @@ public sealed class UnlitShader : IShader3D
             _gl.Uniform1(_hasBaseColorMapLocation, resources.BaseColorTextureId != 0 ? 1 : 0);
         }
 
-        if (resources.EmissiveTextureId != 0)
+        var emissiveTextureId = EmissionUniformResolver.ShouldSampleEmissiveTexture() ? resources.EmissiveTextureId : 0;
+        if (emissiveTextureId != 0)
         {
             _gl.ActiveTexture(TextureUnit.Texture1);
-            _gl.BindTexture(TextureTarget.Texture2D, resources.EmissiveTextureId);
+            _gl.BindTexture(TextureTarget.Texture2D, emissiveTextureId);
             if (_emissiveMapLocation != -1)
             {
                 _gl.Uniform1(_emissiveMapLocation, 1);
@@ -124,7 +132,7 @@ public sealed class UnlitShader : IShader3D
 
         if (_hasEmissiveMapLocation != -1)
         {
-            _gl.Uniform1(_hasEmissiveMapLocation, resources.EmissiveTextureId != 0 ? 1 : 0);
+            _gl.Uniform1(_hasEmissiveMapLocation, emissiveTextureId != 0 ? 1 : 0);
         }
     }
 
@@ -167,6 +175,7 @@ uniform float uEmissiveIntensity;
 uniform vec3 uEmissionColor;
 uniform sampler2D uEmissiveMap;
 uniform int uHasEmissiveMap;
+uniform int uForceWhiteEmissiveMap;
 void main()
 {
     vec4 color = uBaseColorFactor;
@@ -184,7 +193,8 @@ void main()
     vec3 emissive = uEmissiveFactor * max(uEmissiveIntensity, 0.0);
     if (uHasEmissiveMap == 1)
     {
-        emissive *= texture(uEmissiveMap, TexCoord).rgb;
+        vec3 emissiveSample = uForceWhiteEmissiveMap == 1 ? vec3(1.0) : texture(uEmissiveMap, TexCoord).rgb;
+        emissive *= emissiveSample;
     }
 
     float alpha = uAlphaMode == 2 ? sampledAlpha : 1.0;
@@ -228,5 +238,6 @@ void main()
         _emissionColorLocation = _gl.GetUniformLocation(_program, "uEmissionColor");
         _emissiveMapLocation = _gl.GetUniformLocation(_program, "uEmissiveMap");
         _hasEmissiveMapLocation = _gl.GetUniformLocation(_program, "uHasEmissiveMap");
+        _forceWhiteEmissiveMapLocation = _gl.GetUniformLocation(_program, "uForceWhiteEmissiveMap");
     }
 }

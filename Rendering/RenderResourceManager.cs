@@ -268,6 +268,53 @@ namespace Avalonia3D.Rendering
             return resources;
         }
 
+
+        public unsafe void UpdateVertexBuffer(RenderResources resources, Vertex[] vertices)
+        {
+            if (resources == null || vertices == null || vertices.Length == 0 || resources.Vbo == 0)
+            {
+                return;
+            }
+
+            Gl.BindBuffer(GLEnum.ArrayBuffer, resources.Vbo);
+
+            int vertexCount = vertices.Length;
+            var pool = ArrayPool<VertexHalf>.Shared;
+            var halfVertices = pool.Rent(vertexCount);
+            try
+            {
+                for (var i = 0; i < vertexCount; i++)
+                {
+                    var v = vertices[i];
+                    halfVertices[i] = new VertexHalf
+                    {
+                        Px = (Half)v.Position.X,
+                        Py = (Half)v.Position.Y,
+                        Pz = (Half)v.Position.Z,
+                        Nx = (Half)v.Normal.X,
+                        Ny = (Half)v.Normal.Y,
+                        Nz = (Half)v.Normal.Z,
+                        U = (Half)v.TexCoord.X,
+                        V = (Half)v.TexCoord.Y
+                    };
+                }
+
+                fixed (VertexHalf* pHalf = &halfVertices[0])
+                {
+                    Gl.BufferData(GLEnum.ArrayBuffer,
+                        (nuint)(vertexCount * sizeof(VertexHalf)),
+                        pHalf,
+                        GLEnum.DynamicDraw);
+                }
+            }
+            finally
+            {
+                pool.Return(halfVertices, true);
+            }
+
+            Gl.BindBuffer(GLEnum.ArrayBuffer, 0);
+        }
+
         private void DeleteTextureIfNeeded(uint textureId)
         {
             if (textureId != 0)

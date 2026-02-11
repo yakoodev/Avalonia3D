@@ -7,7 +7,10 @@ namespace Avalonia3D.Animation
     {
         Position,
         Rotation,
-        Scale
+        Scale,
+        EmissiveIntensity,
+        EmissiveColor,
+        MorphWeights
     }
 
     public class AnimationChannel
@@ -24,8 +27,10 @@ namespace Avalonia3D.Animation
 
         public List<AnimationKeyframe<Vector3>> Vector3Keyframes { get; } = [];
         public List<AnimationKeyframe<Quaternion>> QuaternionKeyframes { get; } = [];
+        public List<AnimationKeyframe<float>> FloatKeyframes { get; } = [];
+        public List<AnimationKeyframe<float[]>> FloatArrayKeyframes { get; } = [];
 
-        public bool HasData => Vector3Keyframes.Count > 0 || QuaternionKeyframes.Count > 0;
+        public bool HasData => Vector3Keyframes.Count > 0 || QuaternionKeyframes.Count > 0 || FloatKeyframes.Count > 0 || FloatArrayKeyframes.Count > 0;
 
         public void AddKeyframe(float time, Vector3 value)
         {
@@ -37,6 +42,19 @@ namespace Avalonia3D.Animation
         {
             QuaternionKeyframes.Add(new AnimationKeyframe<Quaternion>(time, value));
             QuaternionKeyframes.Sort((a, b) => a.Time.CompareTo(b.Time));
+        }
+
+        public void AddKeyframe(float time, float value)
+        {
+            FloatKeyframes.Add(new AnimationKeyframe<float>(time, value));
+            FloatKeyframes.Sort((a, b) => a.Time.CompareTo(b.Time));
+        }
+
+        public void AddKeyframe(float time, float[] value)
+        {
+            var copy = value == null ? [] : (float[])value.Clone();
+            FloatArrayKeyframes.Add(new AnimationKeyframe<float[]>(time, copy));
+            FloatArrayKeyframes.Sort((a, b) => a.Time.CompareTo(b.Time));
         }
 
         public float Duration
@@ -52,6 +70,16 @@ namespace Avalonia3D.Animation
                 if (QuaternionKeyframes.Count > 0)
                 {
                     max = System.MathF.Max(max, QuaternionKeyframes[^1].Time);
+                }
+
+                if (FloatKeyframes.Count > 0)
+                {
+                    max = System.MathF.Max(max, FloatKeyframes[^1].Time);
+                }
+
+                if (FloatArrayKeyframes.Count > 0)
+                {
+                    max = System.MathF.Max(max, FloatArrayKeyframes[^1].Time);
                 }
 
                 return max;
@@ -86,6 +114,58 @@ namespace Avalonia3D.Animation
             }
 
             return Sample(time, QuaternionKeyframes, Quaternion.Slerp);
+        }
+
+        public float SampleFloat(float time)
+        {
+            if (FloatKeyframes.Count == 0)
+            {
+                return 0f;
+            }
+
+            if (FloatKeyframes.Count == 1)
+            {
+                return FloatKeyframes[0].Value;
+            }
+
+            return Sample(time, FloatKeyframes, static (a, b, t) => a + ((b - a) * t));
+        }
+
+        public float[] SampleFloatArray(float time)
+        {
+            if (FloatArrayKeyframes.Count == 0)
+            {
+                return [];
+            }
+
+            if (FloatArrayKeyframes.Count == 1)
+            {
+                return (float[])FloatArrayKeyframes[0].Value.Clone();
+            }
+
+            return Sample(time, FloatArrayKeyframes, static (a, b, t) => LerpFloatArrays(a, b, t));
+        }
+
+        private static float[] LerpFloatArrays(float[] a, float[] b, float t)
+        {
+            if (a == null || a.Length == 0)
+            {
+                return b == null ? [] : (float[])b.Clone();
+            }
+
+            if (b == null || b.Length == 0)
+            {
+                return (float[])a.Clone();
+            }
+
+            var len = System.Math.Min(a.Length, b.Length);
+            var result = new float[len];
+            for (var i = 0; i < len; i++)
+            {
+                result[i] = a[i] + ((b[i] - a[i]) * t);
+            }
+
+            return result;
         }
 
         private static T Sample<T>(float time, List<AnimationKeyframe<T>> keyframes, System.Func<T, T, float, T> lerp)
