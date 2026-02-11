@@ -9,14 +9,34 @@ namespace Avalonia3D.Sandbox.Scenes;
 
 public sealed class PbrRegressionScene : ISandboxScene, ISceneLoadOptionsProvider
 {
-    public string Id => "pbr-regression";
-    public string Title => "PBR Regression (фикс. свет/камера)";
-    public string Description => "Регрессионная сцена для быстрой проверки PBR/Unlit и baseColor-текстур.";
+    private readonly PbrQaAssetEntry? _boundAsset;
+
+    public PbrRegressionScene()
+    {
+    }
+
+    public PbrRegressionScene(PbrQaAssetEntry boundAsset)
+    {
+        _boundAsset = boundAsset;
+    }
+
+    public string Id => _boundAsset == null
+        ? "pbr-regression"
+        : $"pbr-regression-{ToSceneToken(_boundAsset.RelativePath)}";
+
+    public string Title => _boundAsset == null
+        ? "PBR Regression (фикс. свет/камера)"
+        : $"PBR Regression: {_boundAsset.DisplayName}";
+
+    public string Description => _boundAsset == null
+        ? "Регрессионная сцена для быстрой проверки PBR/Unlit и baseColor-текстур."
+        : $"Отдельный регрессионный кейс для ассета {_boundAsset.DisplayName} (фикс. свет/камера).";
     public SceneLoadOptions LoadOptions => new(AutoFrameCamera: false);
 
     public void Load(Scene3D scene, string assetsRoot)
     {
-        var asset = PbrQaAssetRegistry.Load(assetsRoot).FirstOrDefault(x => x.IncludeInRegressionScene);
+        var asset = _boundAsset
+            ?? PbrQaAssetRegistry.Load(assetsRoot).FirstOrDefault(x => x.IncludeInRegressionScene);
         if (asset == null)
         {
             Log.Warning("PBR regression scene skipped: no QA asset marked for regression scene.");
@@ -48,5 +68,14 @@ public sealed class PbrRegressionScene : ISandboxScene, ISceneLoadOptionsProvide
             Color = new Vector3(0.75f, 0.82f, 1f),
             Intensity = 0.55f
         });
+    }
+
+    private static string ToSceneToken(string value)
+    {
+        var chars = value.ToLowerInvariant()
+            .Select(ch => char.IsLetterOrDigit(ch) ? ch : '-')
+            .ToArray();
+
+        return new string(chars).Trim('-');
     }
 }
