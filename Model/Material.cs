@@ -1,5 +1,8 @@
 ﻿using Avalonia3D.Interfaces;
+using Avalonia3D.Rendering;
 using Avalonia3D.Shaders;
+using System;
+using System.Collections.Generic;
 using System.Numerics;
 
 namespace Avalonia3D.Model
@@ -71,6 +74,53 @@ namespace Avalonia3D.Model
     public sealed class MaterialIorSettings
     {
         public float Value { get; set; } = 1.5f;
+    }
+
+    public sealed class MaterialTextureTransformRuntime
+    {
+        public Vector2 UvOffset { get; set; } = Vector2.Zero;
+        public Vector2 UvScale { get; set; } = Vector2.One;
+        public float UvRotation { get; set; }
+
+        public Vector2 Apply(Vector2 uv)
+        {
+            var scaled = new Vector2(uv.X * UvScale.X, uv.Y * UvScale.Y);
+            if (MathF.Abs(UvRotation) < 0.000001f)
+            {
+                return scaled + UvOffset;
+            }
+
+            var sin = MathF.Sin(UvRotation);
+            var cos = MathF.Cos(UvRotation);
+            var rotated = new Vector2(
+                scaled.X * cos - scaled.Y * sin,
+                scaled.X * sin + scaled.Y * cos);
+
+            return rotated + UvOffset;
+        }
+    }
+
+    public sealed class MaterialTextureRuntimeParameters
+    {
+        private readonly Dictionary<TextureSemantic, MaterialTextureTransformRuntime> _transforms = new();
+
+        public MaterialTextureTransformRuntime BaseColor => GetOrCreate(TextureSemantic.BaseColor);
+        public MaterialTextureTransformRuntime Emissive => GetOrCreate(TextureSemantic.Emissive);
+        public MaterialTextureTransformRuntime Normal => GetOrCreate(TextureSemantic.Normal);
+        public MaterialTextureTransformRuntime MetallicRoughness => GetOrCreate(TextureSemantic.MetallicRoughness);
+        public MaterialTextureTransformRuntime Occlusion => GetOrCreate(TextureSemantic.Occlusion);
+
+        public MaterialTextureTransformRuntime GetOrCreate(TextureSemantic semantic)
+        {
+            if (_transforms.TryGetValue(semantic, out var value))
+            {
+                return value;
+            }
+
+            value = new MaterialTextureTransformRuntime();
+            _transforms[semantic] = value;
+            return value;
+        }
     }
 
     public class Material
@@ -217,6 +267,7 @@ namespace Avalonia3D.Model
         public TextureData? MetallicRoughnessTexture { get; set; }
         public TextureData? OcclusionTexture { get; set; }
         public TextureData? EmissiveTexture { get; set; }
+        public MaterialTextureRuntimeParameters TextureRuntime { get; set; } = new();
         public MaterialExtensionTextures ExtensionTextures { get; set; } = new();
 
         public IShader? Shader { get; set; }
