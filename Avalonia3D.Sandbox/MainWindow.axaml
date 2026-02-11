@@ -97,6 +97,7 @@
                 <TextBlock Text="Режим шейдера" FontWeight="SemiBold" Foreground="White" Margin="0,6,0,0" />
                 <ComboBox ItemsSource="{Binding ShaderModes}" SelectedItem="{Binding SelectedRenderMode}" HorizontalAlignment="Stretch" />
                 <Button Content="Применить режим" Command="{Binding SwitchShaderModeCommand}" CommandParameter="{Binding SelectedRenderMode}" HorizontalAlignment="Left" />
+                <Button Content="Toggle PBR/Unlit" Command="{Binding TogglePbrUnlitCommand}" HorizontalAlignment="Left" />
 
                 <TextBlock Text="Debug emissive texture" FontWeight="SemiBold" Foreground="White" Margin="0,6,0,0" />
                 <ComboBox ItemsSource="{Binding EmissiveTextureDebugModes}" SelectedItem="{Binding SelectedEmissiveTextureDebugMode}" HorizontalAlignment="Stretch" />

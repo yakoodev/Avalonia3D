@@ -26,6 +26,7 @@ public class SceneCatalogTests
             var ids = scenes.Select(s => s.Id).ToArray();
 
             Assert.Contains("gltf:vehicle", ids);
+            Assert.Contains("pbr-regression", ids);
             Assert.Contains("gltf:nested/wheel", ids);
             Assert.DoesNotContain(ids, id => id.Contains("ignore", StringComparison.OrdinalIgnoreCase));
         }

@@ -88,7 +88,25 @@ public sealed class SceneLoaderTests
 
         var scenes = SceneCatalog.CreateDefault(assetsRoot);
 
-        Assert.Empty(scenes);
+        Assert.Single(scenes);
+        Assert.Equal("pbr-regression", scenes[0].Id);
+    }
+
+
+    [Fact]
+    public void Load_WhenSceneDisablesAutoFrame_KeepsPresetCamera()
+    {
+        var scene = new Scene3D();
+        var scheduler = new ImmediateScheduler();
+        var loader = new SceneLoader(scene, assetsRoot: "/tmp/assets", scheduler);
+        var sample = new FixedCameraScene("fixed");
+
+        loader.MarkRendererReady();
+        loader.Load(sample);
+
+        Assert.Equal(42f, scene.Camera.Distance);
+        Assert.Equal(0.3f, scene.Camera.Pitch);
+        Assert.Equal(-0.1f, scene.Camera.Yaw);
     }
 
     private sealed class ImmediateScheduler : IRenderThreadScheduler
@@ -146,4 +164,25 @@ public sealed class SceneLoaderTests
             return mesh;
         }
     }
+
+    private sealed class FixedCameraScene : ISandboxScene, ISceneLoadOptionsProvider
+    {
+        public FixedCameraScene(string id)
+        {
+            Id = id;
+        }
+
+        public string Id { get; }
+        public string Title => $"title:{Id}";
+        public string Description => $"description:{Id}";
+        public SceneLoadOptions LoadOptions => new(AutoFrameCamera: false);
+
+        public void Load(Scene3D scene, string assetsRoot)
+        {
+            scene.Camera.Distance = 42f;
+            scene.Camera.Pitch = 0.3f;
+            scene.Camera.Yaw = -0.1f;
+        }
+    }
+
 }

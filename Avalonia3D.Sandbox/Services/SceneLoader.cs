@@ -70,7 +70,11 @@ public sealed class SceneLoader
         ApplyDefaults(scene);
         scene.Load(_scene, _assetsRoot);
 
-        if (SceneCameraFramer.TryFrame(_scene.SceneGraph, _scene.Camera))
+        var loadOptions = scene is ISceneLoadOptionsProvider provider
+            ? provider.LoadOptions
+            : SceneLoadOptions.Default;
+
+        if (loadOptions.AutoFrameCamera && SceneCameraFramer.TryFrame(_scene.SceneGraph, _scene.Camera))
         {
             Log.Information("Camera auto-framed for scene {SceneId}. Target: {Target}, Distance: {Distance:0.00}, Near/Far: {Near:0.00}/{Far:0.00}",
                 scene.Id,
@@ -79,9 +83,13 @@ public sealed class SceneLoader
                 _scene.Camera.Near,
                 _scene.Camera.Far);
         }
-        else
+        else if (loadOptions.AutoFrameCamera)
         {
             Log.Warning("Scene {SceneId} has no geometry bounds for auto-frame; using preset camera.", scene.Id);
+        }
+        else
+        {
+            Log.Information("Scene {SceneId} requested fixed camera. Auto-frame skipped.", scene.Id);
         }
 
         LogSceneDiagnostics(scene);

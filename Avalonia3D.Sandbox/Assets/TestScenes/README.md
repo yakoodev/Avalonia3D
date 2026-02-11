@@ -17,3 +17,10 @@
 - Для наглядной проверки рендера используйте модели типа `DamagedHelmet`, `Lantern`, `BoomBox`.
 - Если модель не видна, проверьте логи `Scene diagnostics` (число мешей, bounds, lights, позиция камеры).
 - Если модель не загружается, проверьте warning `GLTF dependency missing` (часто не хватает `.bin` или текстур по относительному пути).
+
+
+## QA для PBR-регрессии
+
+- Реестр ассетов и пороги snapshot-проверки: `PBR_QA_ASSETS.json`.
+- Чеклист ручной/авто-валидации: `PBR_QA_CHECKLIST.md`.
+- Автопроверка без pixel-perfect: `python3 tools/validate_pbr_snapshot.py`.
