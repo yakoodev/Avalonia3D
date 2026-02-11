@@ -13,6 +13,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+      - name: Preflight glTF assets
+        run: python3 tools/validate_gltf_assets.py
       - name: Restore
         run: dotnet restore Avalonia3D.sln
       - name: Test (all)
@@ -25,6 +27,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+      - name: Preflight glTF assets
+        run: python3 tools/validate_gltf_assets.py
       - name: Restore
         run: dotnet restore Avalonia3D.sln
       - name: Test (domain only, no graphics)
