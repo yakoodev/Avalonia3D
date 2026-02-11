@@ -13,6 +13,7 @@ namespace Avalonia3D.Model
 
         public TextureData TextureData { get; set; }
         public Material? Material { get; set; }
+        public string MaterialKey { get; set; } = string.Empty;
 
         public Matrix4x4 LocalMatrix { get; set; }
 

@@ -224,6 +224,66 @@ public class AnimationTests
     }
 
     [Fact]
+    public void AnimationClipPlayer_Update_MixedClip_AppliesNodeMaterialAndMorphBindings()
+    {
+        var graph = new SceneGraph();
+        var group = new MeshGroup { Name = "Avatar" };
+        group.Node.StableId = "node:avatar";
+        graph.AddRoot(group);
+
+        var model = new Avalonia3D.Model.Model
+        {
+            Name = "face",
+            MaterialKey = "material:7",
+            Vertices =
+            [
+                new Vertex { Position = Vector3.Zero }
+            ],
+            Material = new Material { EmissiveFactor = Vector3.Zero }
+        };
+
+        var mesh = new MeshObject { Name = "AvatarMesh" };
+        mesh.AssignModel(model);
+        group.Add(mesh);
+
+        var clip = new AnimationClip("Mixed");
+
+        var nodeChannel = new AnimationChannel("node:avatar", AnimationTargetProperty.Position)
+        {
+            Binding = new NodeTransformBinding("node:avatar", AnimationTargetProperty.Position)
+        };
+        nodeChannel.AddKeyframe(0f, Vector3.Zero);
+        nodeChannel.AddKeyframe(1f, new Vector3(2f, 0f, 0f));
+        clip.Channels.Add(nodeChannel);
+
+        var materialChannel = new AnimationChannel("node:avatar", AnimationTargetProperty.EmissiveColor)
+        {
+            Binding = new MaterialPropertyBinding("material:7", AnimationTargetProperty.EmissiveColor)
+        };
+        materialChannel.AddKeyframe(0f, Vector3.Zero);
+        materialChannel.AddKeyframe(1f, new Vector3(0.6f, 0.2f, 0.4f));
+        clip.Channels.Add(materialChannel);
+
+        var morphChannel = new AnimationChannel("node:avatar", AnimationTargetProperty.MorphWeights)
+        {
+            Binding = new NodeMorphBinding("node:avatar")
+        };
+        morphChannel.AddKeyframe(0f, new float[] { 0f, 1f });
+        morphChannel.AddKeyframe(1f, new float[] { 1f, 0f });
+        clip.Channels.Add(morphChannel);
+
+        var player = new AnimationClipPlayer(clip, graph);
+        player.Play(loop: false, speed: 1f);
+
+        Assert.True(player.Update(0.5f));
+        Assert.InRange(group.Node.Position.X, 0.99f, 1.01f);
+        AssertVectorEqual(new Vector3(0.3f, 0.1f, 0.2f), mesh.Material!.EmissiveFactor);
+        Assert.Equal(2, group.Node.MorphWeights.Length);
+        Assert.InRange(group.Node.MorphWeights[0], 0.49f, 0.51f);
+        Assert.InRange(group.Node.MorphWeights[1], 0.49f, 0.51f);
+    }
+
+    [Fact]
     public void AnimatorComponent_RuntimeFallback_CanAnimateMaterialEmissive()
     {
         var graph = new SceneGraph();

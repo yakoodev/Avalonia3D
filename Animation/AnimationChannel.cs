@@ -10,7 +10,12 @@ namespace Avalonia3D.Animation
         Scale,
         EmissiveIntensity,
         EmissiveColor,
-        MorphWeights
+        MorphWeights,
+        BaseColorFactor,
+        TextureTransformOffset,
+        TextureTransformScale,
+        TextureTransformRotation,
+        TextureTransformTexCoord
     }
 
     public class AnimationChannel
@@ -24,6 +29,7 @@ namespace Avalonia3D.Animation
         public string TargetNodeKey { get; }
         public string TargetNodeName => TargetNodeKey;
         public AnimationTargetProperty Property { get; }
+        public IAnimationTargetBinding? Binding { get; set; }
 
         public List<AnimationKeyframe<Vector3>> Vector3Keyframes { get; } = [];
         public List<AnimationKeyframe<Quaternion>> QuaternionKeyframes { get; } = [];
