@@ -21,6 +21,7 @@ public sealed class UnlitShader : IShader3D
     private int _alphaCutoffLocation = -1;
     private int _emissiveFactorLocation = -1;
     private int _emissiveIntensityLocation = -1;
+    private int _materialEmissiveStrengthLocation = -1;
     private int _emissionColorLocation = -1;
     private int _emissiveMapLocation = -1;
     private int _hasEmissiveMapLocation = -1;
@@ -58,6 +59,7 @@ public sealed class UnlitShader : IShader3D
         var alphaCutoff = material?.AlphaCutoff ?? 0.5f;
         var emissiveFactor = material?.EmissiveFactor ?? Vector3.Zero;
         var emissiveIntensity = material?.EmissiveIntensity ?? 1f;
+        var materialEmissiveStrength = material?.EmissiveStrength ?? 1f;
         var emissionColor = EmissionUniformResolver.ResolveSceneEmissionColor(material, sceneObject);
         var forceWhiteEmissive = EmissionUniformResolver.ShouldForceWhiteEmissiveTexture();
 
@@ -91,6 +93,11 @@ public sealed class UnlitShader : IShader3D
             _gl.Uniform1(_emissiveIntensityLocation, emissiveIntensity);
         }
 
+        if (_materialEmissiveStrengthLocation != -1)
+        {
+            _gl.Uniform1(_materialEmissiveStrengthLocation, materialEmissiveStrength);
+        }
+
         if (_emissionColorLocation != -1)
         {
             _gl.Uniform3(_emissionColorLocation, emissionColor.X, emissionColor.Y, emissionColor.Z);
@@ -104,6 +111,11 @@ public sealed class UnlitShader : IShader3D
 
     public void BindMaterial(RenderResources resources, Material? material, uint? shadowMapId = null)
     {
+        if (_materialEmissiveStrengthLocation != -1)
+        {
+            _gl.Uniform1(_materialEmissiveStrengthLocation, material?.EmissiveStrength ?? 1f);
+        }
+
         if (resources.BaseColorTextureId != 0)
         {
             _gl.ActiveTexture(TextureUnit.Texture0);
@@ -147,7 +159,20 @@ public sealed class UnlitShader : IShader3D
 
     private uint CreateProgram()
     {
-        const string vert = @"#version 300 es
+        uint vertex = Compile(ShaderType.VertexShader, VertexShaderSource);
+        uint fragment = Compile(ShaderType.FragmentShader, FragmentShaderSource);
+
+        uint program = _gl.CreateProgram();
+        _gl.AttachShader(program, vertex);
+        _gl.AttachShader(program, fragment);
+        _gl.LinkProgram(program);
+
+        _gl.DeleteShader(vertex);
+        _gl.DeleteShader(fragment);
+        return program;
+    }
+
+    internal const string VertexShaderSource = @"#version 300 es
 precision mediump float;
 layout(location = 0) in vec3 aPosition;
 layout(location = 2) in vec2 aTexCoord;
@@ -159,7 +184,7 @@ void main()
     gl_Position = uMVP * vec4(aPosition, 1.0);
 }";
 
-        const string frag = @"#version 300 es
+    internal const string FragmentShaderSource = @"#version 300 es
 precision mediump float;
 in vec2 TexCoord;
 layout(location = 0) out vec4 FragColor;
@@ -172,6 +197,7 @@ uniform int uAlphaMode;
 uniform float uAlphaCutoff;
 uniform vec3 uEmissiveFactor;
 uniform float uEmissiveIntensity;
+uniform float uMaterialEmissiveStrength;
 uniform vec3 uEmissionColor;
 uniform sampler2D uEmissiveMap;
 uniform int uHasEmissiveMap;
@@ -191,6 +217,7 @@ void main()
     }
 
     vec3 emissive = uEmissiveFactor * max(uEmissiveIntensity, 0.0);
+    emissive *= max(uMaterialEmissiveStrength, 0.0);
     if (uHasEmissiveMap == 1)
     {
         vec3 emissiveSample = uForceWhiteEmissiveMap == 1 ? vec3(1.0) : texture(uEmissiveMap, TexCoord).rgb;
@@ -202,19 +229,6 @@ void main()
     FragColor = vec4(color.rgb + totalEmissive, alpha);
     EmissiveColor = vec4(totalEmissive, alpha);
 }";
-
-        uint vertex = Compile(ShaderType.VertexShader, vert);
-        uint fragment = Compile(ShaderType.FragmentShader, frag);
-
-        uint program = _gl.CreateProgram();
-        _gl.AttachShader(program, vertex);
-        _gl.AttachShader(program, fragment);
-        _gl.LinkProgram(program);
-
-        _gl.DeleteShader(vertex);
-        _gl.DeleteShader(fragment);
-        return program;
-    }
 
     private uint Compile(ShaderType type, string source)
     {
@@ -235,6 +249,7 @@ void main()
         _alphaCutoffLocation = _gl.GetUniformLocation(_program, "uAlphaCutoff");
         _emissiveFactorLocation = _gl.GetUniformLocation(_program, "uEmissiveFactor");
         _emissiveIntensityLocation = _gl.GetUniformLocation(_program, "uEmissiveIntensity");
+        _materialEmissiveStrengthLocation = _gl.GetUniformLocation(_program, "uMaterialEmissiveStrength");
         _emissionColorLocation = _gl.GetUniformLocation(_program, "uEmissionColor");
         _emissiveMapLocation = _gl.GetUniformLocation(_program, "uEmissiveMap");
         _hasEmissiveMapLocation = _gl.GetUniformLocation(_program, "uHasEmissiveMap");
