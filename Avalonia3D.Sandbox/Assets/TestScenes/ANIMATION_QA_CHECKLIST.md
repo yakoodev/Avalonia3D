@@ -51,6 +51,18 @@
 
 **Ожидаемый результат:** unsupported channels явно отражены в отчёте и summary в UI, без ложных пропусков и без падений.
 
+### 6) Явный отчёт по типам каналов в клипе (TRS / Weights / Material / TextureTransform)
+1. Загрузить сцену и открыть лог импорта.
+2. Проверить, что для каждого клипа есть строка вида `Summary=[Trs=..., Weights=..., Material=..., TextureTransform=...]`.
+3. Сверить итоговые категории с ожиданиями по glTF: TRS/Weights для node animation, Material/TextureTransform для pointer-анимаций.
+
+**Ожидаемый результат:** лог явно показывает типы каналов по каждому клипу, и QA может быстро понять, какой тип анимации реально импортирован.
+
+### 7) Специфика `droid/scene.gltf` (глаза)
+- Для `droid/scene.gltf` текущий эффект глаз зафиксирован как **morph + emissive fallback**, а **не animated texture**.
+- В текущем ассете отсутствуют каналы `KHR_animation_pointer` с `target.extensions` для emissive texture transform, поэтому анимация UV/texture в emissive slot не импортируется.
+- Если нужен именно animated texture в emissive slot, ассет должен содержать каналы `animations[].channels[].target.extensions.KHR_animation_pointer` с pointer на `KHR_texture_transform` (например `.../emissiveTexture/extensions/KHR_texture_transform/...`).
+
 ## Критерии приемки
 - Средний FPS в тестовой сцене не деградирует относительно базового профиля (или держится в допустимом диапазоне окружения QA).
 - В процессе проигрывания отсутствуют визуальные артефакты: дрожание, рывки, спонтанные масштабирования, «взрывы» меша.

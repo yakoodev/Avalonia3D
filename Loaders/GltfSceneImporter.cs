@@ -21,13 +21,15 @@ namespace Avalonia3D.Loaders
             IReadOnlyList<AnimationClip> clips,
             SceneImportStatus status,
             IReadOnlyList<string>? issues = null,
-            IReadOnlyList<UnsupportedAnimationChannelReport>? unsupportedAnimationChannels = null)
+            IReadOnlyList<UnsupportedAnimationChannelReport>? unsupportedAnimationChannels = null,
+            IReadOnlyList<AnimationChannelKindSummary>? animationChannelKinds = null)
         {
             Graph = graph;
             Clips = clips;
             Status = status;
             Issues = issues ?? [];
             UnsupportedAnimationChannels = unsupportedAnimationChannels ?? [];
+            AnimationChannelKinds = animationChannelKinds ?? [];
         }
 
         public SceneGraph Graph { get; }
@@ -35,6 +37,7 @@ namespace Avalonia3D.Loaders
         public SceneImportStatus Status { get; }
         public IReadOnlyList<string> Issues { get; }
         public IReadOnlyList<UnsupportedAnimationChannelReport> UnsupportedAnimationChannels { get; }
+        public IReadOnlyList<AnimationChannelKindSummary> AnimationChannelKinds { get; }
         public bool IsDegraded => Status == SceneImportStatus.Degraded;
     }
 
@@ -50,6 +53,19 @@ namespace Avalonia3D.Loaders
         string PointerPath,
         string TargetId,
         UnsupportedAnimationChannelReason Reason);
+
+    public enum ImportedAnimationChannelKind
+    {
+        Trs,
+        Weights,
+        Material,
+        TextureTransform
+    }
+
+    public readonly record struct AnimationChannelKindSummary(
+        string ClipName,
+        ImportedAnimationChannelKind Kind,
+        int ChannelCount);
 
     public enum SceneImportStatus
     {
@@ -95,7 +111,13 @@ namespace Avalonia3D.Loaders
                     ? ImportWithAnimations(loaded.Model)
                     : new SceneImportResult(new SceneGraph(), [], SceneImportStatus.Success);
 
-                return new SceneImportResult(importResult.Graph, importResult.Clips, loaded.Status, loaded.Issues, importResult.UnsupportedAnimationChannels);
+                return new SceneImportResult(
+                    importResult.Graph,
+                    importResult.Clips,
+                    loaded.Status,
+                    loaded.Issues,
+                    importResult.UnsupportedAnimationChannels,
+                    importResult.AnimationChannelKinds);
             }
             finally
             {
@@ -241,12 +263,17 @@ namespace Avalonia3D.Loaders
             }
 
             var materialTargetMap = BuildMaterialTargetMap(gltf, nodeKeys);
-            var (clips, unsupportedChannels) = ExtractAnimationClips(gltf, nodeKeys, materialTargetMap);
+            var (clips, unsupportedChannels, channelKindSummary) = ExtractAnimationClips(gltf, nodeKeys, materialTargetMap);
 
             ModelLoader.ClearAllCaches();
             MemoryManager.PerformAggressiveCleanup();
             MemoryManager.LogMemoryState("After GLTF load");
-            return new SceneImportResult(graph, clips, SceneImportStatus.Success, unsupportedAnimationChannels: unsupportedChannels);
+            return new SceneImportResult(
+                graph,
+                clips,
+                SceneImportStatus.Success,
+                unsupportedAnimationChannels: unsupportedChannels,
+                animationChannelKinds: channelKindSummary);
         }
 
         private sealed record ModelLoadOutcome(ModelRoot? Model, SceneImportStatus Status, IReadOnlyList<string> Issues);
@@ -401,13 +428,14 @@ namespace Avalonia3D.Loaders
             return readonlyMap;
         }
 
-        private static (List<AnimationClip> Clips, List<UnsupportedAnimationChannelReport> UnsupportedChannels) ExtractAnimationClips(
+        private static (List<AnimationClip> Clips, List<UnsupportedAnimationChannelReport> UnsupportedChannels, List<AnimationChannelKindSummary> ChannelKinds) ExtractAnimationClips(
             ModelRoot gltf,
             IReadOnlyDictionary<Node, string> nodeKeys,
             IReadOnlyDictionary<int, IReadOnlyList<string>> materialTargetMap)
         {
             var clips = new List<AnimationClip>();
             var unsupportedChannels = new List<UnsupportedAnimationChannelReport>();
+            var channelKinds = new List<AnimationChannelKindSummary>();
             foreach (var animation in gltf.LogicalAnimations)
             {
                 var clipName = string.IsNullOrWhiteSpace(animation.Name)
@@ -415,6 +443,7 @@ namespace Avalonia3D.Loaders
                     : animation.Name;
 
                 var clip = new AnimationClip(clipName);
+                var clipChannelKinds = new Dictionary<ImportedAnimationChannelKind, int>();
 
                 foreach (var channel in animation.Channels)
                 {
@@ -436,6 +465,7 @@ namespace Avalonia3D.Loaders
                     }
 
                     var resolved = descriptor.Value;
+                    TrackChannelKind(clipChannelKinds, ResolveChannelKind(resolved));
                     var bindingSpecs = ResolveTargetBindings(channel, resolved, nodeKeys, materialTargetMap);
                     if (bindingSpecs.Count == 0)
                     {
@@ -483,9 +513,33 @@ namespace Avalonia3D.Loaders
                         clipName,
                         animation.Channels.Count);
                 }
+
+                foreach (var (kind, count) in clipChannelKinds)
+                {
+                    channelKinds.Add(new AnimationChannelKindSummary(clipName, kind, count));
+                }
             }
 
-            return (clips, unsupportedChannels);
+            return (clips, unsupportedChannels, channelKinds);
+        }
+
+
+        private static ImportedAnimationChannelKind ResolveChannelKind(ChannelTargetDescriptor descriptor)
+        {
+            return descriptor.Kind switch
+            {
+                AnimationTargetKind.NodeTransform => ImportedAnimationChannelKind.Trs,
+                AnimationTargetKind.NodeMorph => ImportedAnimationChannelKind.Weights,
+                AnimationTargetKind.TextureProperty => ImportedAnimationChannelKind.TextureTransform,
+                AnimationTargetKind.MaterialProperty => ImportedAnimationChannelKind.Material,
+                _ => ImportedAnimationChannelKind.Material
+            };
+        }
+
+        private static void TrackChannelKind(Dictionary<ImportedAnimationChannelKind, int> channelKinds, ImportedAnimationChannelKind kind)
+        {
+            channelKinds.TryGetValue(kind, out var count);
+            channelKinds[kind] = count + 1;
         }
 
         private static UnsupportedAnimationChannelReport CreateUnsupportedChannelReport(

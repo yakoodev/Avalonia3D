@@ -59,6 +59,7 @@ public sealed class GltfFileScene : ISandboxScene
         GltfAssetDiagnostics.LogAssetStatus(path);
         scene.LoadScene(path);
         GltfAssetDiagnostics.LogNodeIdConflicts(scene.SceneGraph, Path.GetFileName(path));
+        GltfAssetDiagnostics.LogAnimationChannelKinds(scene.LastImportReport, Path.GetFileName(path));
 
         if (scene.Lights.Count == 0)
         {

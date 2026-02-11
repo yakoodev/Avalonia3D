@@ -3,6 +3,7 @@ using Avalonia3D.Loaders;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.IO;
 
 namespace Avalonia3D.Sandbox.Services;
@@ -64,6 +65,32 @@ public static class GltfAssetDiagnostics
         LogDuplicateIds(graph, sceneLabel, node => node.SemanticId, "semantic");
         LogDuplicateIds(graph, sceneLabel, node => node.StableId, "stable");
         LogDuplicateIds(graph, sceneLabel, node => node.ExternalId, "external");
+    }
+
+    public static void LogAnimationChannelKinds(SceneImportReport report, string sceneLabel)
+    {
+        if (report.AnimationChannelKinds.Count == 0)
+        {
+            return;
+        }
+
+        var groupedByClip = report.AnimationChannelKinds
+            .GroupBy(summary => summary.ClipName, StringComparer.Ordinal)
+            .OrderBy(group => group.Key, StringComparer.Ordinal);
+
+        foreach (var clipGroup in groupedByClip)
+        {
+            var clipSummary = string.Join(", ",
+                clipGroup
+                    .OrderBy(item => item.Kind)
+                    .Select(item => $"{item.Kind}={item.ChannelCount}"));
+
+            Log.Information(
+                "GLTF animation channel kinds in {Scene}. Clip={Clip}, Summary=[{Summary}]",
+                sceneLabel,
+                clipGroup.Key,
+                clipSummary);
+        }
     }
 
     private static void LogDuplicateIds(SceneGraph graph, string sceneLabel, Func<SceneNode, string?> selector, string idKind)

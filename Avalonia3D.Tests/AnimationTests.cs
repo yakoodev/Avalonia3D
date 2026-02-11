@@ -27,6 +27,18 @@ public class AnimationTests
     }
 
     [Fact]
+    public void GltfImporter_ReportsAnimationChannelKinds_ForClip()
+    {
+        var importer = new GltfSceneImporter();
+        var path = GetTestAssetPath("Fox.gltf");
+
+        var result = importer.ImportWithAnimations(path);
+
+        Assert.NotEmpty(result.AnimationChannelKinds);
+        Assert.Contains(result.AnimationChannelKinds, summary => summary.Kind == ImportedAnimationChannelKind.Trs);
+    }
+
+    [Fact]
     public void AnimationClipPlayer_Update_AppliesChannelValueToNode()
     {
         var (graph, node, clip) = CreateSingleNodeClip(duration: 1f);

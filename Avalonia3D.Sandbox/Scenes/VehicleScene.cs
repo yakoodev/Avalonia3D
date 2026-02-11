@@ -20,6 +20,7 @@ public sealed class VehicleScene : ISandboxScene
         GltfAssetDiagnostics.LogAssetStatus(path);
         scene.LoadScene(path);
         GltfAssetDiagnostics.LogNodeIdConflicts(scene.SceneGraph, Path.GetFileName(path));
+        GltfAssetDiagnostics.LogAnimationChannelKinds(scene.LastImportReport, Path.GetFileName(path));
 
         scene.Lights.Add(new Light
         {
