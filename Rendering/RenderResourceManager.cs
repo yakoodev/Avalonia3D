@@ -16,6 +16,7 @@ namespace Avalonia3D.Rendering
         public Half Px; public Half Py; public Half Pz;
         public Half Nx; public Half Ny; public Half Nz;
         public Half U; public Half V;
+        public Half U1; public Half V1;
     }
 
     public sealed class RenderResources
@@ -296,7 +297,9 @@ namespace Avalonia3D.Rendering
                         Ny = (Half)v.Normal.Y,
                         Nz = (Half)v.Normal.Z,
                         U = (Half)v.TexCoord.X,
-                        V = (Half)v.TexCoord.Y
+                        V = (Half)v.TexCoord.Y,
+                        U1 = (Half)v.TexCoord1.X,
+                        V1 = (Half)v.TexCoord1.Y
                     };
                 }
 
@@ -380,7 +383,9 @@ namespace Avalonia3D.Rendering
                             Ny = (Half)v.Normal.Y,
                             Nz = (Half)v.Normal.Z,
                             U = (Half)v.TexCoord.X,
-                            V = (Half)v.TexCoord.Y
+                            V = (Half)v.TexCoord.Y,
+                            U1 = (Half)v.TexCoord1.X,
+                            V1 = (Half)v.TexCoord1.Y
                         };
                     }
                 }
@@ -587,6 +592,9 @@ namespace Avalonia3D.Rendering
 
             Gl.EnableVertexAttribArray(2);
             Gl.VertexAttribPointer(2, 2, VertexAttribPointerType.HalfFloat, false, stride, (void*)12);
+
+            Gl.EnableVertexAttribArray(3);
+            Gl.VertexAttribPointer(3, 2, VertexAttribPointerType.HalfFloat, false, stride, (void*)16);
         }
     }
 }

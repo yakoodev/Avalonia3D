@@ -148,6 +148,7 @@ namespace Avalonia3D.Loaders
             var positions = posAccessor.AsVector3Array();
             var normals = prim.GetVertexAccessor("NORMAL")?.AsVector3Array();
             var texcoords = prim.GetVertexAccessor("TEXCOORD_0")?.AsVector2Array();
+            var texcoords1 = prim.GetVertexAccessor("TEXCOORD_1")?.AsVector2Array();
             var indicesAccessor = prim.GetIndexAccessor();
 
             // Создаем уникальный ключ для кеширования на GPU
@@ -173,7 +174,8 @@ namespace Avalonia3D.Loaders
                     {
                         Position = positions[i],
                         Normal = normal,
-                        TexCoord = (i < (texcoords?.Count ?? 0)) ? texcoords[i] : Vector2.Zero
+                        TexCoord = (i < (texcoords?.Count ?? 0)) ? texcoords[i] : Vector2.Zero,
+                        TexCoord1 = (i < (texcoords1?.Count ?? 0)) ? texcoords1[i] : Vector2.Zero
                     };
                 }
             }
@@ -275,7 +277,8 @@ namespace Avalonia3D.Loaders
             result.Opacity = result.BaseColorFactor.W;
 
             var baseColorChannel = material.FindChannel("BaseColor");
-            result.BaseColorTexture = LoadTextureFromChannel(baseColorChannel);
+            result.BaseColorTexture = LoadTextureFromChannel(baseColorChannel, out var baseColorTexCoord);
+            AssignTextureTexCoord(result.BaseColorTexture, baseColorTexCoord);
             SyncTextureRuntimeTransform(result, TextureSemantic.BaseColor, result.BaseColorTexture);
             if (baseColorChannel != null)
             {
@@ -285,15 +288,18 @@ namespace Avalonia3D.Loaders
             }
 
             var normalChannel = material.FindChannel("Normal");
-            result.NormalTexture = LoadTextureFromChannel(normalChannel);
+            result.NormalTexture = LoadTextureFromChannel(normalChannel, out var normalTexCoord);
+            AssignTextureTexCoord(result.NormalTexture, normalTexCoord);
             SyncTextureRuntimeTransform(result, TextureSemantic.Normal, result.NormalTexture);
 
             var metallicRoughnessChannel = material.FindChannel("MetallicRoughness");
-            result.MetallicRoughnessTexture = LoadTextureFromChannel(metallicRoughnessChannel);
+            result.MetallicRoughnessTexture = LoadTextureFromChannel(metallicRoughnessChannel, out var metallicRoughnessTexCoord);
+            AssignTextureTexCoord(result.MetallicRoughnessTexture, metallicRoughnessTexCoord);
             SyncTextureRuntimeTransform(result, TextureSemantic.MetallicRoughness, result.MetallicRoughnessTexture);
 
             var occlusionChannel = material.FindChannel("Occlusion");
-            result.OcclusionTexture = LoadTextureFromChannel(occlusionChannel);
+            result.OcclusionTexture = LoadTextureFromChannel(occlusionChannel, out var occlusionTexCoord);
+            AssignTextureTexCoord(result.OcclusionTexture, occlusionTexCoord);
             SyncTextureRuntimeTransform(result, TextureSemantic.Occlusion, result.OcclusionTexture);
             if (occlusionChannel != null)
             {
@@ -303,7 +309,8 @@ namespace Avalonia3D.Loaders
             result.EmissiveFactor = ReadEmissiveFactor(material, result.EmissiveFactor);
 
             var emissiveChannel = material.FindChannel("Emissive");
-            result.EmissiveTexture = LoadTextureFromChannel(emissiveChannel);
+            result.EmissiveTexture = LoadTextureFromChannel(emissiveChannel, out var emissiveTexCoord);
+            AssignTextureTexCoord(result.EmissiveTexture, emissiveTexCoord);
             SyncTextureRuntimeTransform(result, TextureSemantic.Emissive, result.EmissiveTexture);
             if (emissiveChannel != null)
             {
@@ -313,15 +320,24 @@ namespace Avalonia3D.Loaders
 
 
             var extensionChannels = extensionPayload.TextureChannels;
-            result.ExtensionTextures.ClearcoatTexture = LoadTextureFromChannel(extensionChannels.Clearcoat);
-            result.ExtensionTextures.ClearcoatRoughnessTexture = LoadTextureFromChannel(extensionChannels.ClearcoatRoughness);
-            result.ExtensionTextures.ClearcoatNormalTexture = LoadTextureFromChannel(extensionChannels.ClearcoatNormal);
-            result.ExtensionTextures.SheenColorTexture = LoadTextureFromChannel(extensionChannels.SheenColor);
-            result.ExtensionTextures.SheenRoughnessTexture = LoadTextureFromChannel(extensionChannels.SheenRoughness);
-            result.ExtensionTextures.SpecularTexture = LoadTextureFromChannel(extensionChannels.Specular);
-            result.ExtensionTextures.SpecularColorTexture = LoadTextureFromChannel(extensionChannels.SpecularColor);
-            result.ExtensionTextures.TransmissionTexture = LoadTextureFromChannel(extensionChannels.Transmission);
-            result.ExtensionTextures.VolumeThicknessTexture = LoadTextureFromChannel(extensionChannels.VolumeThickness);
+            result.ExtensionTextures.ClearcoatTexture = LoadTextureFromChannel(extensionChannels.Clearcoat, out var clearcoatTexCoord);
+            AssignTextureTexCoord(result.ExtensionTextures.ClearcoatTexture, clearcoatTexCoord);
+            result.ExtensionTextures.ClearcoatRoughnessTexture = LoadTextureFromChannel(extensionChannels.ClearcoatRoughness, out var clearcoatRoughnessTexCoord);
+            AssignTextureTexCoord(result.ExtensionTextures.ClearcoatRoughnessTexture, clearcoatRoughnessTexCoord);
+            result.ExtensionTextures.ClearcoatNormalTexture = LoadTextureFromChannel(extensionChannels.ClearcoatNormal, out var clearcoatNormalTexCoord);
+            AssignTextureTexCoord(result.ExtensionTextures.ClearcoatNormalTexture, clearcoatNormalTexCoord);
+            result.ExtensionTextures.SheenColorTexture = LoadTextureFromChannel(extensionChannels.SheenColor, out var sheenColorTexCoord);
+            AssignTextureTexCoord(result.ExtensionTextures.SheenColorTexture, sheenColorTexCoord);
+            result.ExtensionTextures.SheenRoughnessTexture = LoadTextureFromChannel(extensionChannels.SheenRoughness, out var sheenRoughnessTexCoord);
+            AssignTextureTexCoord(result.ExtensionTextures.SheenRoughnessTexture, sheenRoughnessTexCoord);
+            result.ExtensionTextures.SpecularTexture = LoadTextureFromChannel(extensionChannels.Specular, out var specularTexCoord);
+            AssignTextureTexCoord(result.ExtensionTextures.SpecularTexture, specularTexCoord);
+            result.ExtensionTextures.SpecularColorTexture = LoadTextureFromChannel(extensionChannels.SpecularColor, out var specularColorTexCoord);
+            AssignTextureTexCoord(result.ExtensionTextures.SpecularColorTexture, specularColorTexCoord);
+            result.ExtensionTextures.TransmissionTexture = LoadTextureFromChannel(extensionChannels.Transmission, out var transmissionTexCoord);
+            AssignTextureTexCoord(result.ExtensionTextures.TransmissionTexture, transmissionTexCoord);
+            result.ExtensionTextures.VolumeThicknessTexture = LoadTextureFromChannel(extensionChannels.VolumeThickness, out var volumeThicknessTexCoord);
+            AssignTextureTexCoord(result.ExtensionTextures.VolumeThicknessTexture, volumeThicknessTexCoord);
 
             var sourceAlphaMode = result.SourceAlphaMode;
             var resolvedSceneOverride = MaterialImportOverrideConfiguration.ResolveForMaterial(policyContext.AssetPath, material.Name)
@@ -403,16 +419,19 @@ namespace Avalonia3D.Loaders
                 runtime.UvOffset = Vector2.Zero;
                 runtime.UvScale = Vector2.One;
                 runtime.UvRotation = 0f;
+                runtime.TexCoordSet = 0;
                 return;
             }
 
             runtime.UvOffset = texture.Transform.Offset;
             runtime.UvScale = texture.Transform.Scale;
             runtime.UvRotation = texture.Transform.Rotation;
+            runtime.TexCoordSet = texture.Transform.TexCoord;
         }
 
-        private static TextureData? LoadTextureFromChannel(MaterialChannel? channel)
+        private static TextureData? LoadTextureFromChannel(MaterialChannel? channel, out int texCoord)
         {
+            texCoord = GetChannelTexCoord(channel);
             var image = channel?.Texture?.PrimaryImage;
             if (image == null)
             {
@@ -422,13 +441,14 @@ namespace Avalonia3D.Loaders
             return LoadTextureFromImage(image);
         }
 
-        private static TextureData? LoadTextureFromChannel(object? channel)
+        private static TextureData? LoadTextureFromChannel(object? channel, out int texCoord)
         {
             if (channel is MaterialChannel materialChannel)
             {
-                return LoadTextureFromChannel(materialChannel);
+                return LoadTextureFromChannel(materialChannel, out texCoord);
             }
 
+            texCoord = GetChannelTexCoord(channel);
             if (channel == null)
             {
                 return null;
@@ -443,6 +463,36 @@ namespace Avalonia3D.Loaders
             }
 
             return null;
+        }
+
+
+        private static void AssignTextureTexCoord(TextureData? texture, int texCoord)
+        {
+            if (texture == null)
+            {
+                return;
+            }
+
+            texture.Transform.TexCoord = texCoord;
+        }
+
+        private static int GetChannelTexCoord(object? channel)
+        {
+            if (channel == null)
+            {
+                return 0;
+            }
+
+            var texCoordProperty = channel.GetType().GetProperty("TextureCoordinate")
+                ?? channel.GetType().GetProperty("TexCoord")
+                ?? channel.GetType().GetProperty("TextureCoord");
+
+            if (texCoordProperty?.GetValue(channel) is int texCoord)
+            {
+                return texCoord;
+            }
+
+            return 0;
         }
 
         private static TextureData? LoadTextureFromImage(SharpGLTF.Schema2.Image image)

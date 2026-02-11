@@ -709,6 +709,32 @@ public sealed class MaterialAlphaAndLoaderTests
         Assert.False(material.IsTransparent);
     }
 
+
+    [Fact]
+    public void ModelLoader_TransfersChannelTexCoordToRuntimeParameters()
+    {
+        var getChannelTexCoord = typeof(ModelLoader).GetMethod("GetChannelTexCoord", BindingFlags.NonPublic | BindingFlags.Static);
+        var syncRuntimeTransform = typeof(ModelLoader).GetMethod("SyncTextureRuntimeTransform", BindingFlags.NonPublic | BindingFlags.Static);
+
+        Assert.NotNull(getChannelTexCoord);
+        Assert.NotNull(syncRuntimeTransform);
+
+        var channel = new FakeTextureChannel { TextureCoordinate = 1 };
+        var texCoord = (int)getChannelTexCoord!.Invoke(null, new object?[] { channel })!;
+
+        var texture = new TextureData();
+        texture.Transform.TexCoord = texCoord;
+
+        var material = new Avalonia3D.Model.Material();
+        syncRuntimeTransform!.Invoke(null, new object?[] { material, TextureSemantic.BaseColor, texture });
+
+        Assert.Equal(1, material.TextureRuntime.BaseColor.TexCoordSet);
+    }
+
+    private sealed class FakeTextureChannel
+    {
+        public int TextureCoordinate { get; set; }
+    }
     private static string GetMinimalGltfJson() =>
         """
         {

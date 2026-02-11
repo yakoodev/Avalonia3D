@@ -78,6 +78,11 @@ namespace Avalonia3D.Shaders
         private int _emissiveUvOffsetLocation = -1;
         private int _emissiveUvScaleLocation = -1;
         private int _emissiveUvRotationLocation = -1;
+        private int _baseColorTexCoordSetLocation = -1;
+        private int _normalTexCoordSetLocation = -1;
+        private int _metallicRoughnessTexCoordSetLocation = -1;
+        private int _occlusionTexCoordSetLocation = -1;
+        private int _emissiveTexCoordSetLocation = -1;
         private int _environmentMapLocation = -1;
         private int _reflectionIntensityLocation = -1;
         private int _hasEnvironmentMapLocation = -1;
@@ -289,6 +294,11 @@ namespace Avalonia3D.Shaders
             _emissiveUvOffsetLocation = _gl.GetUniformLocation(_shaderProgram, "uEmissiveUvOffset");
             _emissiveUvScaleLocation = _gl.GetUniformLocation(_shaderProgram, "uEmissiveUvScale");
             _emissiveUvRotationLocation = _gl.GetUniformLocation(_shaderProgram, "uEmissiveUvRotation");
+            _baseColorTexCoordSetLocation = _gl.GetUniformLocation(_shaderProgram, "uBaseColorTexCoordSet");
+            _normalTexCoordSetLocation = _gl.GetUniformLocation(_shaderProgram, "uNormalTexCoordSet");
+            _metallicRoughnessTexCoordSetLocation = _gl.GetUniformLocation(_shaderProgram, "uMetallicRoughnessTexCoordSet");
+            _occlusionTexCoordSetLocation = _gl.GetUniformLocation(_shaderProgram, "uOcclusionTexCoordSet");
+            _emissiveTexCoordSetLocation = _gl.GetUniformLocation(_shaderProgram, "uEmissiveTexCoordSet");
             _ambientLocation = _gl.GetUniformLocation(_shaderProgram, "uAmbientStrength");
             _specularLocation = _gl.GetUniformLocation(_shaderProgram, "uSpecularStrength");
             _intensityLocation = _gl.GetUniformLocation(_shaderProgram, "uIntensity[0]");
@@ -422,6 +432,9 @@ namespace Avalonia3D.Shaders
                 _gl.Uniform3(_emissiveFactorLocation, emissiveFactor.X, emissiveFactor.Y, emissiveFactor.Z);
 
             var baseColorUv = material?.TextureRuntime.BaseColor ?? new MaterialTextureTransformRuntime();
+            var normalUv = material?.TextureRuntime.Normal ?? new MaterialTextureTransformRuntime();
+            var metallicRoughnessUv = material?.TextureRuntime.MetallicRoughness ?? new MaterialTextureTransformRuntime();
+            var occlusionUv = material?.TextureRuntime.Occlusion ?? new MaterialTextureTransformRuntime();
             var emissiveUv = material?.TextureRuntime.Emissive ?? new MaterialTextureTransformRuntime();
 
             if (_baseColorUvOffsetLocation != -1)
@@ -441,6 +454,21 @@ namespace Avalonia3D.Shaders
 
             if (_emissiveUvRotationLocation != -1)
                 _gl.Uniform1(_emissiveUvRotationLocation, emissiveUv.UvRotation);
+
+            if (_baseColorTexCoordSetLocation != -1)
+                _gl.Uniform1(_baseColorTexCoordSetLocation, baseColorUv.TexCoordSet);
+
+            if (_normalTexCoordSetLocation != -1)
+                _gl.Uniform1(_normalTexCoordSetLocation, normalUv.TexCoordSet);
+
+            if (_metallicRoughnessTexCoordSetLocation != -1)
+                _gl.Uniform1(_metallicRoughnessTexCoordSetLocation, metallicRoughnessUv.TexCoordSet);
+
+            if (_occlusionTexCoordSetLocation != -1)
+                _gl.Uniform1(_occlusionTexCoordSetLocation, occlusionUv.TexCoordSet);
+
+            if (_emissiveTexCoordSetLocation != -1)
+                _gl.Uniform1(_emissiveTexCoordSetLocation, emissiveUv.TexCoordSet);
 
             if (_metallicFactorLocation != -1)
                 _gl.Uniform1(_metallicFactorLocation, metallicFactor);

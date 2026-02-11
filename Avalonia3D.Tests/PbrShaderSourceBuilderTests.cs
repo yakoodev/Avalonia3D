@@ -96,4 +96,25 @@ public class PbrShaderSourceBuilderTests
         Assert.True(specularApply > specularColorMapDecl);
     }
 
+    [Fact]
+    public void Build_WithTextureMaps_IncludesPerTextureTexCoordSetSelection()
+    {
+        var builder = new PbrShaderSourceBuilder();
+
+        var (vertexSource, fragmentSource) = builder.Build(
+            PbrFeatures.BaseColorMap | PbrFeatures.NormalMap | PbrFeatures.MetallicRoughnessMap | PbrFeatures.OcclusionMap | PbrFeatures.EmissiveMap,
+            maxLights: 4);
+
+        Assert.Contains("layout(location = 3) in vec2 aTexCoord1;", vertexSource);
+        Assert.Contains("out vec2 TexCoord1;", vertexSource);
+        Assert.Contains("SelectTexCoord", fragmentSource);
+        Assert.Contains("uBaseColorTexCoordSet", fragmentSource);
+        Assert.Contains("uNormalTexCoordSet", fragmentSource);
+        Assert.Contains("uMetallicRoughnessTexCoordSet", fragmentSource);
+        Assert.Contains("uOcclusionTexCoordSet", fragmentSource);
+        Assert.Contains("uEmissiveTexCoordSet", fragmentSource);
+        Assert.Contains("texture(uMetallicRoughnessMap, metallicRoughnessTexCoord)", fragmentSource);
+        Assert.Contains("texture(uOcclusionMap, occlusionTexCoord)", fragmentSource);
+    }
+
 }
