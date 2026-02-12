@@ -19,21 +19,7 @@ public sealed class DefaultSceneBootstrap : ISceneBootstrap
     {
         var validatedProfile = (profile ?? GraphicsProfile.Medium).Validate();
         scene.ApplyGraphicsProfile(validatedProfile);
-        scene.ShaderRegistry.Register(ShaderIds.Pbr, glContext => GLShader.Create(glContext, PbrFeatures.None, validatedProfile.MaxLights));
-        scene.ShaderRegistry.Register(ShaderIds.PbrBaseColor, glContext => GLShader.Create(glContext, PbrFeatures.BaseColorMap, validatedProfile.MaxLights));
-        scene.ShaderRegistry.Register(ShaderIds.PbrBaseColorNormal, glContext => GLShader.Create(glContext, PbrFeatures.BaseColorMap | PbrFeatures.NormalMap, validatedProfile.MaxLights));
-        scene.ShaderRegistry.Register(ShaderIds.PbrBaseColorNormalMetallicRoughness, glContext => GLShader.Create(glContext, PbrFeatures.BaseColorMap | PbrFeatures.NormalMap | PbrFeatures.MetallicRoughnessMap, validatedProfile.MaxLights));
-        scene.ShaderRegistry.Register(ShaderIds.PbrBaseColorNormalMetallicRoughnessAoEmissive, glContext => GLShader.Create(glContext, PbrFeatures.BaseColorMap | PbrFeatures.NormalMap | PbrFeatures.MetallicRoughnessMap | PbrFeatures.OcclusionMap | PbrFeatures.EmissiveMap, validatedProfile.MaxLights));
-        scene.ShaderRegistry.Register(ShaderIds.PbrFull, glContext => GLShader.Create(glContext, PbrFeatures.BaseColorMap | PbrFeatures.NormalMap | PbrFeatures.MetallicRoughnessMap | PbrFeatures.OcclusionMap | PbrFeatures.EmissiveMap | PbrFeatures.ReflectionsIbl, validatedProfile.MaxLights));
-        scene.ShaderRegistry.Register(ShaderIds.PbrTransmission, glContext => GLShader.Create(glContext, PbrFeatures.Transmission, validatedProfile.MaxLights));
-        scene.ShaderRegistry.Register(ShaderIds.PbrFullTransmission, glContext => GLShader.Create(glContext, PbrFeatures.BaseColorMap | PbrFeatures.NormalMap | PbrFeatures.MetallicRoughnessMap | PbrFeatures.OcclusionMap | PbrFeatures.EmissiveMap | PbrFeatures.ReflectionsIbl | PbrFeatures.Transmission, validatedProfile.MaxLights));
-        scene.ShaderRegistry.Register(ShaderIds.Unlit, UnlitShader.Create);
-        scene.ShaderRegistry.Register(ShaderIds.NormalsDebug, NormalsDebugShader.Create);
-        scene.ShaderRegistry.SetDefault(ShaderIds.Pbr);
-        scene.ActiveShaderId = ShaderIds.Pbr;
-        scene.BindRenderMode(ShaderRenderMode.Pbr, ShaderIds.Pbr);
-        scene.BindRenderMode(ShaderRenderMode.Unlit, ShaderIds.Unlit);
-        scene.BindRenderMode(ShaderRenderMode.NormalsDebug, ShaderIds.NormalsDebug);
+        SceneShaderRegistryBootstrap.Configure(scene, validatedProfile.MaxLights);
 
         scene.Lights.Add(new Light
         {
