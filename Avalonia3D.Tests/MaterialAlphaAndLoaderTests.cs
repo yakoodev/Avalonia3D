@@ -731,6 +731,25 @@ public sealed class MaterialAlphaAndLoaderTests
         }
     }
 
+    [Theory]
+    [InlineData("droid")]
+    [InlineData("cylinder_sci_fi")]
+    [InlineData("")]
+    public void ModelLoader_SandboxSceneFixtures_AssignMaterialToMeshes(string folder)
+    {
+        var scenePath = ResolveSandboxScenePath(folder);
+        var gltf = SharpGLTF.Schema2.ModelRoot.Load(scenePath);
+        var models = ModelLoader.LoadModels(gltf, new MaterialImportPolicyContext
+        {
+            AssetPath = scenePath,
+            AlphaProfile = MaterialAlphaImportConfiguration.CurrentProfile
+        });
+
+        Assert.NotEmpty(models);
+        Assert.All(models, model => Assert.NotNull(model.Material));
+        Assert.All(models, model => Assert.False(string.IsNullOrWhiteSpace(model.MaterialKey)));
+    }
+
     [Fact]
     public void ModelLoader_TransfersChannelTexCoordToRuntimeParameters()
     {
@@ -1393,6 +1412,31 @@ public sealed class MaterialAlphaAndLoaderTests
         }
 
         throw new FileNotFoundException("Не удалось найти fixture droid/scene.gltf для интеграционного теста.", directPath);
+    }
+
+    private static string ResolveSandboxScenePath(string folder)
+    {
+        var parts = string.IsNullOrWhiteSpace(folder)
+            ? new[] { "Avalonia3D.Sandbox", "Assets", "TestScenes", "scene.gltf" }
+            : new[] { "Avalonia3D.Sandbox", "Assets", "TestScenes", folder, "scene.gltf" };
+
+        var directPath = Path.GetFullPath(Path.Combine(parts));
+        if (File.Exists(directPath))
+        {
+            return directPath;
+        }
+
+        var baseParts = string.IsNullOrWhiteSpace(folder)
+            ? new[] { AppContext.BaseDirectory, "..", "..", "..", "..", "Avalonia3D.Sandbox", "Assets", "TestScenes", "scene.gltf" }
+            : new[] { AppContext.BaseDirectory, "..", "..", "..", "..", "Avalonia3D.Sandbox", "Assets", "TestScenes", folder, "scene.gltf" };
+
+        var baseDirectoryPath = Path.GetFullPath(Path.Combine(baseParts));
+        if (File.Exists(baseDirectoryPath))
+        {
+            return baseDirectoryPath;
+        }
+
+        throw new FileNotFoundException("Не удалось найти fixture scene.gltf для интеграционного теста.", directPath);
     }
 
     private static byte[] BuildTextureAlphaData(int width, int height, byte alpha)
