@@ -182,7 +182,9 @@ public class PbrShaderSourceBuilderTests
         var (_, fragmentSource) = builder.Build(PbrFeatures.None, maxLights: 4);
 
         Assert.Contains("ambient=ambientStrength*diffuseColor*uLightColor[i]", fragmentSource);
-        Assert.Contains("if(uLightCount==0) resultLight=diffuseColor*0.04", fragmentSource);
+        Assert.Contains("if(uLightCount==0){", fragmentSource);
+        Assert.Contains("fallbackSpecular=specularColor", fragmentSource);
+        Assert.Contains("resultLight=diffuseColor*0.04+fallbackSpecular", fragmentSource);
     }
 
     [Fact]
