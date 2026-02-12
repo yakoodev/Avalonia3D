@@ -207,7 +207,12 @@ public sealed class GltfMaterialExtensionsReader
             return fallback;
         }
 
-        if (TryReadNamedParameter(channel, "RGB", out var rgbValue) && rgbValue is Vector3 rgb)
+        if (TryReadNamedParameter(channel, "AttenuationColor", out var attenuationColor) && TryConvertVector3(attenuationColor, out var attenuationRgb))
+        {
+            return attenuationRgb;
+        }
+
+        if (TryReadNamedParameter(channel, "RGB", out var rgbValue) && TryConvertVector3(rgbValue, out var rgb))
         {
             return rgb;
         }
@@ -255,6 +260,29 @@ public sealed class GltfMaterialExtensionsReader
 
         var rawValue = ReadChannelParameter(channel, new Vector4(fallback, fallback, fallback, 0f));
         return preferW && rawValue.W != 0f ? rawValue.W : rawValue.X;
+    }
+
+
+    private static bool TryConvertVector3(object? value, out Vector3 result)
+    {
+        switch (value)
+        {
+            case Vector3 v3:
+                result = v3;
+                return true;
+            case Vector4 v4:
+                result = new Vector3(v4.X, v4.Y, v4.Z);
+                return true;
+            case float[] f when f.Length >= 3:
+                result = new Vector3(f[0], f[1], f[2]);
+                return true;
+            case double[] d when d.Length >= 3:
+                result = new Vector3((float)d[0], (float)d[1], (float)d[2]);
+                return true;
+            default:
+                result = default;
+                return false;
+        }
     }
 
     private static bool TryReadNamedParameter(object channel, string parameterName, out object? value)

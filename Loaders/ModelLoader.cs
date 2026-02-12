@@ -579,6 +579,11 @@ namespace Avalonia3D.Loaders
             result.MetallicRoughnessTexture = LoadTextureFromChannel(metallicRoughnessChannel, out var metallicRoughnessTexCoord);
             AssignTextureTexCoord(result.MetallicRoughnessTexture, metallicRoughnessTexCoord);
             SyncTextureRuntimeTransform(result, TextureSemantic.MetallicRoughness, result.MetallicRoughnessTexture);
+            if (metallicRoughnessChannel != null)
+            {
+                result.MetallicFactor = GetChannelScalarByName(metallicRoughnessChannel, result.MetallicFactor, "MetallicFactor", "MetalnessFactor", "Metallic", "metallicFactor");
+                result.RoughnessFactor = GetChannelScalarByName(metallicRoughnessChannel, result.RoughnessFactor, "RoughnessFactor", "roughnessFactor");
+            }
 
             var occlusionChannel = material.FindChannel("Occlusion");
             result.OcclusionTexture = LoadTextureFromChannel(occlusionChannel, out var occlusionTexCoord);
@@ -800,6 +805,45 @@ namespace Avalonia3D.Loaders
             return fallback;
         }
 
+        private static float GetChannelScalarByName(MaterialChannel? channel, float fallback, params string[] parameterNames)
+        {
+            if (channel == null || parameterNames == null || parameterNames.Length == 0)
+            {
+                return fallback;
+            }
+
+            var parametersProperty = channel.GetType().GetProperty("Parameters");
+            if (parametersProperty?.GetValue(channel) is not System.Collections.IEnumerable parameters)
+            {
+                return fallback;
+            }
+
+            foreach (var parameter in parameters)
+            {
+                var name = parameter?.GetType().GetProperty("Name")?.GetValue(parameter) as string;
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    continue;
+                }
+
+                foreach (var parameterName in parameterNames)
+                {
+                    if (!string.Equals(name, parameterName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    var value = parameter?.GetType().GetProperty("Value")?.GetValue(parameter);
+                    if (TryConvertSingle(value, out var scalar))
+                    {
+                        return scalar;
+                    }
+                }
+            }
+
+            return fallback;
+        }
+
         private static float GetChannelStrength(MaterialChannel? channel, float fallback)
         {
             if (channel == null)
@@ -847,7 +891,8 @@ namespace Avalonia3D.Loaders
                 return;
             }
 
-            var pbrProp = material.GetType().GetProperty("PbrMetallicRoughness");
+            var pbrProp = material.GetType().GetProperty("PbrMetallicRoughness")
+                ?? material.GetType().GetProperty("PBRMetallicRoughness");
             if (pbrProp?.GetValue(material) is not null)
             {
                 var pbr = pbrProp.GetValue(material);
@@ -863,16 +908,38 @@ namespace Avalonia3D.Loaders
                 }
 
                 var metallicProp = pbr.GetType().GetProperty("MetallicFactor");
-                if (metallicProp?.GetValue(pbr) is float metallic)
+                if (TryConvertSingle(metallicProp?.GetValue(pbr), out var metallic))
                 {
                     target.MetallicFactor = metallic;
                 }
 
                 var roughnessProp = pbr.GetType().GetProperty("RoughnessFactor");
-                if (roughnessProp?.GetValue(pbr) is float roughness)
+                if (TryConvertSingle(roughnessProp?.GetValue(pbr), out var roughness))
                 {
                     target.RoughnessFactor = roughness;
                 }
+            }
+        }
+
+        private static bool TryConvertSingle(object? value, out float result)
+        {
+            switch (value)
+            {
+                case float f:
+                    result = f;
+                    return true;
+                case double d:
+                    result = (float)d;
+                    return true;
+                case decimal m:
+                    result = (float)m;
+                    return true;
+                case int i:
+                    result = i;
+                    return true;
+                default:
+                    result = default;
+                    return false;
             }
         }
 
