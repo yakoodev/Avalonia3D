@@ -84,15 +84,7 @@ public sealed class ShaderSelectionPolicy
     public static string ResolvePbrShaderId(Material material, Scene3D scene)
     {
         var features = BuildPbrFeatures(material, scene);
-
-        if (TryResolveLegacyPbrShaderId(features, out var legacyShaderId))
-        {
-            return legacyShaderId;
-        }
-
-        return features == PbrFeatures.None
-            ? ShaderIds.Pbr
-            : ShaderIds.CreatePbrVariantId(features);
+        return ShaderIds.CreatePbrVariantId(features);
     }
 
     public static PbrFeatures BuildPbrFeatures(Material material, Scene3D scene)

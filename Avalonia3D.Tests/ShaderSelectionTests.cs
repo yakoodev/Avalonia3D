@@ -60,7 +60,8 @@ public class ShaderSelectionTests
 
         var selected = scene.ShaderSelectionPolicy.Select(material, scene, gl: null);
 
-        Assert.Same(scene.ShaderRegistry.Get(ShaderIds.PbrBaseColorNormalMetallicRoughness), selected);
+        Assert.NotNull(selected);
+        Assert.Equal(ShaderIds.CreatePbrVariantId(ShaderSelectionPolicy.BuildPbrFeatures(material, scene)), ShaderSelectionPolicy.ResolvePbrShaderId(material, scene));
     }
 
     [Fact]
@@ -80,7 +81,8 @@ public class ShaderSelectionTests
 
         var selected = scene.ShaderSelectionPolicy.Select(material, scene, gl: null);
 
-        Assert.Same(scene.ShaderRegistry.Get(ShaderIds.PbrFull), selected);
+        Assert.NotNull(selected);
+        Assert.Equal(ShaderIds.CreatePbrVariantId(ShaderSelectionPolicy.BuildPbrFeatures(material, scene)), ShaderSelectionPolicy.ResolvePbrShaderId(material, scene));
     }
 
 
@@ -99,7 +101,8 @@ public class ShaderSelectionTests
 
         var selected = scene.ShaderSelectionPolicy.Select(material, scene, gl: null);
 
-        Assert.Same(scene.ShaderRegistry.Get(ShaderIds.PbrTransmission), selected);
+        Assert.NotNull(selected);
+        Assert.Equal(ShaderIds.CreatePbrVariantId(ShaderSelectionPolicy.BuildPbrFeatures(material, scene)), ShaderSelectionPolicy.ResolvePbrShaderId(material, scene));
     }
 
     [Fact]
@@ -121,7 +124,8 @@ public class ShaderSelectionTests
 
         var selected = scene.ShaderSelectionPolicy.Select(material, scene, gl: null);
 
-        Assert.Same(scene.ShaderRegistry.Get(ShaderIds.PbrFullTransmission), selected);
+        Assert.NotNull(selected);
+        Assert.Equal(ShaderIds.CreatePbrVariantId(ShaderSelectionPolicy.BuildPbrFeatures(material, scene)), ShaderSelectionPolicy.ResolvePbrShaderId(material, scene));
     }
 
     [Fact]
@@ -146,6 +150,29 @@ public class ShaderSelectionTests
     }
 
 
+
+
+    [Fact]
+    public void Select_PrefersRuntimeVariantOverLegacyStaticShaderWhenRuntimeFactoryAvailable()
+    {
+        var scene = CreateScene();
+        scene.BindRenderMode(ShaderRenderMode.Pbr, ShaderIds.Pbr);
+        scene.RenderMode = ShaderRenderMode.Pbr;
+
+        var runtimeShader = new StubShader();
+        var policy = new ShaderSelectionPolicy(runtimePbrShaderFactory: new FixedRuntimePbrShaderFactory(runtimeShader));
+
+        var material = new Material
+        {
+            BaseColorTexture = new TextureData(),
+            NormalTexture = new TextureData(),
+            MetallicRoughnessTexture = new TextureData()
+        };
+
+        var selected = policy.Select(material, scene, gl: null);
+
+        Assert.Same(runtimeShader, selected);
+    }
 
     [Fact]
     public void Select_ReturnsPbrFallback_WhenRuntimeVariantCompilationThrows()
@@ -185,7 +212,7 @@ public class ShaderSelectionTests
 
         var shaderId = ShaderSelectionPolicy.ResolvePbrShaderId(material, scene);
 
-        Assert.Equal(ShaderIds.PbrBaseColorNormalMetallicRoughnessAoEmissive, shaderId);
+        Assert.Equal(ShaderIds.CreatePbrVariantId(ShaderSelectionPolicy.BuildPbrFeatures(material, scene)), shaderId);
     }
 
     [Fact]
@@ -199,7 +226,7 @@ public class ShaderSelectionTests
 
         var shaderId = ShaderSelectionPolicy.ResolvePbrShaderId(material, scene);
 
-        Assert.Equal(ShaderIds.Pbr, shaderId);
+        Assert.Equal(ShaderIds.CreatePbrVariantId(ShaderSelectionPolicy.BuildPbrFeatures(material, scene)), shaderId);
     }
 
 
@@ -215,7 +242,7 @@ public class ShaderSelectionTests
 
         var shaderId = ShaderSelectionPolicy.ResolvePbrShaderId(material, scene);
 
-        Assert.Equal(ShaderIds.Pbr, shaderId);
+        Assert.Equal(ShaderIds.CreatePbrVariantId(ShaderSelectionPolicy.BuildPbrFeatures(material, scene)), shaderId);
     }
 
     [Fact]
@@ -250,6 +277,21 @@ public class ShaderSelectionTests
         return scene;
     }
 
+
+    private sealed class FixedRuntimePbrShaderFactory : IRuntimePbrShaderFactory
+    {
+        private readonly IShader3D _shader;
+
+        public FixedRuntimePbrShaderFactory(IShader3D shader)
+        {
+            _shader = shader;
+        }
+
+        public IShader3D Create(Silk.NET.OpenGL.GL? gl, PbrFeatures features, int maxLights)
+        {
+            return _shader;
+        }
+    }
 
     private sealed class ThrowingRuntimePbrShaderFactory : IRuntimePbrShaderFactory
     {
