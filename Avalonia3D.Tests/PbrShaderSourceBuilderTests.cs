@@ -160,6 +160,49 @@ public class PbrShaderSourceBuilderTests
         Assert.Contains("uReflectionContributionClamp", fragmentSource);
         Assert.Contains("uAmbientStrengthClamp", fragmentSource);
         Assert.Contains("iblDiffuse", fragmentSource);
-        Assert.Contains("min(reflection + iblDiffuse", fragmentSource);
+        Assert.Contains("iblSpecular = reflection * max(specularColor, vec3(0.04))", fragmentSource);
+        Assert.Contains("min((iblSpecular + iblDiffuse)*ao", fragmentSource);
     }
+    [Fact]
+    public void Build_IncludesSeparateEmissiveSurfaceControls()
+    {
+        var builder = new PbrShaderSourceBuilder();
+
+        var (_, fragmentSource) = builder.Build(PbrFeatures.EmissiveMap, maxLights: 4);
+
+        Assert.Contains("uSeparateEmissiveTarget", fragmentSource);
+        Assert.Contains("uSeparateEmissiveSurfaceScale", fragmentSource);
+        Assert.Contains("totalEmissiveForSurface", fragmentSource);
+    }
+
+    [Fact]
+    public void Build_PbrLighting_UsesNonWhiteningAmbientTerm()
+    {
+        var builder = new PbrShaderSourceBuilder();
+
+        var (_, fragmentSource) = builder.Build(PbrFeatures.None, maxLights: 4);
+
+        Assert.Contains("ambient=ambientStrength*0.35*diffuseColor*uLightColor[i]", fragmentSource);
+        Assert.Contains("if(uLightCount==0){", fragmentSource);
+        Assert.Contains("fallbackSpecular=specularColor", fragmentSource);
+        Assert.Contains("resultLight=diffuseColor*0.04+fallbackSpecular", fragmentSource);
+        Assert.Contains("iblDiffuse = diffuseColor * max(uIblDiffuseIntensity,0.0) * (1.0-metallic)", fragmentSource);
+        Assert.Contains("metallicReflectionBoost", fragmentSource);
+        Assert.Contains("reflection *= metallicReflectionBoost*(1.0-0.55*clamp(roughness,0.0,1.0))", fragmentSource);
+        Assert.Contains("iblSpecular = reflection * max(specularColor, vec3(0.04))", fragmentSource);
+        Assert.Contains("iblComponent = min((iblSpecular + iblDiffuse)*ao", fragmentSource);
+    }
+
+    [Fact]
+    public void Build_WithTransmission_UsesTintedSurfaceInsteadOfSyntheticBlueBackground()
+    {
+        var builder = new PbrShaderSourceBuilder();
+
+        var (_, fragmentSource) = builder.Build(PbrFeatures.Transmission, maxLights: 4);
+
+        Assert.Contains("attenuationTint=mix(vec3(1.0), clamp(uTransmissionAttenuationColor", fragmentSource);
+        Assert.Contains("transmittedLight=surfaceResult*attenuationTint", fragmentSource);
+        Assert.Contains("mix(surfaceResult, transmittedLight, transmissionWeight)", fragmentSource);
+    }
+
 }

@@ -59,6 +59,103 @@ public sealed class MaterialAlphaAndLoaderTests
         Assert.Equal(MaterialAlphaMode.Opaque, mode);
     }
 
+
+    [Fact]
+    public void MaterialAlphaImportPolicy_BlendSource_WithSparseNearOpaqueNoise_FallsBackToOpaque()
+    {
+        var material = new Avalonia3D.Model.Material
+        {
+            AlphaMode = MaterialAlphaMode.Blend,
+            BaseColorFactor = new Vector4(1f, 1f, 1f, 1f),
+            BaseColorTexture = new TextureData
+            {
+                Width = 16,
+                Height = 16,
+                Data = BuildTextureAlphaData(16, 16, 255)
+            }
+        };
+
+        SetAlpha(material.BaseColorTexture!.Data, pixelIndex: 3, alpha: 254);
+
+        var context = new MaterialImportPolicyContext
+        {
+            AlphaProfile = MaterialAlphaImportProfile.Balanced,
+            SourceAlphaMode = MaterialAlphaMode.Blend
+        };
+
+        var policy = new DefaultMaterialImportPolicy();
+        var mode = policy.ResolveAlphaMode(material, context);
+
+        Assert.Equal(MaterialAlphaMode.Opaque, mode);
+        Assert.False(material.HasTextureTransparency);
+    }
+
+    [Fact]
+    public void MaterialAlphaImportPolicy_BlendSource_WithDenseDeepMask_ConvertsToMask()
+    {
+        var material = new Avalonia3D.Model.Material
+        {
+            AlphaMode = MaterialAlphaMode.Blend,
+            BaseColorFactor = new Vector4(1f, 1f, 1f, 1f),
+            BaseColorTexture = new TextureData
+            {
+                Width = 16,
+                Height = 16,
+                Data = BuildTextureAlphaData(16, 16, 255)
+            }
+        };
+
+        for (var i = 0; i < 64; i++)
+        {
+            SetAlpha(material.BaseColorTexture!.Data, pixelIndex: i, alpha: 0);
+        }
+
+        var context = new MaterialImportPolicyContext
+        {
+            AlphaProfile = MaterialAlphaImportProfile.Balanced,
+            SourceAlphaMode = MaterialAlphaMode.Blend
+        };
+
+        var policy = new DefaultMaterialImportPolicy();
+        var mode = policy.ResolveAlphaMode(material, context);
+
+        Assert.Equal(MaterialAlphaMode.Blend, mode);
+        Assert.True(material.HasTextureTransparency);
+    }
+
+    [Fact]
+    public void MaterialAlphaImportPolicy_BlendSource_WithDenseDeepAndLowOpaque_ConvertsToMask()
+    {
+        var material = new Avalonia3D.Model.Material
+        {
+            AlphaMode = MaterialAlphaMode.Blend,
+            BaseColorFactor = new Vector4(1f, 1f, 1f, 1f),
+            BaseColorTexture = new TextureData
+            {
+                Width = 16,
+                Height = 16,
+                Data = BuildTextureAlphaData(16, 16, 0)
+            }
+        };
+
+        for (var i = 0; i < 26; i++)
+        {
+            SetAlpha(material.BaseColorTexture!.Data, pixelIndex: i, alpha: 255);
+        }
+
+        var context = new MaterialImportPolicyContext
+        {
+            AlphaProfile = MaterialAlphaImportProfile.Balanced,
+            SourceAlphaMode = MaterialAlphaMode.Blend
+        };
+
+        var policy = new DefaultMaterialImportPolicy();
+        var mode = policy.ResolveAlphaMode(material, context);
+
+        Assert.Equal(MaterialAlphaMode.Mask, mode);
+        Assert.True(material.HasTextureTransparency);
+    }
+
     [Fact]
     public void TextureTransparencyHeuristic_DetectsMeaningfulDeepAlphaCuts()
     {
@@ -300,6 +397,23 @@ public sealed class MaterialAlphaAndLoaderTests
         Assert.Equal(new Vector3(0.9f, 0.8f, 0.7f), material.TransmissionAttenuationColor);
     }
 
+
+
+    [Fact]
+    public void LoadModels_PbrMetallicRoughnessFactors_AreLoadedCorrectly()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"mat-loader-pbr-factors-{Guid.NewGuid():N}.gltf");
+        File.WriteAllText(path, GetPbrFactorsGltfJson());
+
+        var gltf = SharpGLTF.Schema2.ModelRoot.Load(path);
+        var models = ModelLoader.LoadModels(gltf);
+        File.Delete(path);
+        var material = Assert.Single(models).Material;
+
+        Assert.NotNull(material);
+        Assert.InRange(material!.MetallicFactor, 0.84f, 0.86f);
+        Assert.InRange(material.RoughnessFactor, 0.19f, 0.21f);
+    }
 
     [Fact]
     public void LoadModels_KhrAdvancedExtensions_ReadsAdvancedSurfaceSettings()
@@ -557,6 +671,21 @@ public sealed class MaterialAlphaAndLoaderTests
     }
 
     [Fact]
+    public void ResolveAlphaMode_PbrMode_TreatsBlendWithoutTransparency_AsOpaque()
+    {
+        var material = new Avalonia3D.Model.Material
+        {
+            AlphaMode = MaterialAlphaMode.Blend,
+            Opacity = 1f,
+            HasTextureTransparency = false
+        };
+
+        var resolved = MeshObject.ResolveAlphaMode(material, 1f, ShaderRenderMode.Pbr);
+
+        Assert.Equal(MaterialAlphaMode.Opaque, resolved);
+    }
+
+    [Fact]
     public void DroidSceneFixture_ContainsWeightsChannel_And_EmissiveBlendMaterial()
     {
         var scenePath = ResolveDroidScenePath();
@@ -643,6 +772,35 @@ public sealed class MaterialAlphaAndLoaderTests
     }
 
     [Fact]
+    public void MaterialImportOverrideConfiguration_ResolveForMaterial_CanUseTextureTransparencySignalOverride()
+    {
+        MaterialImportOverrideConfiguration.ConfigureAssetOverrides(new System.Collections.Generic.Dictionary<string, MaterialAssetImportOverride>
+        {
+            ["Assets/TestScenes/droid/scene.gltf"] = new()
+            {
+                Materials = new System.Collections.Generic.Dictionary<string, MaterialSceneImportOverride>
+                {
+                    ["Boden"] = new() { ForceTextureTransparencySignal = true }
+                }
+            }
+        });
+
+        try
+        {
+            var resolved = MaterialImportOverrideConfiguration.ResolveForMaterial(
+                "/workspace/Avalonia3D/Avalonia3D.Sandbox/Assets/TestScenes/droid/scene.gltf",
+                "Boden");
+
+            Assert.NotNull(resolved);
+            Assert.True(resolved!.ForceTextureTransparencySignal);
+        }
+        finally
+        {
+            MaterialImportOverrideConfiguration.Configure(null);
+        }
+    }
+
+    [Fact]
     public void MaterialImportOverrideConfiguration_ResolveForMaterial_UsesMaterialLevelOverride()
     {
         MaterialImportOverrideConfiguration.ConfigureAssetOverrides(new System.Collections.Generic.Dictionary<string, MaterialAssetImportOverride>
@@ -673,6 +831,99 @@ public sealed class MaterialAlphaAndLoaderTests
         }
     }
 
+
+    [Fact]
+    public void DefaultMaterialImportPolicy_BalancedProfile_KeepsBlendSignalAsBlend()
+    {
+        var material = new Avalonia3D.Model.Material
+        {
+            AlphaMode = MaterialAlphaMode.Blend,
+            BaseColorFactor = new Vector4(1f, 1f, 1f, 1f),
+            BaseColorTexture = new TextureData
+            {
+                Width = 16,
+                Height = 16,
+                Data = BuildTextureAlphaData(16, 16, 255)
+            }
+        };
+
+        SetAlpha(material.BaseColorTexture!.Data, pixelIndex: 10, alpha: 200);
+
+        var context = new MaterialImportPolicyContext
+        {
+            AlphaProfile = MaterialAlphaImportProfile.Balanced,
+            SourceAlphaMode = MaterialAlphaMode.Blend,
+            IsAnimatedMaterial = false
+        };
+
+        var policy = new DefaultMaterialImportPolicy();
+        var mode = policy.ResolveAlphaMode(material, context);
+
+        Assert.Equal(MaterialAlphaMode.Blend, mode);
+        Assert.True(material.HasTextureTransparency);
+    }
+
+    [Fact]
+    public void DefaultMaterialImportPolicy_StrictProfile_PromotesBlendSignalToMask()
+    {
+        var material = new Avalonia3D.Model.Material
+        {
+            AlphaMode = MaterialAlphaMode.Blend,
+            BaseColorFactor = new Vector4(1f, 1f, 1f, 1f),
+            BaseColorTexture = new TextureData
+            {
+                Width = 16,
+                Height = 16,
+                Data = BuildTextureAlphaData(16, 16, 255)
+            }
+        };
+
+        SetAlpha(material.BaseColorTexture!.Data, pixelIndex: 10, alpha: 200);
+
+        var context = new MaterialImportPolicyContext
+        {
+            AlphaProfile = MaterialAlphaImportProfile.Strict,
+            SourceAlphaMode = MaterialAlphaMode.Blend,
+            IsAnimatedMaterial = false
+        };
+
+        var policy = new DefaultMaterialImportPolicy();
+        var mode = policy.ResolveAlphaMode(material, context);
+
+        Assert.Equal(MaterialAlphaMode.Mask, mode);
+        Assert.True(material.HasTextureTransparency);
+    }
+
+    [Fact]
+    public void DefaultMaterialImportPolicy_LegacyProfile_KeepsBlendSignalAsBlend()
+    {
+        var material = new Avalonia3D.Model.Material
+        {
+            AlphaMode = MaterialAlphaMode.Blend,
+            BaseColorFactor = new Vector4(1f, 1f, 1f, 1f),
+            BaseColorTexture = new TextureData
+            {
+                Width = 16,
+                Height = 16,
+                Data = BuildTextureAlphaData(16, 16, 255)
+            }
+        };
+
+        SetAlpha(material.BaseColorTexture!.Data, pixelIndex: 10, alpha: 200);
+
+        var context = new MaterialImportPolicyContext
+        {
+            AlphaProfile = MaterialAlphaImportProfile.Legacy,
+            SourceAlphaMode = MaterialAlphaMode.Blend,
+            IsAnimatedMaterial = false
+        };
+
+        var policy = new DefaultMaterialImportPolicy();
+        var mode = policy.ResolveAlphaMode(material, context);
+
+        Assert.Equal(MaterialAlphaMode.Blend, mode);
+        Assert.True(material.HasTextureTransparency);
+    }
     [Fact]
     public void DefaultMaterialImportPolicy_AnimatedEmissiveContract_PreservesBlendInLegacy()
     {
@@ -697,6 +948,29 @@ public sealed class MaterialAlphaAndLoaderTests
     }
 
     [Fact]
+    public void DefaultMaterialImportPolicy_BalancedProfile_DoesNotUseEmissiveAsTransparencySignal()
+    {
+        var material = new Avalonia3D.Model.Material
+        {
+            AlphaMode = MaterialAlphaMode.Blend,
+            BaseColorFactor = new Vector4(1f, 1f, 1f, 1f),
+            EmissiveFactor = new Vector3(0.3f, 0f, 0f)
+        };
+
+        var context = new MaterialImportPolicyContext
+        {
+            AlphaProfile = MaterialAlphaImportProfile.Balanced,
+            SourceAlphaMode = MaterialAlphaMode.Blend,
+            IsAnimatedMaterial = false
+        };
+
+        var policy = new DefaultMaterialImportPolicy();
+        var mode = policy.ResolveAlphaMode(material, context);
+
+        Assert.Equal(MaterialAlphaMode.Opaque, mode);
+    }
+
+    [Fact]
     public void OpaqueMaterialDefaults_DoNotRegress()
     {
         var material = new Avalonia3D.Model.Material();
@@ -709,6 +983,46 @@ public sealed class MaterialAlphaAndLoaderTests
         Assert.False(material.IsTransparent);
     }
 
+
+    [Fact]
+    public void ModelLoader_PrimitiveWithoutExplicitMaterial_UsesSingleMaterialFallback()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"single-material-fallback-{Guid.NewGuid():N}.gltf");
+        File.WriteAllText(path, GetSingleMaterialWithoutPrimitiveBindingGltfJson());
+
+        try
+        {
+            var gltf = SharpGLTF.Schema2.ModelRoot.Load(path);
+            var model = Assert.Single(ModelLoader.LoadModels(gltf));
+
+            Assert.NotNull(model.Material);
+            Assert.Equal("material:0", model.MaterialKey);
+            Assert.True(model.Material!.RoughnessFactor >= 0f);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Theory]
+    [InlineData("droid")]
+    [InlineData("cylinder_sci_fi")]
+    [InlineData("")]
+    public void ModelLoader_SandboxSceneFixtures_AssignMaterialToMeshes(string folder)
+    {
+        var scenePath = ResolveSandboxScenePath(folder);
+        var gltf = SharpGLTF.Schema2.ModelRoot.Load(scenePath);
+        var models = ModelLoader.LoadModels(gltf, new MaterialImportPolicyContext
+        {
+            AssetPath = scenePath,
+            AlphaProfile = MaterialAlphaImportConfiguration.CurrentProfile
+        });
+
+        Assert.NotEmpty(models);
+        Assert.All(models, model => Assert.NotNull(model.Material));
+        Assert.All(models, model => Assert.False(string.IsNullOrWhiteSpace(model.MaterialKey)));
+    }
 
     [Fact]
     public void ModelLoader_TransfersChannelTexCoordToRuntimeParameters()
@@ -1255,6 +1569,49 @@ public sealed class MaterialAlphaAndLoaderTests
         }
         """;
 
+    private static string GetSingleMaterialWithoutPrimitiveBindingGltfJson() =>
+        """
+        {
+          "asset": { "version": "2.0" },
+          "scenes": [ { "nodes": [0] } ],
+          "nodes": [ { "mesh": 0, "name": "n" } ],
+          "meshes": [
+            {
+              "primitives": [
+                {
+                  "attributes": { "POSITION": 0 },
+                  "indices": 1
+                }
+              ]
+            }
+          ],
+          "materials": [
+            {
+              "name": "SingleFallbackMaterial",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [1,1,1,1],
+                "metallicFactor": 0.8,
+                "roughnessFactor": 0.2
+              }
+            }
+          ],
+          "buffers": [
+            {
+              "uri": "data:application/octet-stream;base64,AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAABAAIA",
+              "byteLength": 42
+            }
+          ],
+          "bufferViews": [
+            { "buffer": 0, "byteOffset": 0, "byteLength": 36, "target": 34962 },
+            { "buffer": 0, "byteOffset": 36, "byteLength": 6, "target": 34963 }
+          ],
+          "accessors": [
+            { "bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3", "min": [0,0,0], "max": [1,1,0] },
+            { "bufferView": 1, "componentType": 5123, "count": 3, "type": "SCALAR" }
+          ]
+        }
+        """;
+
     private static string GetBlendNoAlphaButEmissiveTextureAndStrengthGltfJson() =>
         """
         {
@@ -1314,6 +1671,51 @@ public sealed class MaterialAlphaAndLoaderTests
         }
         """;
 
+
+
+    private static string GetPbrFactorsGltfJson() =>
+        """
+        {
+          "asset": { "version": "2.0" },
+          "scenes": [ { "nodes": [0] } ],
+          "nodes": [ { "mesh": 0, "name": "n" } ],
+          "meshes": [
+            {
+              "primitives": [
+                {
+                  "attributes": { "POSITION": 0 },
+                  "indices": 1,
+                  "material": 0
+                }
+              ]
+            }
+          ],
+          "materials": [
+            {
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [1,1,1,1],
+                "metallicFactor": 0.85,
+                "roughnessFactor": 0.2
+              }
+            }
+          ],
+          "buffers": [
+            {
+              "uri": "data:application/octet-stream;base64,AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAABAAIA",
+              "byteLength": 42
+            }
+          ],
+          "bufferViews": [
+            { "buffer": 0, "byteOffset": 0, "byteLength": 36, "target": 34962 },
+            { "buffer": 0, "byteOffset": 36, "byteLength": 6, "target": 34963 }
+          ],
+          "accessors": [
+            { "bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3", "min": [0,0,0], "max": [1,1,0] },
+            { "bufferView": 1, "componentType": 5123, "count": 3, "type": "SCALAR" }
+          ]
+        }
+        """;
+
     private static string ResolveDroidScenePath()
     {
         var directPath = Path.GetFullPath(Path.Combine("Avalonia3D.Sandbox", "Assets", "TestScenes", "droid", "scene.gltf"));
@@ -1329,6 +1731,31 @@ public sealed class MaterialAlphaAndLoaderTests
         }
 
         throw new FileNotFoundException("Не удалось найти fixture droid/scene.gltf для интеграционного теста.", directPath);
+    }
+
+    private static string ResolveSandboxScenePath(string folder)
+    {
+        var parts = string.IsNullOrWhiteSpace(folder)
+            ? new[] { "Avalonia3D.Sandbox", "Assets", "TestScenes", "scene.gltf" }
+            : new[] { "Avalonia3D.Sandbox", "Assets", "TestScenes", folder, "scene.gltf" };
+
+        var directPath = Path.GetFullPath(Path.Combine(parts));
+        if (File.Exists(directPath))
+        {
+            return directPath;
+        }
+
+        var baseParts = string.IsNullOrWhiteSpace(folder)
+            ? new[] { AppContext.BaseDirectory, "..", "..", "..", "..", "Avalonia3D.Sandbox", "Assets", "TestScenes", "scene.gltf" }
+            : new[] { AppContext.BaseDirectory, "..", "..", "..", "..", "Avalonia3D.Sandbox", "Assets", "TestScenes", folder, "scene.gltf" };
+
+        var baseDirectoryPath = Path.GetFullPath(Path.Combine(baseParts));
+        if (File.Exists(baseDirectoryPath))
+        {
+            return baseDirectoryPath;
+        }
+
+        throw new FileNotFoundException("Не удалось найти fixture scene.gltf для интеграционного теста.", directPath);
     }
 
     private static byte[] BuildTextureAlphaData(int width, int height, byte alpha)

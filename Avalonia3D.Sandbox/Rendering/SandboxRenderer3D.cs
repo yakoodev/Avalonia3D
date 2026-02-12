@@ -1,4 +1,5 @@
 using Avalonia.Media.Imaging;
+using Avalonia3D.Composition;
 using Avalonia3D.Interfaces;
 using Avalonia3D.Model;
 using Avalonia3D.Rendering;
@@ -43,16 +44,7 @@ public sealed class SandboxRenderer3D : IRenderContext
         _gl = gl;
         Scene.Init(gl);
         Scene.ApplyGraphicsProfile(_renderPipeline.Profile);
-        Scene.ShaderRegistry.Register(ShaderIds.Pbr, glContext => GLShader.Create(glContext, PbrFeatures.None, _renderPipeline.Profile.MaxLights));
-        Scene.ShaderRegistry.Register(ShaderIds.PbrTransmission, glContext => GLShader.Create(glContext, PbrFeatures.Transmission, _renderPipeline.Profile.MaxLights));
-        Scene.ShaderRegistry.Register(ShaderIds.PbrFullTransmission, glContext => GLShader.Create(glContext, PbrFeatures.BaseColorMap | PbrFeatures.NormalMap | PbrFeatures.MetallicRoughnessMap | PbrFeatures.OcclusionMap | PbrFeatures.EmissiveMap | PbrFeatures.ReflectionsIbl | PbrFeatures.Transmission, _renderPipeline.Profile.MaxLights));
-        Scene.ShaderRegistry.Register(ShaderIds.Unlit, UnlitShader.Create);
-        Scene.ShaderRegistry.Register(ShaderIds.NormalsDebug, NormalsDebugShader.Create);
-        Scene.ShaderRegistry.SetDefault(ShaderIds.Pbr);
-        Scene.ActiveShaderId = ShaderIds.Pbr;
-        Scene.BindRenderMode(ShaderRenderMode.Pbr, ShaderIds.Pbr);
-        Scene.BindRenderMode(ShaderRenderMode.Unlit, ShaderIds.Unlit);
-        Scene.BindRenderMode(ShaderRenderMode.NormalsDebug, ShaderIds.NormalsDebug);
+        SceneShaderRegistryBootstrap.Configure(Scene, _renderPipeline.Profile.MaxLights);
         ConfigureOpenGLState();
         InitializeCameraDefaults();
         InitializeFramePresenter();

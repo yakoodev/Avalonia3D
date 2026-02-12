@@ -131,7 +131,8 @@ vec3 ApplyToneMapping(vec3 color)
 
 void main()
 {
-    vec3 color = max(texture(uSceneTexture, vUv).rgb, vec3(0.0)) * max(uExposure, 0.0001);
+    vec4 sceneSample = texture(uSceneTexture, vUv);
+    vec3 color = max(sceneSample.rgb, vec3(0.0)) * max(uExposure, 0.0001);
 
     if (uApplyToneMapping == 1)
     {
@@ -146,7 +147,7 @@ void main()
         color = pow(color, vec3(1.0 / max(uGamma, 0.0001)));
     }
 
-    FragColor = vec4(clamp(color, vec3(0.0), vec3(1.0)), 1.0);
+    FragColor = vec4(clamp(color, vec3(0.0), vec3(1.0)), sceneSample.a);
 }";
 
             var vertexShader = CompileShader(gl, ShaderType.VertexShader, vertex);

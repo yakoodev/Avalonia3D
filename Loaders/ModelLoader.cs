@@ -12,6 +12,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
+using System.Text.Json;
 using System.Numerics;
 using System.Runtime;
 
@@ -21,6 +23,10 @@ namespace Avalonia3D.Loaders
     {
         private static readonly GltfMaterialExtensionsReader _materialExtensionsReader = new();
         private static readonly IMaterialImportPolicy _materialImportPolicy = new DefaultMaterialImportPolicy();
+
+        private static readonly Dictionary<string, Dictionary<(int MeshIndex, int PrimitiveIndex), int>> _materialIndexMapCache = new(StringComparer.OrdinalIgnoreCase);
+        private const uint GlbMagic = 0x46546C67;
+        private const uint JsonChunkType = 0x4E4F534A;
 
         private unsafe static long EstimateModelMemory(Model.Model m)
         {
@@ -185,11 +191,13 @@ namespace Avalonia3D.Loaders
                 .Select(idx => (uint)idx)
                 .ToArray() ?? Array.Empty<uint>();
 
+            var resolvedMaterial = ResolvePrimitiveMaterial(prim, policyContext?.AssetPath);
+
             var model = new Model.Model
             {
-                Name = $"{node.Name}_{prim.Material?.Name ?? "mat"}",
+                Name = $"{node.Name}_{resolvedMaterial?.Name ?? "mat"}",
                 PrimitiveKey = primitiveKey,
-                MaterialKey = prim.Material != null ? $"material:{prim.Material.LogicalIndex}" : string.Empty,
+                MaterialKey = resolvedMaterial != null ? $"material:{resolvedMaterial.LogicalIndex}" : string.Empty,
                 Vertices = vertices,
                 Indices = indices,
                 LocalMatrix = node.LocalMatrix,
@@ -202,11 +210,287 @@ namespace Avalonia3D.Loaders
             }
 
             // Загрузка материала и текстур с кешированием
-            LoadMaterialForModel(model, prim, node, policyContext);
+            LoadMaterialForModel(model, resolvedMaterial, prim, node, policyContext);
 
             return model;
         }
 
+
+
+        private static SharpGLTF.Schema2.Material? ResolvePrimitiveMaterial(MeshPrimitive prim, string? assetPath)
+        {
+            if (prim == null)
+            {
+                return null;
+            }
+
+            if (prim.Material != null)
+            {
+                return prim.Material;
+            }
+
+            var reflectionMaterial = TryResolveMaterialViaReflection(prim);
+            if (reflectionMaterial != null)
+            {
+                return reflectionMaterial;
+            }
+
+            var documentMaterial = TryResolveMaterialFromSourceDocument(prim, assetPath);
+            if (documentMaterial != null)
+            {
+                return documentMaterial;
+            }
+
+            try
+            {
+                var mesh = prim.LogicalParent;
+                var modelRoot = mesh?.LogicalParent;
+                if (modelRoot == null)
+                {
+                    return null;
+                }
+
+                var materials = modelRoot.LogicalMaterials;
+                if (materials == null || materials.Count != 1)
+                {
+                    return null;
+                }
+
+                var fallback = materials[0];
+                Log.Warning("GLTF primitive has no explicit material binding. Applying single-material fallback: materialIndex={MaterialIndex}, materialName={MaterialName}", fallback.LogicalIndex, fallback.Name ?? "<unnamed>");
+                return fallback;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static SharpGLTF.Schema2.Material? TryResolveMaterialViaReflection(MeshPrimitive prim)
+        {
+            try
+            {
+                var type = prim.GetType();
+
+                var logicalMaterialProperty = type.GetProperty("LogicalMaterial");
+                if (logicalMaterialProperty?.GetValue(prim) is SharpGLTF.Schema2.Material logicalMaterial)
+                {
+                    Log.Warning("GLTF primitive material resolved via reflection property LogicalMaterial. materialIndex={MaterialIndex}, materialName={MaterialName}", logicalMaterial.LogicalIndex, logicalMaterial.Name ?? "<unnamed>");
+                    return logicalMaterial;
+                }
+
+                var materialProperty = type.GetProperty("Material");
+                if (materialProperty?.GetValue(prim) is SharpGLTF.Schema2.Material reflectedMaterial)
+                {
+                    Log.Warning("GLTF primitive material resolved via reflection property Material. materialIndex={MaterialIndex}, materialName={MaterialName}", reflectedMaterial.LogicalIndex, reflectedMaterial.Name ?? "<unnamed>");
+                    return reflectedMaterial;
+                }
+
+                var materialIndex = TryReadMaterialIndex(type, prim);
+                if (materialIndex.HasValue)
+                {
+                    var materials = prim.LogicalParent?.LogicalParent?.LogicalMaterials;
+                    if (materials != null && materialIndex.Value >= 0 && materialIndex.Value < materials.Count)
+                    {
+                        var indexedMaterial = materials[materialIndex.Value];
+                        Log.Warning("GLTF primitive material resolved via reflection index. materialIndex={MaterialIndex}, materialName={MaterialName}", indexedMaterial.LogicalIndex, indexedMaterial.Name ?? "<unnamed>");
+                        return indexedMaterial;
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore reflection failures.
+            }
+
+            return null;
+        }
+
+        private static SharpGLTF.Schema2.Material? TryResolveMaterialFromSourceDocument(MeshPrimitive prim, string? assetPath)
+        {
+            if (string.IsNullOrWhiteSpace(assetPath) || !File.Exists(assetPath))
+            {
+                return null;
+            }
+
+            var meshIndex = prim.LogicalParent?.LogicalIndex ?? -1;
+            var primitiveIndex = ResolvePrimitiveIndexWithinMesh(prim);
+            if (meshIndex < 0 || primitiveIndex < 0)
+            {
+                return null;
+            }
+
+            if (!TryGetMaterialIndexMap(assetPath, out var map))
+            {
+                return null;
+            }
+
+            if (!map.TryGetValue((meshIndex, primitiveIndex), out var materialIndex))
+            {
+                return null;
+            }
+
+            var materials = prim.LogicalParent?.LogicalParent?.LogicalMaterials;
+            if (materials == null || materialIndex < 0 || materialIndex >= materials.Count)
+            {
+                return null;
+            }
+
+            var material = materials[materialIndex];
+            Log.Warning("GLTF primitive material resolved from source JSON mapping. meshIndex={MeshIndex}, primitiveIndex={PrimitiveIndex}, materialIndex={MaterialIndex}, materialName={MaterialName}", meshIndex, primitiveIndex, material.LogicalIndex, material.Name ?? "<unnamed>");
+            return material;
+        }
+
+        private static int ResolvePrimitiveIndexWithinMesh(MeshPrimitive prim)
+        {
+            var primitives = prim.LogicalParent?.Primitives;
+            if (primitives == null)
+            {
+                return -1;
+            }
+
+            for (var i = 0; i < primitives.Count; i++)
+            {
+                if (ReferenceEquals(primitives[i], prim))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private static bool TryGetMaterialIndexMap(string assetPath, out Dictionary<(int MeshIndex, int PrimitiveIndex), int> map)
+        {
+            if (_materialIndexMapCache.TryGetValue(assetPath, out map!))
+            {
+                return true;
+            }
+
+            try
+            {
+                var root = ReadGltfRootFromFile(assetPath);
+                var parsed = ParseMaterialIndexMap(root);
+                _materialIndexMapCache[assetPath] = parsed;
+                map = parsed;
+                return true;
+            }
+            catch
+            {
+                map = new Dictionary<(int MeshIndex, int PrimitiveIndex), int>();
+                return false;
+            }
+        }
+
+        private static JsonElement ReadGltfRootFromFile(string assetPath)
+        {
+            if (Path.GetExtension(assetPath).Equals(".glb", StringComparison.OrdinalIgnoreCase))
+            {
+                using var stream = File.OpenRead(assetPath);
+                using var reader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: false);
+                if (TryReadGlbJsonChunk(reader, out var glbRoot))
+                {
+                    return glbRoot;
+                }
+
+                throw new InvalidDataException("GLB JSON chunk was not found.");
+            }
+
+            using var jsonStream = File.OpenRead(assetPath);
+            using var doc = JsonDocument.Parse(jsonStream);
+            return doc.RootElement.Clone();
+        }
+
+        private static Dictionary<(int MeshIndex, int PrimitiveIndex), int> ParseMaterialIndexMap(JsonElement root)
+        {
+            var map = new Dictionary<(int MeshIndex, int PrimitiveIndex), int>();
+            if (!root.TryGetProperty("meshes", out var meshes) || meshes.ValueKind != JsonValueKind.Array)
+            {
+                return map;
+            }
+
+            var meshIndex = 0;
+            foreach (var mesh in meshes.EnumerateArray())
+            {
+                if (!mesh.TryGetProperty("primitives", out var primitives) || primitives.ValueKind != JsonValueKind.Array)
+                {
+                    meshIndex++;
+                    continue;
+                }
+
+                var primitiveIndex = 0;
+                foreach (var primitive in primitives.EnumerateArray())
+                {
+                    if (primitive.TryGetProperty("material", out var materialProperty) && materialProperty.ValueKind == JsonValueKind.Number && materialProperty.TryGetInt32(out var materialIndex))
+                    {
+                        map[(meshIndex, primitiveIndex)] = materialIndex;
+                    }
+
+                    primitiveIndex++;
+                }
+
+                meshIndex++;
+            }
+
+            return map;
+        }
+
+        private static bool TryReadGlbJsonChunk(BinaryReader reader, out JsonElement root)
+        {
+            root = default;
+            if (reader.BaseStream.Length < 12)
+            {
+                return false;
+            }
+
+            var magic = reader.ReadUInt32();
+            var version = reader.ReadUInt32();
+            var fileLength = reader.ReadUInt32();
+
+            if (magic != GlbMagic || version < 2 || fileLength > reader.BaseStream.Length)
+            {
+                return false;
+            }
+
+            while (reader.BaseStream.Position + 8 <= reader.BaseStream.Length)
+            {
+                var chunkLength = reader.ReadUInt32();
+                var chunkType = reader.ReadUInt32();
+                if (chunkLength > int.MaxValue || reader.BaseStream.Position + chunkLength > reader.BaseStream.Length)
+                {
+                    return false;
+                }
+
+                var chunkBytes = reader.ReadBytes((int)chunkLength);
+                if (chunkType != JsonChunkType)
+                {
+                    continue;
+                }
+
+                using var doc = JsonDocument.Parse(chunkBytes);
+                root = doc.RootElement.Clone();
+                return true;
+            }
+
+            return false;
+        }
+
+        private static int? TryReadMaterialIndex(Type primitiveType, MeshPrimitive primitive)
+        {
+            var materialIndexProperty = primitiveType.GetProperty("MaterialIndex") ?? primitiveType.GetProperty("LogicalMaterialIndex");
+            if (materialIndexProperty?.GetValue(primitive) is int materialIndex)
+            {
+                return materialIndex;
+            }
+
+            var rawValue = materialIndexProperty?.GetValue(primitive);
+            if (rawValue != null && int.TryParse(rawValue.ToString(), out var parsed))
+            {
+                return parsed;
+            }
+
+            return null;
+        }
 
         private static MorphTarget[] ReadMorphTargets(MeshPrimitive prim, int vertexCount)
         {
@@ -252,14 +536,13 @@ namespace Avalonia3D.Loaders
             return targets;
         }
 
-        private static void LoadMaterialForModel(Model.Model model, MeshPrimitive prim, Node node, MaterialImportPolicyContext? policyContext)
+        private static void LoadMaterialForModel(Model.Model model, SharpGLTF.Schema2.Material? material, MeshPrimitive prim, Node node, MaterialImportPolicyContext? policyContext)
         {
             if (model == null)
             {
                 return;
             }
 
-            var material = prim.Material;
             if (material == null)
             {
                 return;
@@ -296,6 +579,11 @@ namespace Avalonia3D.Loaders
             result.MetallicRoughnessTexture = LoadTextureFromChannel(metallicRoughnessChannel, out var metallicRoughnessTexCoord);
             AssignTextureTexCoord(result.MetallicRoughnessTexture, metallicRoughnessTexCoord);
             SyncTextureRuntimeTransform(result, TextureSemantic.MetallicRoughness, result.MetallicRoughnessTexture);
+            if (metallicRoughnessChannel != null)
+            {
+                result.MetallicFactor = GetChannelScalarByName(metallicRoughnessChannel, result.MetallicFactor, "MetallicFactor", "MetalnessFactor", "Metallic", "metallicFactor");
+                result.RoughnessFactor = GetChannelScalarByName(metallicRoughnessChannel, result.RoughnessFactor, "RoughnessFactor", "roughnessFactor");
+            }
 
             var occlusionChannel = material.FindChannel("Occlusion");
             result.OcclusionTexture = LoadTextureFromChannel(occlusionChannel, out var occlusionTexCoord);
@@ -517,6 +805,45 @@ namespace Avalonia3D.Loaders
             return fallback;
         }
 
+        private static float GetChannelScalarByName(MaterialChannel? channel, float fallback, params string[] parameterNames)
+        {
+            if (channel == null || parameterNames == null || parameterNames.Length == 0)
+            {
+                return fallback;
+            }
+
+            var parametersProperty = channel.GetType().GetProperty("Parameters");
+            if (parametersProperty?.GetValue(channel) is not System.Collections.IEnumerable parameters)
+            {
+                return fallback;
+            }
+
+            foreach (var parameter in parameters)
+            {
+                var name = parameter?.GetType().GetProperty("Name")?.GetValue(parameter) as string;
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    continue;
+                }
+
+                foreach (var parameterName in parameterNames)
+                {
+                    if (!string.Equals(name, parameterName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    var value = parameter?.GetType().GetProperty("Value")?.GetValue(parameter);
+                    if (TryConvertSingle(value, out var scalar))
+                    {
+                        return scalar;
+                    }
+                }
+            }
+
+            return fallback;
+        }
+
         private static float GetChannelStrength(MaterialChannel? channel, float fallback)
         {
             if (channel == null)
@@ -564,7 +891,8 @@ namespace Avalonia3D.Loaders
                 return;
             }
 
-            var pbrProp = material.GetType().GetProperty("PbrMetallicRoughness");
+            var pbrProp = material.GetType().GetProperty("PbrMetallicRoughness")
+                ?? material.GetType().GetProperty("PBRMetallicRoughness");
             if (pbrProp?.GetValue(material) is not null)
             {
                 var pbr = pbrProp.GetValue(material);
@@ -580,16 +908,38 @@ namespace Avalonia3D.Loaders
                 }
 
                 var metallicProp = pbr.GetType().GetProperty("MetallicFactor");
-                if (metallicProp?.GetValue(pbr) is float metallic)
+                if (TryConvertSingle(metallicProp?.GetValue(pbr), out var metallic))
                 {
                     target.MetallicFactor = metallic;
                 }
 
                 var roughnessProp = pbr.GetType().GetProperty("RoughnessFactor");
-                if (roughnessProp?.GetValue(pbr) is float roughness)
+                if (TryConvertSingle(roughnessProp?.GetValue(pbr), out var roughness))
                 {
                     target.RoughnessFactor = roughness;
                 }
+            }
+        }
+
+        private static bool TryConvertSingle(object? value, out float result)
+        {
+            switch (value)
+            {
+                case float f:
+                    result = f;
+                    return true;
+                case double d:
+                    result = (float)d;
+                    return true;
+                case decimal m:
+                    result = (float)m;
+                    return true;
+                case int i:
+                    result = i;
+                    return true;
+                default:
+                    result = default;
+                    return false;
             }
         }
 

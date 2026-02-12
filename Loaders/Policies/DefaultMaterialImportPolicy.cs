@@ -39,21 +39,34 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
             return resolved;
         }
 
-        var textureTransparencySignal = sceneOverride?.ForceTextureTransparencySignal ?? HasMeaningfulTextureTransparency(material.BaseColorTexture);
-        var hasAlphaSignal = material.BaseColorFactor.W < AlphaSignalThreshold || textureTransparencySignal;
-        material.HasTextureTransparency = textureTransparencySignal;
+        var alphaProfile = sceneOverride?.AlphaProfile ?? context.AlphaProfile;
+        var textureSignal = ResolveTextureSignal(material.BaseColorTexture, sourceAlphaMode, sceneOverride, alphaProfile);
+        var hasAlphaSignal = material.BaseColorFactor.W < AlphaSignalThreshold || textureSignal != TextureAlphaSignal.None;
+        material.HasTextureTransparency = textureSignal != TextureAlphaSignal.None;
 
         if (hasAlphaSignal)
         {
-            resolved = MaterialAlphaMode.Blend;
+            resolved = textureSignal == TextureAlphaSignal.MaskCutout
+                ? MaterialAlphaMode.Mask
+                : MaterialAlphaMode.Blend;
             reasonCode = material.BaseColorFactor.W < AlphaSignalThreshold
                 ? "base_color_alpha_signal"
-                : "texture_alpha_signal";
+                : textureSignal == TextureAlphaSignal.MaskCutout
+                    ? "texture_alpha_mask_cutout"
+                    : "texture_alpha_signal";
+
+            if (resolved == MaterialAlphaMode.Blend &&
+                alphaProfile == MaterialAlphaImportProfile.Strict &&
+                !context.IsAnimatedMaterial)
+            {
+                resolved = MaterialAlphaMode.Mask;
+                reasonCode += "_strict_profile_promoted_to_mask";
+            }
+
             LogAlphaDecision(material, context, sourceAlphaMode, resolved, reasonCode);
             return resolved;
         }
 
-        var alphaProfile = sceneOverride?.AlphaProfile ?? context.AlphaProfile;
         if (alphaProfile == MaterialAlphaImportProfile.Strict)
         {
             resolved = MaterialAlphaMode.Blend;
@@ -95,6 +108,13 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
             return preserveOverride.Value
                 ? MaterialEmissiveBehavior.TreatAsTransparencySignal
                 : MaterialEmissiveBehavior.IgnoreForTransparencyFallback;
+        }
+
+        var alphaProfile = context.SceneOverride?.AlphaProfile ?? context.AlphaProfile;
+        var allowEmissiveTransparencyFallback = context.IsAnimatedMaterial || alphaProfile == MaterialAlphaImportProfile.Legacy;
+        if (!allowEmissiveTransparencyFallback)
+        {
+            return MaterialEmissiveBehavior.IgnoreForTransparencyFallback;
         }
 
         if (material.EmissiveTexture != null)
@@ -180,24 +200,166 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
         public const float MinOpaqueRatio = 0.05f;
         public const float MinDeepTransparentRatio = 0.001f;
         public const float MinRegularTransparentRatio = 0.01f;
-        public const float MinSoftTransparentRatio = 0.15f;
+        public const float StrictMinSoftTransparentRatio = 0.15f;
+        public const float BalancedMinSoftTransparentRatio = 0.01f;
+        public const float PermissiveMinSoftTransparentRatio = 0.001f;
 
         public const float DenseDeepMaskOpaqueRatio = 0.35f;
+        public const float DenseDeepMaskSoftTransparentCeiling = 0.03f;
+        public const float DenseDeepMaskRegularTransparentCeiling = 0.03f;
         public const float StrictDenseDeepMaskRatio = 0.15f;
         public const float BalancedDenseDeepMaskRatio = 0.20f;
         public const float PermissiveDenseDeepMaskRatio = 0.35f;
 
-        public static TextureAlphaHeuristicProfile ActiveProfile { get; set; } = TextureAlphaHeuristicProfile.Balanced;
-
-        public static float GetDenseDeepMaskRatioThreshold()
+        public static float GetDenseDeepMaskRatioThreshold(TextureAlphaHeuristicProfile profile)
         {
-            return ActiveProfile switch
+            return profile switch
             {
                 TextureAlphaHeuristicProfile.Strict => StrictDenseDeepMaskRatio,
                 TextureAlphaHeuristicProfile.Permissive => PermissiveDenseDeepMaskRatio,
                 _ => BalancedDenseDeepMaskRatio,
             };
         }
+
+        public static float GetMinSoftTransparentRatio(TextureAlphaHeuristicProfile profile)
+        {
+            return profile switch
+            {
+                TextureAlphaHeuristicProfile.Strict => StrictMinSoftTransparentRatio,
+                TextureAlphaHeuristicProfile.Permissive => PermissiveMinSoftTransparentRatio,
+                _ => BalancedMinSoftTransparentRatio,
+            };
+        }
+    }
+
+
+    private enum TextureAlphaSignal
+    {
+        None,
+        Blend,
+        MaskCutout
+    }
+
+    private static TextureAlphaSignal ResolveTextureSignal(
+        TextureData? texture,
+        MaterialAlphaMode sourceAlphaMode,
+        MaterialSceneImportOverride? sceneOverride,
+        MaterialAlphaImportProfile alphaProfile)
+    {
+        if (sceneOverride?.ForceTextureTransparencySignal.HasValue == true)
+        {
+            return sceneOverride.ForceTextureTransparencySignal.Value
+                ? TextureAlphaSignal.Blend
+                : TextureAlphaSignal.None;
+        }
+
+        if (sourceAlphaMode != MaterialAlphaMode.Blend)
+        {
+            return HasMeaningfulTextureTransparency(texture)
+                ? TextureAlphaSignal.Blend
+                : TextureAlphaSignal.None;
+        }
+
+        return ClassifyBlendSourceTextureTransparency(texture, ToHeuristicProfile(alphaProfile));
+    }
+
+    private static TextureAlphaSignal ClassifyBlendSourceTextureTransparency(
+        TextureData? texture,
+        TextureAlphaHeuristicProfile heuristicProfile)
+    {
+        if (texture?.Data == null || texture.Data.Length < 4)
+        {
+            return TextureAlphaSignal.None;
+        }
+
+        var data = texture.Data;
+        var sampled = 0;
+        var softTransparent = 0;
+        var regularTransparent = 0;
+        var deepTransparent = 0;
+        var opaque = 0;
+        var anyTransparent = 0;
+
+        var pixelCount = data.Length / 4;
+        var stepPixels = Math.Max(1, pixelCount / TextureAlphaHeuristics.MaxSamples);
+        var step = stepPixels * 4;
+
+        for (var i = 3; i < data.Length; i += step)
+        {
+            sampled++;
+            var alpha = data[i];
+
+            if (alpha <= TextureAlphaHeuristics.DeepTransparentAlphaThreshold)
+            {
+                deepTransparent++;
+            }
+            else
+            {
+                if (alpha <= TextureAlphaHeuristics.RegularTransparentAlphaThreshold)
+                {
+                    regularTransparent++;
+                }
+
+                if (alpha <= TextureAlphaHeuristics.SoftTransparentAlphaThreshold)
+                {
+                    softTransparent++;
+                }
+            }
+
+            if (alpha >= TextureAlphaHeuristics.OpaqueAlphaThreshold)
+            {
+                opaque++;
+            }
+            else
+            {
+                anyTransparent++;
+            }
+        }
+
+        if (sampled == 0)
+        {
+            return TextureAlphaSignal.None;
+        }
+
+        var opaqueRatio = opaque / (float)sampled;
+        var softTransparentRatio = softTransparent / (float)sampled;
+        if (softTransparentRatio < TextureAlphaHeuristics.GetMinSoftTransparentRatio(heuristicProfile) &&
+            anyTransparent == 0)
+        {
+            return TextureAlphaSignal.None;
+        }
+
+        var deepTransparentRatio = deepTransparent / (float)sampled;
+        var denseDeepMaskThreshold = TextureAlphaHeuristics.GetDenseDeepMaskRatioThreshold(heuristicProfile);
+
+        var regularTransparentRatio = regularTransparent / (float)sampled;
+
+        var shouldTreatAsCutout =
+            deepTransparentRatio > denseDeepMaskThreshold &&
+            opaqueRatio >= TextureAlphaHeuristics.MinOpaqueRatio &&
+            softTransparentRatio <= TextureAlphaHeuristics.DenseDeepMaskSoftTransparentCeiling &&
+            regularTransparentRatio <= TextureAlphaHeuristics.DenseDeepMaskRegularTransparentCeiling;
+
+        if (shouldTreatAsCutout)
+        {
+            return TextureAlphaSignal.MaskCutout;
+        }
+
+        return deepTransparentRatio >= TextureAlphaHeuristics.MinDeepTransparentRatio ||
+               regularTransparentRatio >= TextureAlphaHeuristics.MinRegularTransparentRatio ||
+               anyTransparent > 0
+            ? TextureAlphaSignal.Blend
+            : TextureAlphaSignal.None;
+    }
+
+    private static TextureAlphaHeuristicProfile ToHeuristicProfile(MaterialAlphaImportProfile alphaProfile)
+    {
+        return alphaProfile switch
+        {
+            MaterialAlphaImportProfile.Strict => TextureAlphaHeuristicProfile.Strict,
+            MaterialAlphaImportProfile.Legacy => TextureAlphaHeuristicProfile.Permissive,
+            _ => TextureAlphaHeuristicProfile.Balanced,
+        };
     }
 
     public static bool HasMeaningfulTextureTransparency(TextureData? texture)
@@ -228,19 +390,21 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
             sampled++;
             var alpha = data[i];
 
-            if (alpha <= TextureAlphaHeuristics.SoftTransparentAlphaThreshold)
-            {
-                softTransparent++;
-            }
-
-            if (alpha <= TextureAlphaHeuristics.RegularTransparentAlphaThreshold)
-            {
-                regularTransparent++;
-            }
-
             if (alpha <= TextureAlphaHeuristics.DeepTransparentAlphaThreshold)
             {
                 deepTransparent++;
+            }
+            else
+            {
+                if (alpha <= TextureAlphaHeuristics.RegularTransparentAlphaThreshold)
+                {
+                    regularTransparent++;
+                }
+
+                if (alpha <= TextureAlphaHeuristics.SoftTransparentAlphaThreshold)
+                {
+                    softTransparent++;
+                }
             }
 
             if (alpha >= TextureAlphaHeuristics.OpaqueAlphaThreshold)
@@ -261,7 +425,7 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
         }
 
         var deepTransparentRatio = deepTransparent / (float)sampled;
-        var denseDeepMaskThreshold = TextureAlphaHeuristics.GetDenseDeepMaskRatioThreshold();
+        var denseDeepMaskThreshold = TextureAlphaHeuristics.GetDenseDeepMaskRatioThreshold(TextureAlphaHeuristicProfile.Balanced);
         if (deepTransparentRatio > denseDeepMaskThreshold &&
             opaqueRatio >= TextureAlphaHeuristics.DenseDeepMaskOpaqueRatio)
         {
@@ -280,6 +444,6 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
         }
 
         var softTransparentRatio = softTransparent / (float)sampled;
-        return softTransparentRatio >= TextureAlphaHeuristics.MinSoftTransparentRatio;
+        return softTransparentRatio >= TextureAlphaHeuristics.GetMinSoftTransparentRatio(TextureAlphaHeuristicProfile.Balanced);
     }
 }

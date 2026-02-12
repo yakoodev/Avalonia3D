@@ -445,16 +445,23 @@ namespace Avalonia3D.Model.StandObjects
                 return MaterialAlphaMode.Opaque;
             }
 
-            if (renderMode == ShaderRenderMode.Unlit && material?.AlphaMode == MaterialAlphaMode.Blend)
+            if (material?.AlphaMode == MaterialAlphaMode.Blend && ShouldTreatBlendMaterialAsOpaque(material))
             {
-                var hasFactorTransparency = material.Opacity < 0.999f;
-                if (!hasFactorTransparency && !material.HasTextureTransparency)
-                {
-                    return MaterialAlphaMode.Opaque;
-                }
+                return MaterialAlphaMode.Opaque;
             }
 
             return ResolveAlphaMode(material, opacity);
+        }
+
+        private static bool ShouldTreatBlendMaterialAsOpaque(Material material)
+        {
+            if (material == null)
+            {
+                return false;
+            }
+
+            var hasFactorTransparency = material.Opacity < 0.999f;
+            return !hasFactorTransparency && !material.HasTextureTransparency;
         }
 
         public static MaterialAlphaMode ResolveAlphaMode(Material? material, float opacity)

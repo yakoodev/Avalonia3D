@@ -49,6 +49,7 @@ namespace Avalonia3D.Rendering
         public float ReflectionContributionClamp { get; init; } = 1.25f;
         public float AmbientStrengthClamp { get; init; } = 0.35f;
         public float AmbientOcclusionStrength { get; init; } = 1.0f;
+        public float SeparateEmissiveSurfaceScale { get; init; } = 0.0f;
     }
 
     public sealed record BackgroundProfile
@@ -118,7 +119,8 @@ namespace Avalonia3D.Rendering
                 IblSpecularIntensity = 0f,
                 ReflectionContributionClamp = 0.7f,
                 AmbientStrengthClamp = 0.25f,
-                AmbientOcclusionStrength = 0.8f
+                AmbientOcclusionStrength = 0.8f,
+                SeparateEmissiveSurfaceScale = 0.2f
             },
             Background = new BackgroundProfile { Red = 0.09f, Green = 0.09f, Blue = 0.10f },
             MaxLights = 2
@@ -164,7 +166,8 @@ namespace Avalonia3D.Rendering
                 IblSpecularIntensity = 0.75f,
                 ReflectionContributionClamp = 1.05f,
                 AmbientStrengthClamp = 0.30f,
-                AmbientOcclusionStrength = 1.0f
+                AmbientOcclusionStrength = 1.0f,
+                SeparateEmissiveSurfaceScale = 0.2f
             },
             Background = new BackgroundProfile { Red = 0.06f, Green = 0.06f, Blue = 0.08f },
             MaxLights = 4
@@ -210,7 +213,8 @@ namespace Avalonia3D.Rendering
                 IblSpecularIntensity = 1.0f,
                 ReflectionContributionClamp = 1.2f,
                 AmbientStrengthClamp = 0.35f,
-                AmbientOcclusionStrength = 1.05f
+                AmbientOcclusionStrength = 1.05f,
+                SeparateEmissiveSurfaceScale = 0.2f
             },
             Background = new BackgroundProfile { Red = 0.04f, Green = 0.05f, Blue = 0.07f },
             MaxLights = 8
@@ -231,16 +235,16 @@ namespace Avalonia3D.Rendering
                 Gamma = 2.2f,
                 Bloom = new BloomProfile
                 {
-                    Enabled = true,
-                    Threshold = 0.18f,
-                    Intensity = 2.6f,
+                    Enabled = false,
+                    Threshold = 0.35f,
+                    Intensity = 1.2f,
                     Radius = 1.4f,
                     Iterations = 6,
-                    SoftKnee = 0.75f,
-                    NormalizationBoost = 2.0f,
+                    SoftKnee = 0.55f,
+                    NormalizationBoost = 1.2f,
                     EmissiveMinContribution = 0.04f,
                     UnlitIntensityBoost = 2.5f,
-                    ColorAdditiveContribution = 0.55f
+                    ColorAdditiveContribution = 0.2f
                 }
             },
             Reflections = new ReflectionProfile
@@ -252,13 +256,13 @@ namespace Avalonia3D.Rendering
             },
             PbrTuning = new PbrTuningProfile
             {
-                Exposure = 1.15f,
+                Exposure = 1.0f,
                 PbrWhitePoint = 1.35f,
-                IblDiffuseIntensity = 0.3f,
-                IblSpecularIntensity = 1.15f,
-                ReflectionContributionClamp = 1.35f,
-                AmbientStrengthClamp = 0.42f,
-                AmbientOcclusionStrength = 1.2f
+                IblDiffuseIntensity = 0.15f,
+                IblSpecularIntensity = 0.95f,
+                ReflectionContributionClamp = 1.0f,
+                AmbientStrengthClamp = 0.22f,
+                AmbientOcclusionStrength = 1.0f
             },
             Background = new BackgroundProfile { Red = 0.02f, Green = 0.03f, Blue = 0.05f },
             MaxLights = RenderQualitySettings.MaxSupportedLights

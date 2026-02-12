@@ -392,7 +392,7 @@ uniform float uIntensity;
 void main()
 {
     vec3 bloom = texture(uBloomTexture, vUv).rgb;
-    FragColor = vec4(bloom * uIntensity, 1.0);
+    FragColor = vec4(bloom * uIntensity, 0.0);
 }";
 
             _extractProgram = CreateProgram(gl, vertex, extractFragment);

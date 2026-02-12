@@ -10,10 +10,10 @@ namespace Avalonia3D.Memory
 {
     public static class MemoryManager
     {
-        private static Timer _cleanupTimer;
+        private static Timer? _cleanupTimer;
         private static readonly object _lock = new();
         private static bool _isInitialized = false;
-        private static RenderResourceManager _resourceManager;
+        private static RenderResourceManager? _resourceManager;
 
         // Настройки управления памятью
         public static class Settings
@@ -62,7 +62,7 @@ namespace Avalonia3D.Memory
             }
         }
 
-        private static void PerformCleanup(object state)
+        private static void PerformCleanup(object? state)
         {
             try
             {

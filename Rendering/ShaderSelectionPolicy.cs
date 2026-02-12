@@ -84,15 +84,7 @@ public sealed class ShaderSelectionPolicy
     public static string ResolvePbrShaderId(Material material, Scene3D scene)
     {
         var features = BuildPbrFeatures(material, scene);
-
-        if (TryResolveLegacyPbrShaderId(features, out var legacyShaderId))
-        {
-            return legacyShaderId;
-        }
-
-        return features == PbrFeatures.None
-            ? ShaderIds.Pbr
-            : ShaderIds.CreatePbrVariantId(features);
+        return ShaderIds.CreatePbrVariantId(features);
     }
 
     public static PbrFeatures BuildPbrFeatures(Material material, Scene3D scene)
@@ -220,17 +212,11 @@ public sealed class ShaderSelectionPolicy
                          PbrFeatures.Transmission;
 
         var legacyFeatures = features & legacyMask;
-        var hasExtraFeatures = (features & ~legacyMask) != PbrFeatures.None;
-
-        if (hasExtraFeatures)
-        {
-            return false;
-        }
-
-        var isTransmission = legacyFeatures.HasFlag(PbrFeatures.Transmission);
-        var hasCoreMaps = HasAll(legacyFeatures, PbrFeatures.BaseColorMap, PbrFeatures.NormalMap, PbrFeatures.MetallicRoughnessMap);
-        var hasAoEmissive = HasAll(legacyFeatures, PbrFeatures.OcclusionMap, PbrFeatures.EmissiveMap);
-        var hasIbl = legacyFeatures.HasFlag(PbrFeatures.ReflectionsIbl);
+        var normalizedLegacyFeatures = NormalizeLegacyFeaturesForStaticShaders(legacyFeatures);
+        var isTransmission = normalizedLegacyFeatures.HasFlag(PbrFeatures.Transmission);
+        var hasCoreMaps = HasAll(normalizedLegacyFeatures, PbrFeatures.BaseColorMap, PbrFeatures.NormalMap, PbrFeatures.MetallicRoughnessMap);
+        var hasAoEmissive = HasAll(normalizedLegacyFeatures, PbrFeatures.OcclusionMap, PbrFeatures.EmissiveMap);
+        var hasIbl = normalizedLegacyFeatures.HasFlag(PbrFeatures.ReflectionsIbl);
 
         if (isTransmission && hasCoreMaps && hasAoEmissive && hasIbl)
         {
@@ -244,7 +230,7 @@ public sealed class ShaderSelectionPolicy
             return true;
         }
 
-        shaderId = legacyFeatures switch
+        shaderId = normalizedLegacyFeatures switch
         {
             PbrFeatures.None => ShaderIds.Pbr,
             PbrFeatures.BaseColorMap => ShaderIds.PbrBaseColor,
@@ -255,9 +241,29 @@ public sealed class ShaderSelectionPolicy
             _ => string.Empty
         };
 
+        if (string.IsNullOrEmpty(shaderId) && hasCoreMaps)
+        {
+            shaderId = hasIbl
+                ? ShaderIds.PbrFull
+                : ShaderIds.PbrBaseColorNormalMetallicRoughnessAoEmissive;
+        }
+
         return !string.IsNullOrEmpty(shaderId);
     }
 
+
+    private static PbrFeatures NormalizeLegacyFeaturesForStaticShaders(PbrFeatures features)
+    {
+        var hasBaseMetallic = features.HasFlag(PbrFeatures.BaseColorMap) && features.HasFlag(PbrFeatures.MetallicRoughnessMap);
+        if (hasBaseMetallic && !features.HasFlag(PbrFeatures.NormalMap))
+        {
+            // Static legacy registry has no "base+metallic without normal" variant.
+            // Reuse the normal-capable shader and let uHasNormalMap=0 disable sampling at runtime.
+            features |= PbrFeatures.NormalMap;
+        }
+
+        return features;
+    }
     private static IShader3D? TryCreateRuntimePbrVariant(string shaderId, Scene3D scene, GL? gl, IPbrVariantReducer pbrVariantReducer, IRuntimePbrShaderFactory runtimePbrShaderFactory)
     {
         if (!ShaderIds.TryParsePbrVariantId(shaderId, out var features))

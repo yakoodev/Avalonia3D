@@ -141,7 +141,7 @@ namespace Avalonia3D.Model
         }
 
         public Vector4 BaseColorFactor { get; set; } = new(1f, 1f, 1f, 1f);
-        public float MetallicFactor { get; set; } = 0.0f;
+        public float MetallicFactor { get; set; } = 1.0f;
         public float RoughnessFactor { get; set; } = 1.0f;
         public float OcclusionStrength { get; set; } = 1.0f;
         public Vector3 EmissiveFactor { get; set; } = Vector3.Zero;

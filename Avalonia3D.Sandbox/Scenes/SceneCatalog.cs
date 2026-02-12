@@ -12,10 +12,10 @@ public static class SceneCatalog
     {
         var scenes = new List<ISandboxScene>
         {
-            new PbrRegressionScene()
+         
         };
 
-        scenes.AddRange(CreateDedicatedPbrRegressionCases(assetsRoot));
+        //scenes.AddRange(CreateDedicatedPbrRegressionCases(assetsRoot));
         scenes.AddRange(DiscoverGltfScenes(assetsRoot));
 
         Log.Information("Scene catalog initialized. Total scenes: {Count}", scenes.Count);
@@ -23,18 +23,6 @@ public static class SceneCatalog
     }
 
 
-    private static IEnumerable<ISandboxScene> CreateDedicatedPbrRegressionCases(string assetsRoot)
-    {
-        var entries = PbrQaAssetRegistry.Load(assetsRoot)
-            .Where(static asset =>
-                asset.RelativePath.Equals("car/scene.gltf", StringComparison.OrdinalIgnoreCase)
-                || asset.RelativePath.Equals("cylinder_sci_fi/scene.gltf", StringComparison.OrdinalIgnoreCase));
-
-        foreach (var entry in entries)
-        {
-            yield return new PbrRegressionScene(entry);
-        }
-    }
 
     private static IEnumerable<ISandboxScene> DiscoverGltfScenes(string assetsRoot)
     {

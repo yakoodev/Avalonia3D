@@ -183,7 +183,7 @@
 
     <Grid Grid.Column="2">
       <Grid>
-        <Border Background="Black">
+        <Border Background="Gray">
           <local:SandboxModel3DControl x:Name="Viewport" />
         </Border>
         <Border x:Name="InputOverlay" Background="Transparent" IsHitTestVisible="True" />
