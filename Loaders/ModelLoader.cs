@@ -185,11 +185,13 @@ namespace Avalonia3D.Loaders
                 .Select(idx => (uint)idx)
                 .ToArray() ?? Array.Empty<uint>();
 
+            var resolvedMaterial = ResolvePrimitiveMaterial(prim);
+
             var model = new Model.Model
             {
-                Name = $"{node.Name}_{prim.Material?.Name ?? "mat"}",
+                Name = $"{node.Name}_{resolvedMaterial?.Name ?? "mat"}",
                 PrimitiveKey = primitiveKey,
-                MaterialKey = prim.Material != null ? $"material:{prim.Material.LogicalIndex}" : string.Empty,
+                MaterialKey = resolvedMaterial != null ? $"material:{resolvedMaterial.LogicalIndex}" : string.Empty,
                 Vertices = vertices,
                 Indices = indices,
                 LocalMatrix = node.LocalMatrix,
@@ -202,11 +204,49 @@ namespace Avalonia3D.Loaders
             }
 
             // Загрузка материала и текстур с кешированием
-            LoadMaterialForModel(model, prim, node, policyContext);
+            LoadMaterialForModel(model, resolvedMaterial, prim, node, policyContext);
 
             return model;
         }
 
+
+
+        private static SharpGLTF.Schema2.Material? ResolvePrimitiveMaterial(MeshPrimitive prim)
+        {
+            if (prim == null)
+            {
+                return null;
+            }
+
+            if (prim.Material != null)
+            {
+                return prim.Material;
+            }
+
+            try
+            {
+                var mesh = prim.LogicalParent;
+                var modelRoot = mesh?.LogicalParent;
+                if (modelRoot == null)
+                {
+                    return null;
+                }
+
+                var materials = modelRoot.LogicalMaterials;
+                if (materials == null || materials.Count != 1)
+                {
+                    return null;
+                }
+
+                var fallback = materials[0];
+                Log.Warning("GLTF primitive has no explicit material binding. Applying single-material fallback: materialIndex={MaterialIndex}, materialName={MaterialName}", fallback.LogicalIndex, fallback.Name ?? "<unnamed>");
+                return fallback;
+            }
+            catch
+            {
+                return null;
+            }
+        }
 
         private static MorphTarget[] ReadMorphTargets(MeshPrimitive prim, int vertexCount)
         {
@@ -252,14 +292,13 @@ namespace Avalonia3D.Loaders
             return targets;
         }
 
-        private static void LoadMaterialForModel(Model.Model model, MeshPrimitive prim, Node node, MaterialImportPolicyContext? policyContext)
+        private static void LoadMaterialForModel(Model.Model model, SharpGLTF.Schema2.Material? material, MeshPrimitive prim, Node node, MaterialImportPolicyContext? policyContext)
         {
             if (model == null)
             {
                 return;
             }
 
-            var material = prim.Material;
             if (material == null)
             {
                 return;

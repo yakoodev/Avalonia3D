@@ -711,6 +711,27 @@ public sealed class MaterialAlphaAndLoaderTests
 
 
     [Fact]
+    public void ModelLoader_PrimitiveWithoutExplicitMaterial_UsesSingleMaterialFallback()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"single-material-fallback-{Guid.NewGuid():N}.gltf");
+        File.WriteAllText(path, GetSingleMaterialWithoutPrimitiveBindingGltfJson());
+
+        try
+        {
+            var gltf = SharpGLTF.Schema2.ModelRoot.Load(path);
+            var model = Assert.Single(ModelLoader.LoadModels(gltf));
+
+            Assert.NotNull(model.Material);
+            Assert.Equal("material:0", model.MaterialKey);
+            Assert.True(model.Material!.RoughnessFactor >= 0f);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void ModelLoader_TransfersChannelTexCoordToRuntimeParameters()
     {
         var getChannelTexCoord = typeof(ModelLoader).GetMethod("GetChannelTexCoord", BindingFlags.NonPublic | BindingFlags.Static);
@@ -1235,6 +1256,49 @@ public sealed class MaterialAlphaAndLoaderTests
                 "baseColorFactor": [1,1,1,1],
                 "metallicFactor": 0,
                 "roughnessFactor": 1
+              }
+            }
+          ],
+          "buffers": [
+            {
+              "uri": "data:application/octet-stream;base64,AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAABAAIA",
+              "byteLength": 42
+            }
+          ],
+          "bufferViews": [
+            { "buffer": 0, "byteOffset": 0, "byteLength": 36, "target": 34962 },
+            { "buffer": 0, "byteOffset": 36, "byteLength": 6, "target": 34963 }
+          ],
+          "accessors": [
+            { "bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3", "min": [0,0,0], "max": [1,1,0] },
+            { "bufferView": 1, "componentType": 5123, "count": 3, "type": "SCALAR" }
+          ]
+        }
+        """;
+
+    private static string GetSingleMaterialWithoutPrimitiveBindingGltfJson() =>
+        """
+        {
+          "asset": { "version": "2.0" },
+          "scenes": [ { "nodes": [0] } ],
+          "nodes": [ { "mesh": 0, "name": "n" } ],
+          "meshes": [
+            {
+              "primitives": [
+                {
+                  "attributes": { "POSITION": 0 },
+                  "indices": 1
+                }
+              ]
+            }
+          ],
+          "materials": [
+            {
+              "name": "SingleFallbackMaterial",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [1,1,1,1],
+                "metallicFactor": 0.8,
+                "roughnessFactor": 0.2
               }
             }
           ],
