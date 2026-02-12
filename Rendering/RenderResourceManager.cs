@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Runtime.InteropServices;
 using Avalonia3D.Model;
-using Avalonia3D.Rendering.Diagnostics;
 using Avalonia3D.Model.StandObjects;
 using Model3D = Avalonia3D.Model.Model;
 
@@ -58,7 +57,7 @@ namespace Avalonia3D.Rendering
         internal TextureBindingState GetTextureBindingState(TextureSemantic semantic)
             => _textureBindings.TryGetValue(semantic, out var state)
                 ? state
-                : new TextureBindingState(semantic, 0, false, TextureColorFlags.None, null, null, GLEnum.NoError, 0, 0, false, null, "Unavailable", ColorDecodeMode.NotRequired, null);
+                : new TextureBindingState(semantic, 0, false, TextureColorFlags.None, null, null, GLEnum.NoError, 0, 0, false, null);
 
         internal void SetTextureBindingState(TextureBindingState state)
         {
@@ -87,10 +86,7 @@ namespace Avalonia3D.Rendering
         int Width,
         int Height,
         bool WasBoundToGpu,
-        int? LastBoundTextureUnit,
-        string SourceColorFormat,
-        ColorDecodeMode DecodeMode,
-        string? DecodeFallbackReason);
+        int? LastBoundTextureUnit);
 
 
     public sealed record InstanceBatchRequest(string Key, IReadOnlyList<MeshObject> Instances);
@@ -610,9 +606,6 @@ namespace Avalonia3D.Rendering
             var width = textureData?.Width ?? 0;
             var height = textureData?.Height ?? 0;
             var glError = GLEnum.NoError;
-            var sourceColorFormat = textureData == null ? "Unavailable" : "RGBA8";
-            var decodeMode = ColorDecodeMode.NotRequired;
-            string? decodeFallbackReason = null;
             uint textureId = 0;
 
             if (textureData == null || textureData.Data == null)
@@ -628,10 +621,7 @@ namespace Avalonia3D.Rendering
                     width,
                     height,
                     false,
-                    null,
-                    sourceColorFormat,
-                    decodeMode,
-                    decodeFallbackReason));
+                    null));
 
                 Log.Debug("Texture state: model={Model}, material={Material}, semantic={Semantic}, texture={TextureId}, preferredFormat={PreferredInternalFormat}, usedFormat={UsedInternalFormat}, glError={GlError}, size={Width}x{Height}", modelLabel, materialLabel, semantic, 0, preferredInternalFormat, null, glError, width, height);
                 return 0;
@@ -651,10 +641,7 @@ namespace Avalonia3D.Rendering
                     width,
                     height,
                     false,
-                    null,
-                    sourceColorFormat,
-                    decodeMode,
-                    decodeFallbackReason));
+                    null));
 
                 Log.Warning("Texture allocation failed before upload: model={Model}, material={Material}, semantic={Semantic}, texture={TextureId}, preferredFormat={PreferredInternalFormat}, usedFormat={UsedInternalFormat}, glError={GlError}, size={Width}x{Height}", modelLabel, materialLabel, semantic, 0, preferredInternalFormat, null, GLEnum.OutOfMemory, width, height);
                 return 0;
@@ -681,7 +668,6 @@ namespace Avalonia3D.Rendering
                     }
 
                     usedInternalFormat = ResolveFallbackInternalFormat(semantic);
-                    decodeFallbackReason = "Preferred sRGB internal format rejected by driver; fallback to linear format.";
                     _textureGl.TexImage2D(TextureTarget.Texture2D, 0, (int)usedInternalFormat,
                         (uint)textureData.Width, (uint)textureData.Height, 0,
                         PixelFormat.Rgba, PixelType.UnsignedByte, dataPtr);
@@ -710,25 +696,15 @@ namespace Avalonia3D.Rendering
                     width,
                     height,
                     false,
-                    null,
-                    sourceColorFormat,
-                    decodeMode,
-                    decodeFallbackReason));
+                    null));
 
                 Log.Warning("Texture upload failed and texture was deleted: model={Model}, material={Material}, semantic={Semantic}, texture={TextureId}, preferredFormat={PreferredInternalFormat}, usedFormat={UsedInternalFormat}, glError={GlError}, size={Width}x{Height}", modelLabel, materialLabel, semantic, textureId, preferredInternalFormat, usedInternalFormat, glError, width, height);
                 return 0;
             }
 
-            decodeMode = PbrColorPipelineDiagnostics.ResolveDecodeMode(
-                semantic,
-                preferredInternalFormat,
-                usedInternalFormat,
-                TextureColorManagement.EnableManualSrgbDecodeCompensation);
-
             if (TextureColorManagement.ShouldFlagMissingSrgbDecode(semantic, preferredInternalFormat, usedInternalFormat))
             {
                 resources.TextureColorFlags |= TextureColorManagement.GetMissingSrgbDecodeFlag(semantic);
-                Log.Warning("Texture color pipeline fallback: model={Model}, material={Material}, semantic={Semantic}, decodeMode={DecodeMode}, preferredFormat={PreferredInternalFormat}, usedFormat={UsedInternalFormat}, reason={Reason}", modelLabel, materialLabel, semantic, decodeMode, preferredInternalFormat, usedInternalFormat, decodeFallbackReason ?? "manual sRGB decode enabled");
             }
 
             resources.SetTextureBindingState(new TextureBindingState(
@@ -742,12 +718,9 @@ namespace Avalonia3D.Rendering
                 width,
                 height,
                 false,
-                null,
-                sourceColorFormat,
-                decodeMode,
-                decodeFallbackReason));
+                null));
 
-            Log.Information("Texture loaded: model={Model}, material={Material}, semantic={Semantic}, texture={TextureId}, sourceFormat={SourceFormat}, preferredFormat={PreferredInternalFormat}, usedFormat={UsedInternalFormat}, decodeMode={DecodeMode}, fallbackReason={FallbackReason}, glError={GlError}, size={Width}x{Height}, colorFlags={TextureColorFlags}", modelLabel, materialLabel, semantic, textureId, sourceColorFormat, preferredInternalFormat, usedInternalFormat, decodeMode, decodeFallbackReason, glError, width, height, resources.TextureColorFlags);
+            Log.Information("Texture loaded: model={Model}, material={Material}, semantic={Semantic}, texture={TextureId}, preferredFormat={PreferredInternalFormat}, usedFormat={UsedInternalFormat}, glError={GlError}, size={Width}x{Height}, colorFlags={TextureColorFlags}", modelLabel, materialLabel, semantic, textureId, preferredInternalFormat, usedInternalFormat, glError, width, height, resources.TextureColorFlags);
 
             return textureId;
         }

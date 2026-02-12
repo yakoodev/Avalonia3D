@@ -23,8 +23,7 @@ namespace Avalonia3D.Model.StandObjects
             get => Node.Position;
             set => Node.Position = value;
         }
-        // Must be opt-in. Non-zero default causes full-frame emissive bias and bloom washout.
-        public Vector3 EmissionColor { get; set; } = Vector3.Zero;
+        public Vector3 EmissionColor { get; set; } = Vector3.One;
         public Vector3 BaseColor { get; set; } = Vector3.One;
         public float Opacity { get; set; } = 1f;
         public Quaternion Rotation

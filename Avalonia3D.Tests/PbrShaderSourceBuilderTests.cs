@@ -1,5 +1,4 @@
 using Avalonia3D.Shaders;
-using Avalonia3D.Rendering;
 using Xunit;
 
 namespace Avalonia3D.Tests;
@@ -52,7 +51,7 @@ public class PbrShaderSourceBuilderTests
         Assert.Contains("uEmissiveUvOffset", fragmentSource);
         Assert.Contains("uEmissiveUvScale", fragmentSource);
         Assert.Contains("uEmissiveUvRotation", fragmentSource);
-        Assert.Contains("baseColorTexDecoded=ApplyManualBaseColorDecode(baseColorTexRaw)", fragmentSource);
+        Assert.Contains("ApplyManualBaseColorDecode(texture(uBaseColorMap, baseColorUv))", fragmentSource);
         Assert.Contains("ApplyManualEmissiveDecode(texture(uEmissiveMap, emissiveUv).rgb)", fragmentSource);
     }
     [Fact]
@@ -130,29 +129,11 @@ public class PbrShaderSourceBuilderTests
 
         Assert.Contains("uPbrDebugViewMode", fragmentSource);
         Assert.Contains("debugSurfaceResult", fragmentSource);
-        Assert.Contains("emissiveToSurface", fragmentSource);
-        Assert.Contains("uSeparateEmissiveSurfaceScale", fragmentSource);
         Assert.Contains("baseColor.rgb", fragmentSource);
         Assert.Contains("directLightComponent", fragmentSource);
         Assert.Contains("iblComponent", fragmentSource);
         Assert.Contains("vec3(ao)", fragmentSource);
         Assert.Contains("norm*0.5+0.5", fragmentSource);
-        Assert.Contains($"uPbrDebugViewMode=={(int)PbrDebugViewMode.BaseColorTexRaw}", fragmentSource);
-        Assert.Contains($"uPbrDebugViewMode=={(int)PbrDebugViewMode.BaseColorAfterSrgbDecode}", fragmentSource);
-        Assert.Contains("baseColorTexRaw.rgb", fragmentSource);
-        Assert.Contains("baseColorTexDecoded.rgb", fragmentSource);
-    }
-
-    [Fact]
-    public void Build_IncludesDistanceAttenuationInDirectLighting()
-    {
-        var builder = new PbrShaderSourceBuilder();
-
-        var (_, fragmentSource) = builder.Build(PbrFeatures.None, maxLights: 4);
-
-        Assert.Contains("lightDistance", fragmentSource);
-        Assert.Contains("attenuation=1.0/(1.0+lightDistance*lightDistance)", fragmentSource);
-        Assert.Contains("uLightColor[i]*attenuation", fragmentSource);
     }
 
 
@@ -177,7 +158,6 @@ public class PbrShaderSourceBuilderTests
         Assert.Contains("uIblDiffuseIntensity", fragmentSource);
         Assert.Contains("uIblSpecularIntensity", fragmentSource);
         Assert.Contains("uReflectionContributionClamp", fragmentSource);
-        Assert.Contains("uSeparateEmissiveTarget", fragmentSource);
         Assert.Contains("uAmbientStrengthClamp", fragmentSource);
         Assert.Contains("iblDiffuse", fragmentSource);
         Assert.Contains("min(reflection + iblDiffuse", fragmentSource);

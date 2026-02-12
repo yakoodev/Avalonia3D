@@ -11,14 +11,6 @@ namespace Avalonia3D.Tests;
 public class EmissionUniformResolverTests
 {
     [Fact]
-    public void SceneObject_DefaultEmissionColor_IsBlack()
-    {
-        var sceneObject = new AdditiveEmissionSceneObject();
-
-        Assert.Equal(Vector3.Zero, sceneObject.EmissionColor);
-    }
-
-    [Fact]
     public void ResolveSceneEmissionColor_WithMaterial_AndNoOverride_ReturnsZero()
     {
         var mesh = new MeshObject
@@ -61,6 +53,8 @@ public class EmissionUniformResolverTests
 
         Assert.Equal(mesh.EmissionColor, result);
     }
+
+
 
     [Fact]
     public void EmissiveStrengthExtension_ProducesComparableEmissiveBrightness_ForPbrAndUnlit()
@@ -105,6 +99,7 @@ public class EmissionUniformResolverTests
 
         EmissionUniformResolver.EmissiveTextureMode = EmissiveTextureDebugMode.Normal;
     }
+
 
     private static string GetEmissiveStrengthGltfJson() =>
         """

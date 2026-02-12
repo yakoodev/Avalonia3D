@@ -1,6 +1,5 @@
 using Avalonia3D.Lights;
 using Avalonia3D.Model;
-using Avalonia3D.Sandbox.Services;
 using System.IO;
 using System.Numerics;
 
@@ -37,7 +36,5 @@ public sealed class PbrScene : ISandboxScene
             Color = new Vector3(1f, 0.7f, 0.6f),
             Intensity = 0.6f
         });
-
-        GltfAssetDiagnostics.WriteCompactModelReport(path, scene);
     }
 }

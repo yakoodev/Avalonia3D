@@ -22,12 +22,6 @@ namespace Avalonia3D.Rendering
         public float EmissiveMinContribution { get; init; } = 0.035f;
         public float UnlitIntensityBoost { get; init; } = 2.5f;
         public float ColorAdditiveContribution { get; init; } = 0.2f;
-        public float ColorAdditiveWhenEmissivePresentScale { get; init; } = 0.02f;
-        public float EmissivePrimaryThresholdScale { get; init; } = 1.35f;
-        public float EmissivePrimaryIntensityScale { get; init; } = 0.55f;
-        public float EmissivePrimaryWithColorIntensityScale { get; init; } = 0.85f;
-        public float EmissivePrimaryNormalizationScale { get; init; } = 0.6f;
-        public float EmissivePrimaryMinContribution { get; init; } = 0.0f;
     }
 
     public sealed record PostFxProfile
@@ -54,8 +48,6 @@ namespace Avalonia3D.Rendering
         public float IblSpecularIntensity { get; init; } = 1.0f;
         public float ReflectionContributionClamp { get; init; } = 1.25f;
         public float AmbientStrengthClamp { get; init; } = 0.35f;
-        public float DirectLightContributionClamp { get; init; } = 1.35f;
-        public float SeparateEmissiveSurfaceScale { get; init; } = 0.28f;
         public float AmbientOcclusionStrength { get; init; } = 1.0f;
     }
 
@@ -108,13 +100,7 @@ namespace Avalonia3D.Rendering
                     NormalizationBoost = 1.6f,
                     EmissiveMinContribution = 0.02f,
                     UnlitIntensityBoost = 2.0f,
-                    ColorAdditiveContribution = 0.2f,
-                    ColorAdditiveWhenEmissivePresentScale = 0.02f,
-                    EmissivePrimaryThresholdScale = 1.35f,
-                    EmissivePrimaryIntensityScale = 0.55f,
-                    EmissivePrimaryWithColorIntensityScale = 0.85f,
-                    EmissivePrimaryNormalizationScale = 0.6f,
-                    EmissivePrimaryMinContribution = 0.0f
+                    ColorAdditiveContribution = 0.2f
                 }
             },
             Reflections = new ReflectionProfile
@@ -132,8 +118,6 @@ namespace Avalonia3D.Rendering
                 IblSpecularIntensity = 0f,
                 ReflectionContributionClamp = 0.7f,
                 AmbientStrengthClamp = 0.25f,
-                DirectLightContributionClamp = 1.0f,
-                SeparateEmissiveSurfaceScale = 0.35f,
                 AmbientOcclusionStrength = 0.8f
             },
             Background = new BackgroundProfile { Red = 0.09f, Green = 0.09f, Blue = 0.10f },
@@ -162,13 +146,7 @@ namespace Avalonia3D.Rendering
                     NormalizationBoost = 1.8f,
                     EmissiveMinContribution = 0.03f,
                     UnlitIntensityBoost = 2.3f,
-                    ColorAdditiveContribution = 0.35f,
-                    ColorAdditiveWhenEmissivePresentScale = 0.02f,
-                    EmissivePrimaryThresholdScale = 1.35f,
-                    EmissivePrimaryIntensityScale = 0.55f,
-                    EmissivePrimaryWithColorIntensityScale = 0.85f,
-                    EmissivePrimaryNormalizationScale = 0.6f,
-                    EmissivePrimaryMinContribution = 0.0f
+                    ColorAdditiveContribution = 0.35f
                 }
             },
             Reflections = new ReflectionProfile
@@ -214,13 +192,7 @@ namespace Avalonia3D.Rendering
                     NormalizationBoost = 1.9f,
                     EmissiveMinContribution = 0.035f,
                     UnlitIntensityBoost = 2.5f,
-                    ColorAdditiveContribution = 0.45f,
-                    ColorAdditiveWhenEmissivePresentScale = 0.02f,
-                    EmissivePrimaryThresholdScale = 1.35f,
-                    EmissivePrimaryIntensityScale = 0.55f,
-                    EmissivePrimaryWithColorIntensityScale = 0.85f,
-                    EmissivePrimaryNormalizationScale = 0.6f,
-                    EmissivePrimaryMinContribution = 0.0f
+                    ColorAdditiveContribution = 0.45f
                 }
             },
             Reflections = new ReflectionProfile
@@ -268,13 +240,7 @@ namespace Avalonia3D.Rendering
                     NormalizationBoost = 2.0f,
                     EmissiveMinContribution = 0.04f,
                     UnlitIntensityBoost = 2.5f,
-                    ColorAdditiveContribution = 0.55f,
-                    ColorAdditiveWhenEmissivePresentScale = 0.02f,
-                    EmissivePrimaryThresholdScale = 1.35f,
-                    EmissivePrimaryIntensityScale = 0.55f,
-                    EmissivePrimaryWithColorIntensityScale = 0.85f,
-                    EmissivePrimaryNormalizationScale = 0.6f,
-                    EmissivePrimaryMinContribution = 0.0f
+                    ColorAdditiveContribution = 0.55f
                 }
             },
             Reflections = new ReflectionProfile
@@ -326,8 +292,6 @@ namespace Avalonia3D.Rendering
                 IblSpecularIntensity = 0.6f,
                 ReflectionContributionClamp = 0.9f,
                 AmbientStrengthClamp = 0.25f,
-                DirectLightContributionClamp = 0.95f,
-                SeparateEmissiveSurfaceScale = 0.4f,
                 AmbientOcclusionStrength = 1.0f
             },
             Background = new BackgroundProfile { Red = 0.05f, Green = 0.05f, Blue = 0.06f },
@@ -363,13 +327,7 @@ namespace Avalonia3D.Rendering
                     NormalizationBoost = Math.Clamp(bloom.NormalizationBoost, 0f, 4f),
                     EmissiveMinContribution = Math.Clamp(bloom.EmissiveMinContribution, 0f, 1f),
                     UnlitIntensityBoost = Math.Clamp(bloom.UnlitIntensityBoost, 0f, 8f),
-                    ColorAdditiveContribution = Math.Clamp(bloom.ColorAdditiveContribution, 0f, 1f),
-                    ColorAdditiveWhenEmissivePresentScale = Math.Clamp(bloom.ColorAdditiveWhenEmissivePresentScale, 0f, 1f),
-                    EmissivePrimaryThresholdScale = Math.Clamp(bloom.EmissivePrimaryThresholdScale, 0.5f, 4f),
-                    EmissivePrimaryIntensityScale = Math.Clamp(bloom.EmissivePrimaryIntensityScale, 0f, 1f),
-                    EmissivePrimaryWithColorIntensityScale = Math.Clamp(bloom.EmissivePrimaryWithColorIntensityScale, 0f, 1f),
-                    EmissivePrimaryNormalizationScale = Math.Clamp(bloom.EmissivePrimaryNormalizationScale, 0f, 1f),
-                    EmissivePrimaryMinContribution = Math.Clamp(bloom.EmissivePrimaryMinContribution, 0f, 1f)
+                    ColorAdditiveContribution = Math.Clamp(bloom.ColorAdditiveContribution, 0f, 1f)
                 }
             };
 
@@ -391,8 +349,6 @@ namespace Avalonia3D.Rendering
                 IblSpecularIntensity = Math.Clamp(PbrTuning?.IblSpecularIntensity ?? 1.0f, 0f, 8.0f),
                 ReflectionContributionClamp = Math.Clamp(PbrTuning?.ReflectionContributionClamp ?? 1.25f, 0f, 8.0f),
                 AmbientStrengthClamp = Math.Clamp(PbrTuning?.AmbientStrengthClamp ?? 0.35f, 0f, 2.0f),
-                DirectLightContributionClamp = Math.Clamp(PbrTuning?.DirectLightContributionClamp ?? 1.35f, 0f, 16.0f),
-                SeparateEmissiveSurfaceScale = Math.Clamp(PbrTuning?.SeparateEmissiveSurfaceScale ?? 0.28f, 0f, 1.0f),
                 AmbientOcclusionStrength = Math.Clamp(PbrTuning?.AmbientOcclusionStrength ?? 1.0f, 0f, 4.0f)
             };
 
@@ -438,7 +394,7 @@ namespace Avalonia3D.Rendering
         }
 
         public string ToSummary() =>
-            $"Profile={Name} ({QualityPreset}), shadows={Shadows.Enabled}:{Shadows.MapSize}, postfx={PostFx.Effects}, gamma={PostFx.Gamma:0.00}, bloom={PostFx.Bloom.Enabled}:{PostFx.Bloom.Threshold:0.00}/{PostFx.Bloom.Intensity:0.00}/{PostFx.Bloom.Radius:0.00}x{PostFx.Bloom.Iterations}, refl={Reflections.Mode}:{Reflections.Intensity:0.00}, exposure={PbrTuning.Exposure:0.00}, wp={PbrTuning.PbrWhitePoint:0.00}, ibl(diff/spec)={PbrTuning.IblDiffuseIntensity:0.00}/{PbrTuning.IblSpecularIntensity:0.00}, reflClamp={PbrTuning.ReflectionContributionClamp:0.00}, ambientClamp={PbrTuning.AmbientStrengthClamp:0.00}, directClamp={PbrTuning.DirectLightContributionClamp:0.00}, emissiveSurfScale={PbrTuning.SeparateEmissiveSurfaceScale:0.00}, lights={MaxLights}, msaa={MsaaPolicy}, bg=({Background.Red:0.00},{Background.Green:0.00},{Background.Blue:0.00})";
+            $"Profile={Name} ({QualityPreset}), shadows={Shadows.Enabled}:{Shadows.MapSize}, postfx={PostFx.Effects}, gamma={PostFx.Gamma:0.00}, bloom={PostFx.Bloom.Enabled}:{PostFx.Bloom.Threshold:0.00}/{PostFx.Bloom.Intensity:0.00}/{PostFx.Bloom.Radius:0.00}x{PostFx.Bloom.Iterations}, refl={Reflections.Mode}:{Reflections.Intensity:0.00}, exposure={PbrTuning.Exposure:0.00}, wp={PbrTuning.PbrWhitePoint:0.00}, ibl(diff/spec)={PbrTuning.IblDiffuseIntensity:0.00}/{PbrTuning.IblSpecularIntensity:0.00}, reflClamp={PbrTuning.ReflectionContributionClamp:0.00}, ambientClamp={PbrTuning.AmbientStrengthClamp:0.00}, lights={MaxLights}, msaa={MsaaPolicy}, bg=({Background.Red:0.00},{Background.Green:0.00},{Background.Blue:0.00})";
 
         private static string? ResolveDefaultEnvironmentMapPath(bool reflectionsEnabled, ReflectionMode mode)
         {

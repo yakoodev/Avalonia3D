@@ -105,9 +105,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         {
             PbrDebugViewMode.None,
             PbrDebugViewMode.BaseColorOnly,
-            PbrDebugViewMode.BaseColorTexRaw,
-            PbrDebugViewMode.BaseColorAfterSrgbDecode,
-            PbrDebugViewMode.BaseColorAfterFactor,
             PbrDebugViewMode.DirectLightOnly,
             PbrDebugViewMode.IblOnly,
             PbrDebugViewMode.EmissiveOnly,

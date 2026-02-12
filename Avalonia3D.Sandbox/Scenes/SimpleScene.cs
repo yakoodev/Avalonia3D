@@ -1,6 +1,5 @@
 using Avalonia3D.Lights;
 using Avalonia3D.Model;
-using Avalonia3D.Sandbox.Services;
 using System.IO;
 using System.Numerics;
 
@@ -23,7 +22,5 @@ public sealed class SimpleScene : ISandboxScene
             Color = new Vector3(1f, 1f, 1f),
             Intensity = 1.2f
         });
-
-        GltfAssetDiagnostics.WriteCompactModelReport(path, scene);
     }
 }

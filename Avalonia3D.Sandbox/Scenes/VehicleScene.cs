@@ -35,7 +35,5 @@ public sealed class VehicleScene : ISandboxScene
             Color = new Vector3(0.8f, 0.9f, 1f),
             Intensity = 0.7f
         });
-
-        GltfAssetDiagnostics.WriteCompactModelReport(path, scene);
     }
 }
