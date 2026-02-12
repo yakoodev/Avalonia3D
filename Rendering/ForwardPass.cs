@@ -19,6 +19,8 @@ namespace Avalonia3D.Rendering
             var gl = context.Gl;
             var frameState = context.RenderContext.FrameState;
             frameState.AmbientStrengthClamp = _settings.PbrTuning.AmbientStrengthClamp;
+            frameState.SeparateEmissiveTarget = context.RenderContext.FrameState.HasEmissiveTarget;
+            frameState.SeparateEmissiveSurfaceScale = _settings.PbrTuning.SeparateEmissiveSurfaceScale;
 
             if (!_settings.Reflections.Enabled || _settings.Reflections.Mode == ReflectionMode.Off)
             {

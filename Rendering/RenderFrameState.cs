@@ -18,6 +18,8 @@ namespace Avalonia3D.Rendering
         public float IblSpecularIntensity { get; set; } = 1.0f;
         public float ReflectionContributionClamp { get; set; } = 1.25f;
         public float AmbientStrengthClamp { get; set; } = 0.35f;
+        public bool SeparateEmissiveTarget { get; set; }
+        public float SeparateEmissiveSurfaceScale { get; set; } = 0.2f;
         public bool ReflectionsEnabled { get; set; }
         public ReflectionMode ReflectionMode { get; set; } = ReflectionMode.Off;
         public PbrDebugViewMode PbrDebugViewMode { get; set; } = PbrDebugViewMode.None;

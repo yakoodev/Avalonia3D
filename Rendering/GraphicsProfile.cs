@@ -49,6 +49,7 @@ namespace Avalonia3D.Rendering
         public float ReflectionContributionClamp { get; init; } = 1.25f;
         public float AmbientStrengthClamp { get; init; } = 0.35f;
         public float AmbientOcclusionStrength { get; init; } = 1.0f;
+        public float SeparateEmissiveSurfaceScale { get; init; } = 0.2f;
     }
 
     public sealed record BackgroundProfile
@@ -118,7 +119,8 @@ namespace Avalonia3D.Rendering
                 IblSpecularIntensity = 0f,
                 ReflectionContributionClamp = 0.7f,
                 AmbientStrengthClamp = 0.25f,
-                AmbientOcclusionStrength = 0.8f
+                AmbientOcclusionStrength = 0.8f,
+                SeparateEmissiveSurfaceScale = 0.2f
             },
             Background = new BackgroundProfile { Red = 0.09f, Green = 0.09f, Blue = 0.10f },
             MaxLights = 2
@@ -164,7 +166,8 @@ namespace Avalonia3D.Rendering
                 IblSpecularIntensity = 0.75f,
                 ReflectionContributionClamp = 1.05f,
                 AmbientStrengthClamp = 0.30f,
-                AmbientOcclusionStrength = 1.0f
+                AmbientOcclusionStrength = 1.0f,
+                SeparateEmissiveSurfaceScale = 0.2f
             },
             Background = new BackgroundProfile { Red = 0.06f, Green = 0.06f, Blue = 0.08f },
             MaxLights = 4
@@ -210,7 +213,8 @@ namespace Avalonia3D.Rendering
                 IblSpecularIntensity = 1.0f,
                 ReflectionContributionClamp = 1.2f,
                 AmbientStrengthClamp = 0.35f,
-                AmbientOcclusionStrength = 1.05f
+                AmbientOcclusionStrength = 1.05f,
+                SeparateEmissiveSurfaceScale = 0.2f
             },
             Background = new BackgroundProfile { Red = 0.04f, Green = 0.05f, Blue = 0.07f },
             MaxLights = 8

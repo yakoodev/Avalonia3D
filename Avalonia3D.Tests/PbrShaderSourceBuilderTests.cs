@@ -162,4 +162,16 @@ public class PbrShaderSourceBuilderTests
         Assert.Contains("iblDiffuse", fragmentSource);
         Assert.Contains("min(reflection + iblDiffuse", fragmentSource);
     }
+    [Fact]
+    public void Build_IncludesSeparateEmissiveSurfaceControls()
+    {
+        var builder = new PbrShaderSourceBuilder();
+
+        var (_, fragmentSource) = builder.Build(PbrFeatures.EmissiveMap, maxLights: 4);
+
+        Assert.Contains("uSeparateEmissiveTarget", fragmentSource);
+        Assert.Contains("uSeparateEmissiveSurfaceScale", fragmentSource);
+        Assert.Contains("totalEmissiveForSurface", fragmentSource);
+    }
+
 }
