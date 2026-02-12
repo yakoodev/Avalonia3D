@@ -59,6 +59,37 @@ public sealed class MaterialAlphaAndLoaderTests
         Assert.Equal(MaterialAlphaMode.Opaque, mode);
     }
 
+
+    [Fact]
+    public void MaterialAlphaImportPolicy_BlendSource_WithAnyTextureAlpha_PreservesBlend()
+    {
+        var material = new Avalonia3D.Model.Material
+        {
+            AlphaMode = MaterialAlphaMode.Blend,
+            BaseColorFactor = new Vector4(1f, 1f, 1f, 1f),
+            BaseColorTexture = new TextureData
+            {
+                Width = 4,
+                Height = 4,
+                Data = BuildTextureAlphaData(4, 4, 255)
+            }
+        };
+
+        SetAlpha(material.BaseColorTexture!.Data, pixelIndex: 3, alpha: 254);
+
+        var context = new MaterialImportPolicyContext
+        {
+            AlphaProfile = MaterialAlphaImportProfile.Balanced,
+            SourceAlphaMode = MaterialAlphaMode.Blend
+        };
+
+        var policy = new DefaultMaterialImportPolicy();
+        var mode = policy.ResolveAlphaMode(material, context);
+
+        Assert.Equal(MaterialAlphaMode.Blend, mode);
+        Assert.True(material.HasTextureTransparency);
+    }
+
     [Fact]
     public void TextureTransparencyHeuristic_DetectsMeaningfulDeepAlphaCuts()
     {

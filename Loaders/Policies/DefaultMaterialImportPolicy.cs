@@ -39,7 +39,10 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
             return resolved;
         }
 
-        var textureTransparencySignal = sceneOverride?.ForceTextureTransparencySignal ?? HasMeaningfulTextureTransparency(material.BaseColorTexture);
+        var textureTransparencySignal = sceneOverride?.ForceTextureTransparencySignal
+            ?? (sourceAlphaMode == MaterialAlphaMode.Blend
+                ? HasAnyTextureTransparency(material.BaseColorTexture)
+                : HasMeaningfulTextureTransparency(material.BaseColorTexture));
         var hasAlphaSignal = material.BaseColorFactor.W < AlphaSignalThreshold || textureTransparencySignal;
         material.HasTextureTransparency = textureTransparencySignal;
 
@@ -198,6 +201,26 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
                 _ => BalancedDenseDeepMaskRatio,
             };
         }
+    }
+
+
+    private static bool HasAnyTextureTransparency(TextureData? texture)
+    {
+        if (texture?.Data == null || texture.Data.Length < 4)
+        {
+            return false;
+        }
+
+        var data = texture.Data;
+        for (var i = 3; i < data.Length; i += 4)
+        {
+            if (data[i] < 255)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static bool HasMeaningfulTextureTransparency(TextureData? texture)
