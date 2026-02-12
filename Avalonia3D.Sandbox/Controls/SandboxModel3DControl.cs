@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.OpenGL;
 using Avalonia.OpenGL.Controls;
+using Avalonia.Threading;
 using Avalonia3D.Interaction.CameraController;
 using Avalonia3D.Interfaces;
 using Avalonia3D.Model;
@@ -70,10 +71,13 @@ public class SandboxModel3DControl : OpenGlControlBase
         _sceneLoader = new SceneLoader(_renderer.Scene, DefaultSceneSource, _renderThreadScheduler);
         _sceneLoader.SceneChanged += scene =>
         {
-            SetAndRaise(IsLoadingProperty, ref _isLoading, false);
-            SelectedSceneId = scene.Id;
-            SetAndRaise(LastLoadErrorProperty, ref _lastLoadError, null);
-            SceneLoaded?.Invoke(scene);
+            Dispatcher.UIThread.Post(() =>
+            {
+                SetAndRaise(IsLoadingProperty, ref _isLoading, false);
+                SelectedSceneId = scene.Id;
+                SetAndRaise(LastLoadErrorProperty, ref _lastLoadError, null);
+                SceneLoaded?.Invoke(scene);
+            });
         };
 
         LoadSceneCommand = new RelayCommand(parameter => RequestSceneLoad(parameter as string));
