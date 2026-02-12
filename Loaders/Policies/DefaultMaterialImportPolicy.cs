@@ -54,6 +54,15 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
                 : textureSignal == TextureAlphaSignal.MaskCutout
                     ? "texture_alpha_mask_cutout"
                     : "texture_alpha_signal";
+
+            if (resolved == MaterialAlphaMode.Blend &&
+                alphaProfile != MaterialAlphaImportProfile.Legacy &&
+                !context.IsAnimatedMaterial)
+            {
+                resolved = MaterialAlphaMode.Mask;
+                reasonCode += "_promoted_to_mask";
+            }
+
             LogAlphaDecision(material, context, sourceAlphaMode, resolved, reasonCode);
             return resolved;
         }
