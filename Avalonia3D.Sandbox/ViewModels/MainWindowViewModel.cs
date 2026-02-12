@@ -22,7 +22,6 @@ namespace Avalonia3D.Sandbox.ViewModels;
 
 public sealed class MainWindowViewModel : INotifyPropertyChanged
 {
-    private readonly SceneLoader _sceneLoader;
     private readonly Scene3D _scene;
     private readonly CameraController _cameraController;
     private readonly IRenderThreadScheduler _renderThreadScheduler;
@@ -65,12 +64,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _renderThreadScheduler = renderThreadScheduler;
         _applyGraphicsProfile = applyGraphicsProfile;
         _assetsRoot = assetsRoot;
-        _sceneLoader = new SceneLoader(scene, assetsRoot, renderThreadScheduler);
-        _sceneLoader.SceneChanged += sceneInfo =>
+        _viewport.SceneLoaded += sceneInfo =>
         {
             Dispatcher.UIThread.Post(() =>
             {
                 IsLoading = false;
+                LastLoadError = null;
+                IsRendererReady = _viewport.IsRendererReady;
                 _loadedSceneIds.Add(sceneInfo.Id);
                 SelectedSceneId = sceneInfo.Id;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CacheStatusText)));
@@ -177,6 +177,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         ApplyShaderMode(ShaderRenderMode.Pbr);
         EmissionUniformResolver.EmissiveTextureMode = _selectedEmissiveTextureDebugMode;
         _scene.PbrDebugViewMode = _selectedPbrDebugViewMode;
+
+        IsRendererReady = _viewport.IsRendererReady;
 
         if (scenes.Count > 0)
         {
@@ -577,7 +579,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         IsLoading = true;
         SelectedSceneId = sceneId;
 
-        _sceneLoader.Load(scene);
+        _viewport.SelectedSceneId = sceneId;
+
+        if (!IsRendererReady)
+        {
+            IsRendererReady = _viewport.IsRendererReady;
+        }
     }
 
     private void UpdateCameraPreview()

@@ -73,6 +73,7 @@ public class SandboxModel3DControl : OpenGlControlBase
             SetAndRaise(IsLoadingProperty, ref _isLoading, false);
             SelectedSceneId = scene.Id;
             SetAndRaise(LastLoadErrorProperty, ref _lastLoadError, null);
+            SceneLoaded?.Invoke(scene);
         };
 
         LoadSceneCommand = new RelayCommand(parameter => RequestSceneLoad(parameter as string));
@@ -115,6 +116,7 @@ public class SandboxModel3DControl : OpenGlControlBase
     public CameraController CameraController { get; }
 
     public event EventHandler? RendererInitialized;
+    public event Action<ISandboxScene>? SceneLoaded;
 
     public bool IsRendererInitialized => _isRendererReady;
 
@@ -357,6 +359,11 @@ public class SandboxModel3DControl : OpenGlControlBase
 
         try
         {
+            if (_isLoading)
+            {
+                Log.Information("Cancelling previous scene load request in favor of {SceneId}", sceneId);
+            }
+
             SetAndRaise(IsLoadingProperty, ref _isLoading, true);
             SetAndRaise(LastLoadErrorProperty, ref _lastLoadError, null);
             _sceneLoader.Load(scene);

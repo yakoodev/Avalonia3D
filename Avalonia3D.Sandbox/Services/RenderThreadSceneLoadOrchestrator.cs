@@ -1,6 +1,7 @@
 using Avalonia3D.Sandbox.Scenes;
 using Serilog;
 using System;
+using System.Threading;
 
 namespace Avalonia3D.Sandbox.Services;
 
@@ -10,6 +11,7 @@ public sealed class RenderThreadSceneLoadOrchestrator : ISceneLoadService
     private readonly IRenderThreadScheduler _renderThreadScheduler;
     private bool _isRendererReady;
     private ISandboxScene? _pendingScene;
+    private int _lastRequestedVersion;
 
     public RenderThreadSceneLoadOrchestrator(SceneLoadService inner, IRenderThreadScheduler renderThreadScheduler)
     {
@@ -28,7 +30,7 @@ public sealed class RenderThreadSceneLoadOrchestrator : ISceneLoadService
             return;
         }
 
-        QueueLoad(_pendingScene);
+        QueueLoad(_pendingScene, Volatile.Read(ref _lastRequestedVersion));
         _pendingScene = null;
     }
 
@@ -39,7 +41,8 @@ public sealed class RenderThreadSceneLoadOrchestrator : ISceneLoadService
             throw new ArgumentNullException(nameof(scene));
         }
 
-        Log.Information("Scene load requested: {SceneId} - {SceneTitle}", scene.Id, scene.Title);
+        var version = Interlocked.Increment(ref _lastRequestedVersion);
+        Log.Information("Scene load requested: {SceneId} - {SceneTitle}. Version={Version}", scene.Id, scene.Title, version);
 
         if (!_isRendererReady)
         {
@@ -47,11 +50,20 @@ public sealed class RenderThreadSceneLoadOrchestrator : ISceneLoadService
             return;
         }
 
-        QueueLoad(scene);
+        QueueLoad(scene, version);
     }
 
-    private void QueueLoad(ISandboxScene scene)
+    private void QueueLoad(ISandboxScene scene, int requestVersion)
     {
-        _renderThreadScheduler.Enqueue(() => _inner.LoadNow(scene));
+        _renderThreadScheduler.Enqueue(() =>
+        {
+            if (requestVersion != Volatile.Read(ref _lastRequestedVersion))
+            {
+                Log.Information("Scene load canceled (superseded). Scene={SceneId}, Version={Version}", scene.Id, requestVersion);
+                return;
+            }
+
+            _inner.LoadNow(scene);
+        });
     }
 }

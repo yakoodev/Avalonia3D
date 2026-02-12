@@ -39,6 +39,7 @@
           <Separator />
           <TextBlock Text="Статус загрузки" Foreground="White" FontWeight="SemiBold" />
           <TextBlock Text="{Binding LoadStatusText}" Foreground="#FFD36B" TextWrapping="Wrap" />
+          <ProgressBar IsIndeterminate="True" Height="6" IsVisible="{Binding IsLoading}" />
           <TextBlock Text="{Binding CacheStatusText}" Foreground="#D0D0D0" TextWrapping="Wrap" />
         </StackPanel>
       </ScrollViewer>
