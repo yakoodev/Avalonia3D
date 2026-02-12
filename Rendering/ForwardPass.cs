@@ -91,7 +91,7 @@ namespace Avalonia3D.Rendering
 
         private void ClearForwardTargets(GL gl, bool hasEmissiveTarget)
         {
-            gl.ClearColor(_settings.Background.Red, _settings.Background.Green, _settings.Background.Blue, 1f);
+            gl.ClearColor(_settings.Background.Red, _settings.Background.Green, _settings.Background.Blue, 0f);
             gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
             if (!hasEmissiveTarget)
@@ -101,11 +101,11 @@ namespace Avalonia3D.Rendering
 
             Span<GLEnum> emissiveOnlyBuffer = stackalloc GLEnum[] { GLEnum.ColorAttachment1 };
             gl.DrawBuffers(emissiveOnlyBuffer);
-            gl.ClearColor(0f, 0f, 0f, 1f);
+            gl.ClearColor(0f, 0f, 0f, 0f);
             gl.Clear(ClearBufferMask.ColorBufferBit);
 
             ConfigureDrawBuffers(gl, hasEmissiveTarget: true);
-            gl.ClearColor(_settings.Background.Red, _settings.Background.Green, _settings.Background.Blue, 1f);
+            gl.ClearColor(_settings.Background.Red, _settings.Background.Green, _settings.Background.Blue, 0f);
         }
 
     }
