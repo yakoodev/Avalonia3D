@@ -12,6 +12,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
+using System.Text.Json;
 using System.Numerics;
 using System.Runtime;
 
@@ -21,6 +23,10 @@ namespace Avalonia3D.Loaders
     {
         private static readonly GltfMaterialExtensionsReader _materialExtensionsReader = new();
         private static readonly IMaterialImportPolicy _materialImportPolicy = new DefaultMaterialImportPolicy();
+
+        private static readonly Dictionary<string, Dictionary<(int MeshIndex, int PrimitiveIndex), int>> _materialIndexMapCache = new(StringComparer.OrdinalIgnoreCase);
+        private const uint GlbMagic = 0x46546C67;
+        private const uint JsonChunkType = 0x4E4F534A;
 
         private unsafe static long EstimateModelMemory(Model.Model m)
         {
@@ -185,7 +191,7 @@ namespace Avalonia3D.Loaders
                 .Select(idx => (uint)idx)
                 .ToArray() ?? Array.Empty<uint>();
 
-            var resolvedMaterial = ResolvePrimitiveMaterial(prim);
+            var resolvedMaterial = ResolvePrimitiveMaterial(prim, policyContext?.AssetPath);
 
             var model = new Model.Model
             {
@@ -211,7 +217,7 @@ namespace Avalonia3D.Loaders
 
 
 
-        private static SharpGLTF.Schema2.Material? ResolvePrimitiveMaterial(MeshPrimitive prim)
+        private static SharpGLTF.Schema2.Material? ResolvePrimitiveMaterial(MeshPrimitive prim, string? assetPath)
         {
             if (prim == null)
             {
@@ -227,6 +233,12 @@ namespace Avalonia3D.Loaders
             if (reflectionMaterial != null)
             {
                 return reflectionMaterial;
+            }
+
+            var documentMaterial = TryResolveMaterialFromSourceDocument(prim, assetPath);
+            if (documentMaterial != null)
+            {
+                return documentMaterial;
             }
 
             try
@@ -292,6 +304,175 @@ namespace Avalonia3D.Loaders
             }
 
             return null;
+        }
+
+        private static SharpGLTF.Schema2.Material? TryResolveMaterialFromSourceDocument(MeshPrimitive prim, string? assetPath)
+        {
+            if (string.IsNullOrWhiteSpace(assetPath) || !File.Exists(assetPath))
+            {
+                return null;
+            }
+
+            var meshIndex = prim.LogicalParent?.LogicalIndex ?? -1;
+            var primitiveIndex = ResolvePrimitiveIndexWithinMesh(prim);
+            if (meshIndex < 0 || primitiveIndex < 0)
+            {
+                return null;
+            }
+
+            if (!TryGetMaterialIndexMap(assetPath, out var map))
+            {
+                return null;
+            }
+
+            if (!map.TryGetValue((meshIndex, primitiveIndex), out var materialIndex))
+            {
+                return null;
+            }
+
+            var materials = prim.LogicalParent?.LogicalParent?.LogicalMaterials;
+            if (materials == null || materialIndex < 0 || materialIndex >= materials.Count)
+            {
+                return null;
+            }
+
+            var material = materials[materialIndex];
+            Log.Warning("GLTF primitive material resolved from source JSON mapping. meshIndex={MeshIndex}, primitiveIndex={PrimitiveIndex}, materialIndex={MaterialIndex}, materialName={MaterialName}", meshIndex, primitiveIndex, material.LogicalIndex, material.Name ?? "<unnamed>");
+            return material;
+        }
+
+        private static int ResolvePrimitiveIndexWithinMesh(MeshPrimitive prim)
+        {
+            var primitives = prim.LogicalParent?.Primitives;
+            if (primitives == null)
+            {
+                return -1;
+            }
+
+            for (var i = 0; i < primitives.Count; i++)
+            {
+                if (ReferenceEquals(primitives[i], prim))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private static bool TryGetMaterialIndexMap(string assetPath, out Dictionary<(int MeshIndex, int PrimitiveIndex), int> map)
+        {
+            if (_materialIndexMapCache.TryGetValue(assetPath, out map!))
+            {
+                return true;
+            }
+
+            try
+            {
+                var root = ReadGltfRootFromFile(assetPath);
+                var parsed = ParseMaterialIndexMap(root);
+                _materialIndexMapCache[assetPath] = parsed;
+                map = parsed;
+                return true;
+            }
+            catch
+            {
+                map = new Dictionary<(int MeshIndex, int PrimitiveIndex), int>();
+                return false;
+            }
+        }
+
+        private static JsonElement ReadGltfRootFromFile(string assetPath)
+        {
+            if (Path.GetExtension(assetPath).Equals(".glb", StringComparison.OrdinalIgnoreCase))
+            {
+                using var stream = File.OpenRead(assetPath);
+                using var reader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: false);
+                if (TryReadGlbJsonChunk(reader, out var glbRoot))
+                {
+                    return glbRoot;
+                }
+
+                throw new InvalidDataException("GLB JSON chunk was not found.");
+            }
+
+            using var jsonStream = File.OpenRead(assetPath);
+            using var doc = JsonDocument.Parse(jsonStream);
+            return doc.RootElement.Clone();
+        }
+
+        private static Dictionary<(int MeshIndex, int PrimitiveIndex), int> ParseMaterialIndexMap(JsonElement root)
+        {
+            var map = new Dictionary<(int MeshIndex, int PrimitiveIndex), int>();
+            if (!root.TryGetProperty("meshes", out var meshes) || meshes.ValueKind != JsonValueKind.Array)
+            {
+                return map;
+            }
+
+            var meshIndex = 0;
+            foreach (var mesh in meshes.EnumerateArray())
+            {
+                if (!mesh.TryGetProperty("primitives", out var primitives) || primitives.ValueKind != JsonValueKind.Array)
+                {
+                    meshIndex++;
+                    continue;
+                }
+
+                var primitiveIndex = 0;
+                foreach (var primitive in primitives.EnumerateArray())
+                {
+                    if (primitive.TryGetProperty("material", out var materialProperty) && materialProperty.ValueKind == JsonValueKind.Number && materialProperty.TryGetInt32(out var materialIndex))
+                    {
+                        map[(meshIndex, primitiveIndex)] = materialIndex;
+                    }
+
+                    primitiveIndex++;
+                }
+
+                meshIndex++;
+            }
+
+            return map;
+        }
+
+        private static bool TryReadGlbJsonChunk(BinaryReader reader, out JsonElement root)
+        {
+            root = default;
+            if (reader.BaseStream.Length < 12)
+            {
+                return false;
+            }
+
+            var magic = reader.ReadUInt32();
+            var version = reader.ReadUInt32();
+            var fileLength = reader.ReadUInt32();
+
+            if (magic != GlbMagic || version < 2 || fileLength > reader.BaseStream.Length)
+            {
+                return false;
+            }
+
+            while (reader.BaseStream.Position + 8 <= reader.BaseStream.Length)
+            {
+                var chunkLength = reader.ReadUInt32();
+                var chunkType = reader.ReadUInt32();
+                if (chunkLength > int.MaxValue || reader.BaseStream.Position + chunkLength > reader.BaseStream.Length)
+                {
+                    return false;
+                }
+
+                var chunkBytes = reader.ReadBytes((int)chunkLength);
+                if (chunkType != JsonChunkType)
+                {
+                    continue;
+                }
+
+                using var doc = JsonDocument.Parse(chunkBytes);
+                root = doc.RootElement.Clone();
+                return true;
+            }
+
+            return false;
         }
 
         private static int? TryReadMaterialIndex(Type primitiveType, MeshPrimitive primitive)
