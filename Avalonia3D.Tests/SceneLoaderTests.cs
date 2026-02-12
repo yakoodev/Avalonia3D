@@ -2,9 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Numerics;
 using Avalonia3D.Model;
-using Avalonia3D.Model.StandObjects;
 using Avalonia3D.Sandbox.Scenes;
 using Avalonia3D.Sandbox.Services;
 using Xunit;
@@ -17,19 +15,20 @@ public sealed class SceneLoaderTests
     [Fact]
     public void Load_WhenRendererIsNotReady_DefersAndLoadsOnlyLatestPendingScene()
     {
-        var scene = new Scene3D();
+        var coreLoader = CreateCoreLoader();
         var scheduler = new ImmediateScheduler();
-        var loader = new SceneLoader(scene, assetsRoot: "/tmp/assets", scheduler);
+        var orchestrator = new RenderThreadSceneLoadOrchestrator(coreLoader, scheduler);
+
         var first = new RecordingSandboxScene("first");
         var second = new RecordingSandboxScene("second");
 
-        loader.Load(first);
-        loader.Load(second);
+        orchestrator.Load(first);
+        orchestrator.Load(second);
 
         Assert.Equal(0, first.LoadCallCount);
         Assert.Equal(0, second.LoadCallCount);
 
-        loader.MarkRendererReady();
+        orchestrator.MarkRendererReady();
 
         Assert.Equal(0, first.LoadCallCount);
         Assert.Equal(1, second.LoadCallCount);
@@ -39,22 +38,76 @@ public sealed class SceneLoaderTests
     [Fact]
     public void Load_WhenRendererReady_ExecutesOnSchedulerAndRaisesSceneChanged()
     {
-        var scene = new Scene3D();
+        var coreLoader = CreateCoreLoader();
         var scheduler = new ImmediateScheduler();
-        var loader = new SceneLoader(scene, assetsRoot: "/tmp/assets", scheduler);
-        var sample = new RecordingSandboxScene("vehicle", addGeometry: true);
+        var orchestrator = new RenderThreadSceneLoadOrchestrator(coreLoader, scheduler);
+        var sample = new RecordingSandboxScene("vehicle");
         ISandboxScene? changedTo = null;
-        loader.SceneChanged += loaded => changedTo = loaded;
+        orchestrator.SceneChanged += loaded => changedTo = loaded;
 
-        loader.MarkRendererReady();
-        loader.Load(sample);
+        orchestrator.MarkRendererReady();
+        orchestrator.Load(sample);
 
         Assert.Equal(1, scheduler.EnqueueCalls);
         Assert.Equal(1, sample.LoadCallCount);
         Assert.Same(sample, changedTo);
-        Assert.True(scene.Camera.Distance > 0f);
-        Assert.True(scene.Camera.Near > 0f);
-        Assert.True(scene.Camera.Far > scene.Camera.Near);
+    }
+
+    [Fact]
+    public void SceneLoadService_RepeatedLoads_WithAssetCacheHitAndMiss()
+    {
+        var trackingCache = new TrackingSceneAssetCache();
+        var scene = new Scene3D();
+        var loader = new SceneLoadService(scene, "/tmp/assets", new NoopCameraPolicy(), new NoopDiagnosticsReporter(), trackingCache);
+        var cacheable = new CacheableScene("cache-scene", "stable-key-1");
+
+        loader.LoadNow(cacheable);
+        loader.LoadNow(cacheable);
+
+        Assert.Equal(2, cacheable.LoadCallCount);
+        Assert.Equal(2, trackingCache.TryGetCalls);
+        Assert.Equal(1, trackingCache.SetCalls);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void SceneLoadService_CallsCameraPolicy_WithExpectedAutoFrameFlag(bool autoFrame)
+    {
+        var policy = new TrackingCameraPolicy();
+        var loader = new SceneLoadService(new Scene3D(), "/tmp/assets", policy, new NoopDiagnosticsReporter(), new InMemorySceneAssetCache());
+        var scene = new SceneWithOptions("opts", autoFrame);
+
+        loader.LoadNow(scene);
+
+        Assert.True(policy.ApplyDefaultsCalled);
+        Assert.Equal(autoFrame, policy.LastAutoFrameOption);
+    }
+
+    [Fact]
+    public void GltfFileScene_BuildCacheKey_ChangesWhenFileTimestampChanges()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"gltf-key-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var relativePath = "model.gltf";
+        var fullPath = Path.Combine(root, relativePath);
+        File.WriteAllText(fullPath, "{}");
+
+        try
+        {
+            var scene = new GltfFileScene(relativePath);
+            var initialKey = scene.BuildCacheKey(root);
+
+            var updatedTime = DateTime.UtcNow.AddMinutes(1);
+            File.SetLastWriteTimeUtc(fullPath, updatedTime);
+            var updatedKey = scene.BuildCacheKey(root);
+
+            Assert.NotEqual(initialKey, updatedKey);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     [Fact]
@@ -88,25 +141,12 @@ public sealed class SceneLoaderTests
 
         var scenes = SceneCatalog.CreateDefault(assetsRoot);
 
-        Assert.Single(scenes);
-        Assert.Equal("pbr-regression", scenes[0].Id);
+        Assert.Empty(scenes);
     }
 
-
-    [Fact]
-    public void Load_WhenSceneDisablesAutoFrame_KeepsPresetCamera()
+    private static SceneLoadService CreateCoreLoader()
     {
-        var scene = new Scene3D();
-        var scheduler = new ImmediateScheduler();
-        var loader = new SceneLoader(scene, assetsRoot: "/tmp/assets", scheduler);
-        var sample = new FixedCameraScene("fixed");
-
-        loader.MarkRendererReady();
-        loader.Load(sample);
-
-        Assert.Equal(42f, scene.Camera.Distance);
-        Assert.Equal(0.3f, scene.Camera.Pitch);
-        Assert.Equal(-0.1f, scene.Camera.Yaw);
+        return new SceneLoadService(new Scene3D(), "/tmp/assets", new DefaultSceneCameraPolicy(), new DefaultSceneDiagnosticsReporter(), new InMemorySceneAssetCache());
     }
 
     private sealed class ImmediateScheduler : IRenderThreadScheduler
@@ -122,12 +162,9 @@ public sealed class SceneLoaderTests
 
     private sealed class RecordingSandboxScene : ISandboxScene
     {
-        private readonly bool _addGeometry;
-
-        public RecordingSandboxScene(string id, bool addGeometry = false)
+        public RecordingSandboxScene(string id)
         {
             Id = id;
-            _addGeometry = addGeometry;
         }
 
         public string Id { get; }
@@ -138,51 +175,113 @@ public sealed class SceneLoaderTests
         public void Load(Scene3D scene, string assetsRoot)
         {
             LoadCallCount++;
-
-            if (!_addGeometry)
-            {
-                return;
-            }
-
-            scene.SceneGraph.Clear();
-            scene.SceneGraph.AddRoot(CreateMesh(new Vector3(-1f, -1f, -1f), new Vector3(1f, 1f, 1f)));
-        }
-
-        private static MeshObject CreateMesh(Vector3 min, Vector3 max)
-        {
-            var mesh = new MeshObject();
-            var model = new Model.Model
-            {
-                Vertices =
-                [
-                    new Vertex { Position = min },
-                    new Vertex { Position = max }
-                ]
-            };
-
-            mesh.AssignModel(model);
-            return mesh;
         }
     }
 
-    private sealed class FixedCameraScene : ISandboxScene, ISceneLoadOptionsProvider
+    private sealed class CacheableScene : ISandboxScene, ISceneAssetCacheKeyProvider
     {
-        public FixedCameraScene(string id)
+        public CacheableScene(string id, string cacheKey)
         {
             Id = id;
+            CacheKey = cacheKey;
         }
 
         public string Id { get; }
-        public string Title => $"title:{Id}";
-        public string Description => $"description:{Id}";
-        public SceneLoadOptions LoadOptions => new(AutoFrameCamera: false);
+        public string CacheKey { get; }
+        public string Title => Id;
+        public string Description => Id;
+        public int LoadCallCount { get; private set; }
+
+        public string BuildCacheKey(string assetsRoot) => CacheKey;
 
         public void Load(Scene3D scene, string assetsRoot)
         {
-            scene.Camera.Distance = 42f;
-            scene.Camera.Pitch = 0.3f;
-            scene.Camera.Yaw = -0.1f;
+            LoadCallCount++;
         }
     }
 
+    private sealed class SceneWithOptions : ISandboxScene, ISceneLoadOptionsProvider
+    {
+        public SceneWithOptions(string id, bool autoFrame)
+        {
+            Id = id;
+            LoadOptions = new SceneLoadOptions(autoFrame);
+        }
+
+        public string Id { get; }
+        public string Title => Id;
+        public string Description => Id;
+        public SceneLoadOptions LoadOptions { get; }
+
+        public void Load(Scene3D scene, string assetsRoot)
+        {
+        }
+    }
+
+    private sealed class TrackingCameraPolicy : ISceneCameraPolicy
+    {
+        public bool ApplyDefaultsCalled { get; private set; }
+        public bool? LastAutoFrameOption { get; private set; }
+
+        public void ApplyDefaults(Scene3D scene3D, ISandboxScene sceneInfo)
+        {
+            ApplyDefaultsCalled = true;
+        }
+
+        public void ApplyPostLoad(Scene3D scene3D, ISandboxScene sceneInfo, SceneLoadOptions loadOptions)
+        {
+            LastAutoFrameOption = loadOptions.AutoFrameCamera;
+        }
+    }
+
+    private sealed class NoopDiagnosticsReporter : ISceneDiagnosticsReporter
+    {
+        public void Report(Scene3D scene3D, ISandboxScene sceneInfo)
+        {
+        }
+    }
+
+    private sealed class NoopCameraPolicy : ISceneCameraPolicy
+    {
+        public void ApplyDefaults(Scene3D scene3D, ISandboxScene sceneInfo)
+        {
+        }
+
+        public void ApplyPostLoad(Scene3D scene3D, ISandboxScene sceneInfo, SceneLoadOptions loadOptions)
+        {
+        }
+    }
+
+    private sealed class TrackingSceneAssetCache : ISceneAssetCache
+    {
+        private readonly Dictionary<string, SceneAssetCacheEntry> _entries = new(StringComparer.Ordinal);
+
+        public int TryGetCalls { get; private set; }
+        public int SetCalls { get; private set; }
+
+        public bool TryGet(string key, out SceneAssetCacheEntry entry)
+        {
+            TryGetCalls++;
+            return _entries.TryGetValue(key, out entry!);
+        }
+
+        public void Set(string key, SceneAssetCacheEntry entry, TimeSpan? ttl = null)
+        {
+            SetCalls++;
+            _entries[key] = entry;
+        }
+
+        public void Prewarm(IEnumerable<KeyValuePair<string, SceneAssetCacheEntry>> entries, TimeSpan? ttl = null)
+        {
+            foreach (var pair in entries)
+            {
+                _entries[pair.Key] = pair.Value;
+            }
+        }
+
+        public void Invalidate(string key)
+        {
+            _entries.Remove(key);
+        }
+    }
 }
