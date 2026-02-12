@@ -557,6 +557,21 @@ public sealed class MaterialAlphaAndLoaderTests
     }
 
     [Fact]
+    public void ResolveAlphaMode_PbrMode_TreatsBlendWithoutTransparency_AsOpaque()
+    {
+        var material = new Avalonia3D.Model.Material
+        {
+            AlphaMode = MaterialAlphaMode.Blend,
+            Opacity = 1f,
+            HasTextureTransparency = false
+        };
+
+        var resolved = MeshObject.ResolveAlphaMode(material, 1f, ShaderRenderMode.Pbr);
+
+        Assert.Equal(MaterialAlphaMode.Opaque, resolved);
+    }
+
+    [Fact]
     public void DroidSceneFixture_ContainsWeightsChannel_And_EmissiveBlendMaterial()
     {
         var scenePath = ResolveDroidScenePath();
