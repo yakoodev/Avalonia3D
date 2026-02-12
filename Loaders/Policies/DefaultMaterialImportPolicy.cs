@@ -39,19 +39,20 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
             return resolved;
         }
 
-        var textureTransparencySignal = sceneOverride?.ForceTextureTransparencySignal
-            ?? (sourceAlphaMode == MaterialAlphaMode.Blend
-                ? HasAnyTextureTransparency(material.BaseColorTexture)
-                : HasMeaningfulTextureTransparency(material.BaseColorTexture));
-        var hasAlphaSignal = material.BaseColorFactor.W < AlphaSignalThreshold || textureTransparencySignal;
-        material.HasTextureTransparency = textureTransparencySignal;
+        var textureSignal = ResolveTextureSignal(material.BaseColorTexture, sourceAlphaMode, sceneOverride);
+        var hasAlphaSignal = material.BaseColorFactor.W < AlphaSignalThreshold || textureSignal != TextureAlphaSignal.None;
+        material.HasTextureTransparency = textureSignal != TextureAlphaSignal.None;
 
         if (hasAlphaSignal)
         {
-            resolved = MaterialAlphaMode.Blend;
+            resolved = textureSignal == TextureAlphaSignal.MaskCutout
+                ? MaterialAlphaMode.Mask
+                : MaterialAlphaMode.Blend;
             reasonCode = material.BaseColorFactor.W < AlphaSignalThreshold
                 ? "base_color_alpha_signal"
-                : "texture_alpha_signal";
+                : textureSignal == TextureAlphaSignal.MaskCutout
+                    ? "texture_alpha_mask_cutout"
+                    : "texture_alpha_signal";
             LogAlphaDecision(material, context, sourceAlphaMode, resolved, reasonCode);
             return resolved;
         }
@@ -204,23 +205,105 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
     }
 
 
-    private static bool HasAnyTextureTransparency(TextureData? texture)
+    private enum TextureAlphaSignal
+    {
+        None,
+        Blend,
+        MaskCutout
+    }
+
+    private static TextureAlphaSignal ResolveTextureSignal(
+        TextureData? texture,
+        MaterialAlphaMode sourceAlphaMode,
+        MaterialSceneImportOverride? sceneOverride)
+    {
+        if (sceneOverride?.ForceTextureTransparencySignal.HasValue == true)
+        {
+            return sceneOverride.ForceTextureTransparencySignal.Value
+                ? TextureAlphaSignal.Blend
+                : TextureAlphaSignal.None;
+        }
+
+        if (sourceAlphaMode != MaterialAlphaMode.Blend)
+        {
+            return HasMeaningfulTextureTransparency(texture)
+                ? TextureAlphaSignal.Blend
+                : TextureAlphaSignal.None;
+        }
+
+        return ClassifyBlendSourceTextureTransparency(texture);
+    }
+
+    private static TextureAlphaSignal ClassifyBlendSourceTextureTransparency(TextureData? texture)
     {
         if (texture?.Data == null || texture.Data.Length < 4)
         {
-            return false;
+            return TextureAlphaSignal.None;
         }
 
         var data = texture.Data;
-        for (var i = 3; i < data.Length; i += 4)
+        var sampled = 0;
+        var softTransparent = 0;
+        var regularTransparent = 0;
+        var deepTransparent = 0;
+        var opaque = 0;
+
+        var pixelCount = data.Length / 4;
+        var stepPixels = Math.Max(1, pixelCount / TextureAlphaHeuristics.MaxSamples);
+        var step = stepPixels * 4;
+
+        for (var i = 3; i < data.Length; i += step)
         {
-            if (data[i] < 255)
+            sampled++;
+            var alpha = data[i];
+
+            if (alpha <= TextureAlphaHeuristics.SoftTransparentAlphaThreshold)
             {
-                return true;
+                softTransparent++;
+            }
+
+            if (alpha <= TextureAlphaHeuristics.RegularTransparentAlphaThreshold)
+            {
+                regularTransparent++;
+            }
+
+            if (alpha <= TextureAlphaHeuristics.DeepTransparentAlphaThreshold)
+            {
+                deepTransparent++;
+            }
+
+            if (alpha >= TextureAlphaHeuristics.OpaqueAlphaThreshold)
+            {
+                opaque++;
             }
         }
 
-        return false;
+        if (sampled == 0)
+        {
+            return TextureAlphaSignal.None;
+        }
+
+        var softTransparentRatio = softTransparent / (float)sampled;
+        if (softTransparentRatio < TextureAlphaHeuristics.MinSoftTransparentRatio)
+        {
+            return TextureAlphaSignal.None;
+        }
+
+        var opaqueRatio = opaque / (float)sampled;
+        var deepTransparentRatio = deepTransparent / (float)sampled;
+        var denseDeepMaskThreshold = TextureAlphaHeuristics.GetDenseDeepMaskRatioThreshold();
+
+        if (deepTransparentRatio > denseDeepMaskThreshold &&
+            opaqueRatio >= TextureAlphaHeuristics.DenseDeepMaskOpaqueRatio)
+        {
+            return TextureAlphaSignal.MaskCutout;
+        }
+
+        var regularTransparentRatio = regularTransparent / (float)sampled;
+        return deepTransparentRatio >= TextureAlphaHeuristics.MinDeepTransparentRatio ||
+               regularTransparentRatio >= TextureAlphaHeuristics.MinRegularTransparentRatio
+            ? TextureAlphaSignal.Blend
+            : TextureAlphaSignal.None;
     }
 
     public static bool HasMeaningfulTextureTransparency(TextureData? texture)

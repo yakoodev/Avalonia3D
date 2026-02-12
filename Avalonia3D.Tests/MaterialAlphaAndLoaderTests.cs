@@ -61,7 +61,7 @@ public sealed class MaterialAlphaAndLoaderTests
 
 
     [Fact]
-    public void MaterialAlphaImportPolicy_BlendSource_WithAnyTextureAlpha_PreservesBlend()
+    public void MaterialAlphaImportPolicy_BlendSource_WithSparseNearOpaqueNoise_FallsBackToOpaque()
     {
         var material = new Avalonia3D.Model.Material
         {
@@ -69,9 +69,9 @@ public sealed class MaterialAlphaAndLoaderTests
             BaseColorFactor = new Vector4(1f, 1f, 1f, 1f),
             BaseColorTexture = new TextureData
             {
-                Width = 4,
-                Height = 4,
-                Data = BuildTextureAlphaData(4, 4, 255)
+                Width = 16,
+                Height = 16,
+                Data = BuildTextureAlphaData(16, 16, 255)
             }
         };
 
@@ -86,7 +86,40 @@ public sealed class MaterialAlphaAndLoaderTests
         var policy = new DefaultMaterialImportPolicy();
         var mode = policy.ResolveAlphaMode(material, context);
 
-        Assert.Equal(MaterialAlphaMode.Blend, mode);
+        Assert.Equal(MaterialAlphaMode.Opaque, mode);
+        Assert.False(material.HasTextureTransparency);
+    }
+
+    [Fact]
+    public void MaterialAlphaImportPolicy_BlendSource_WithDenseDeepMask_ConvertsToMask()
+    {
+        var material = new Avalonia3D.Model.Material
+        {
+            AlphaMode = MaterialAlphaMode.Blend,
+            BaseColorFactor = new Vector4(1f, 1f, 1f, 1f),
+            BaseColorTexture = new TextureData
+            {
+                Width = 16,
+                Height = 16,
+                Data = BuildTextureAlphaData(16, 16, 255)
+            }
+        };
+
+        for (var i = 0; i < 64; i++)
+        {
+            SetAlpha(material.BaseColorTexture!.Data, pixelIndex: i, alpha: 0);
+        }
+
+        var context = new MaterialImportPolicyContext
+        {
+            AlphaProfile = MaterialAlphaImportProfile.Balanced,
+            SourceAlphaMode = MaterialAlphaMode.Blend
+        };
+
+        var policy = new DefaultMaterialImportPolicy();
+        var mode = policy.ResolveAlphaMode(material, context);
+
+        Assert.Equal(MaterialAlphaMode.Mask, mode);
         Assert.True(material.HasTextureTransparency);
     }
 
