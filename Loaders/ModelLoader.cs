@@ -958,9 +958,24 @@ namespace Avalonia3D.Loaders
             // no-op: CPU texture cache removed to avoid excessive RAM usage
         }
 
+        internal static int MaterialIndexMapCacheCount
+        {
+            get
+            {
+                lock (_materialIndexMapCache)
+                {
+                    return _materialIndexMapCache.Count;
+                }
+            }
+        }
+
         public static void ClearAllCaches()
         {
-            // no-op: CPU texture cache removed to avoid excessive RAM usage
+            lock (_materialIndexMapCache)
+            {
+                _materialIndexMapCache.Clear();
+            }
+
             GC.Collect(2, GCCollectionMode.Aggressive);
             GC.WaitForPendingFinalizers();
             GC.Collect(2, GCCollectionMode.Aggressive);

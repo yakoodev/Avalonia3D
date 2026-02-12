@@ -29,6 +29,12 @@ namespace Avalonia3D.Model
         inch
     }
 
+    public enum CacheScope
+    {
+        SceneOnly,
+        SceneAndGlobal
+    }
+
     public class Scene3D
     {
         private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
@@ -224,11 +230,22 @@ namespace Avalonia3D.Model
 
         public void Clear()
         {
-            ResetSceneGraph();
+            ClearCaches(CacheScope.SceneAndGlobal);
             MemoryManager.Shutdown();
         }
 
-        internal void ResetSceneGraph()
+        public void ClearCaches(CacheScope scope)
+        {
+            if (scope == CacheScope.SceneAndGlobal)
+            {
+                ResetSceneGraph(clearGlobalCaches: true);
+                return;
+            }
+
+            ResetSceneGraph(clearGlobalCaches: false);
+        }
+
+        internal void ResetSceneGraph(bool clearGlobalCaches)
         {
             foreach (var item in SceneGraph.RootObjects)
             {
@@ -236,13 +253,19 @@ namespace Avalonia3D.Model
             }
 
             SceneGraph.Clear();
+
+            if (!clearGlobalCaches)
+            {
+                return;
+            }
+
             _resourceManager?.ClearAll();
             ModelLoader.ClearAllCaches();
         }
 
         public SceneGraph LoadScene(string gltfPath)
         {
-            ResetSceneGraph();
+            ResetSceneGraph(clearGlobalCaches: false);
             var importResult = Importer.ImportWithAnimations(gltfPath);
             LastImportReport = new SceneImportReport(
                 importResult.Status,
