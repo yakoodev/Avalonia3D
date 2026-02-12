@@ -156,12 +156,6 @@ public static class GltfAssetDiagnostics
 
     private static IEnumerable<MeshObject> CollectMeshesRecursive(SceneObject node)
     {
-        if (node is MeshObject mesh)
-        {
-            yield return mesh;
-            yield break;
-        }
-
         if (node is MeshGroup group)
         {
             foreach (var child in group)
@@ -171,6 +165,13 @@ public static class GltfAssetDiagnostics
                     yield return childMesh;
                 }
             }
+
+            yield break;
+        }
+
+        if (node is MeshObject mesh)
+        {
+            yield return mesh;
         }
     }
 
