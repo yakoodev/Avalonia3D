@@ -320,7 +320,7 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
 
         var shouldTreatAsCutout =
             deepTransparentRatio > denseDeepMaskThreshold &&
-            opaqueRatio >= TextureAlphaHeuristics.DenseDeepMaskOpaqueRatio &&
+            opaqueRatio >= TextureAlphaHeuristics.MinOpaqueRatio &&
             softTransparentRatio <= TextureAlphaHeuristics.DenseDeepMaskSoftTransparentCeiling &&
             regularTransparentRatio <= TextureAlphaHeuristics.DenseDeepMaskRegularTransparentCeiling;
 
