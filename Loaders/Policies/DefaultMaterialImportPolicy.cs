@@ -189,6 +189,8 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
         public const float PermissiveMinSoftTransparentRatio = 0.001f;
 
         public const float DenseDeepMaskOpaqueRatio = 0.35f;
+        public const float DenseDeepMaskSoftTransparentCeiling = 0.03f;
+        public const float DenseDeepMaskRegularTransparentCeiling = 0.03f;
         public const float StrictDenseDeepMaskRatio = 0.15f;
         public const float BalancedDenseDeepMaskRatio = 0.20f;
         public const float PermissiveDenseDeepMaskRatio = 0.35f;
@@ -271,19 +273,21 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
             sampled++;
             var alpha = data[i];
 
-            if (alpha <= TextureAlphaHeuristics.SoftTransparentAlphaThreshold)
-            {
-                softTransparent++;
-            }
-
-            if (alpha <= TextureAlphaHeuristics.RegularTransparentAlphaThreshold)
-            {
-                regularTransparent++;
-            }
-
             if (alpha <= TextureAlphaHeuristics.DeepTransparentAlphaThreshold)
             {
                 deepTransparent++;
+            }
+            else
+            {
+                if (alpha <= TextureAlphaHeuristics.RegularTransparentAlphaThreshold)
+                {
+                    regularTransparent++;
+                }
+
+                if (alpha <= TextureAlphaHeuristics.SoftTransparentAlphaThreshold)
+                {
+                    softTransparent++;
+                }
             }
 
             if (alpha >= TextureAlphaHeuristics.OpaqueAlphaThreshold)
@@ -312,13 +316,19 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
         var deepTransparentRatio = deepTransparent / (float)sampled;
         var denseDeepMaskThreshold = TextureAlphaHeuristics.GetDenseDeepMaskRatioThreshold(heuristicProfile);
 
-        if (deepTransparentRatio > denseDeepMaskThreshold &&
-            opaqueRatio >= TextureAlphaHeuristics.MinOpaqueRatio)
+        var regularTransparentRatio = regularTransparent / (float)sampled;
+
+        var shouldTreatAsCutout =
+            deepTransparentRatio > denseDeepMaskThreshold &&
+            opaqueRatio >= TextureAlphaHeuristics.DenseDeepMaskOpaqueRatio &&
+            softTransparentRatio <= TextureAlphaHeuristics.DenseDeepMaskSoftTransparentCeiling &&
+            regularTransparentRatio <= TextureAlphaHeuristics.DenseDeepMaskRegularTransparentCeiling;
+
+        if (shouldTreatAsCutout)
         {
             return TextureAlphaSignal.MaskCutout;
         }
 
-        var regularTransparentRatio = regularTransparent / (float)sampled;
         return deepTransparentRatio >= TextureAlphaHeuristics.MinDeepTransparentRatio ||
                regularTransparentRatio >= TextureAlphaHeuristics.MinRegularTransparentRatio ||
                anyTransparent > 0
@@ -364,19 +374,21 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
             sampled++;
             var alpha = data[i];
 
-            if (alpha <= TextureAlphaHeuristics.SoftTransparentAlphaThreshold)
-            {
-                softTransparent++;
-            }
-
-            if (alpha <= TextureAlphaHeuristics.RegularTransparentAlphaThreshold)
-            {
-                regularTransparent++;
-            }
-
             if (alpha <= TextureAlphaHeuristics.DeepTransparentAlphaThreshold)
             {
                 deepTransparent++;
+            }
+            else
+            {
+                if (alpha <= TextureAlphaHeuristics.RegularTransparentAlphaThreshold)
+                {
+                    regularTransparent++;
+                }
+
+                if (alpha <= TextureAlphaHeuristics.SoftTransparentAlphaThreshold)
+                {
+                    softTransparent++;
+                }
             }
 
             if (alpha >= TextureAlphaHeuristics.OpaqueAlphaThreshold)

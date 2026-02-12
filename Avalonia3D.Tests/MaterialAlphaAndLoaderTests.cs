@@ -124,7 +124,7 @@ public sealed class MaterialAlphaAndLoaderTests
     }
 
     [Fact]
-    public void MaterialAlphaImportPolicy_BlendSource_WithDenseDeepAndLowOpaque_ConvertsToMask()
+    public void MaterialAlphaImportPolicy_BlendSource_WithDenseDeepAndLowOpaque_PreservesBlend()
     {
         var material = new Avalonia3D.Model.Material
         {
@@ -152,7 +152,7 @@ public sealed class MaterialAlphaAndLoaderTests
         var policy = new DefaultMaterialImportPolicy();
         var mode = policy.ResolveAlphaMode(material, context);
 
-        Assert.Equal(MaterialAlphaMode.Mask, mode);
+        Assert.Equal(MaterialAlphaMode.Blend, mode);
         Assert.True(material.HasTextureTransparency);
     }
 
