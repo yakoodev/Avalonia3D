@@ -143,6 +143,18 @@ public class PbrShaderSourceBuilderTests
         Assert.Contains("baseColorTexDecoded.rgb", fragmentSource);
     }
 
+    [Fact]
+    public void Build_IncludesDistanceAttenuationInDirectLighting()
+    {
+        var builder = new PbrShaderSourceBuilder();
+
+        var (_, fragmentSource) = builder.Build(PbrFeatures.None, maxLights: 4);
+
+        Assert.Contains("lightDistance", fragmentSource);
+        Assert.Contains("attenuation=1.0/(1.0+lightDistance*lightDistance)", fragmentSource);
+        Assert.Contains("uLightColor[i]*attenuation", fragmentSource);
+    }
+
 
     [Fact]
     public void Build_WithSheenAndSpecularColorMaps_UsesCentralizedDecodeFunctions()
