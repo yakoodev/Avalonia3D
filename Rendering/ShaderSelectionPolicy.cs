@@ -220,13 +220,6 @@ public sealed class ShaderSelectionPolicy
                          PbrFeatures.Transmission;
 
         var legacyFeatures = features & legacyMask;
-        var hasExtraFeatures = (features & ~legacyMask) != PbrFeatures.None;
-
-        if (hasExtraFeatures)
-        {
-            return false;
-        }
-
         var isTransmission = legacyFeatures.HasFlag(PbrFeatures.Transmission);
         var hasCoreMaps = HasAll(legacyFeatures, PbrFeatures.BaseColorMap, PbrFeatures.NormalMap, PbrFeatures.MetallicRoughnessMap);
         var hasAoEmissive = HasAll(legacyFeatures, PbrFeatures.OcclusionMap, PbrFeatures.EmissiveMap);

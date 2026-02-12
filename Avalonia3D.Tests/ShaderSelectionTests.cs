@@ -193,7 +193,7 @@ public class ShaderSelectionTests
     }
 
     [Fact]
-    public void ResolvePbrShaderId_ReturnsDynamicVariant_ForEmissiveStrengthExtension()
+    public void ResolvePbrShaderId_UsesStableLegacyPbr_ForEmissiveStrengthExtension()
     {
         var scene = CreateScene();
         var material = new Material
@@ -203,9 +203,7 @@ public class ShaderSelectionTests
 
         var shaderId = ShaderSelectionPolicy.ResolvePbrShaderId(material, scene);
 
-        Assert.StartsWith(ShaderIds.PbrVariantPrefix, shaderId);
-        Assert.True(ShaderIds.TryParsePbrVariantId(shaderId, out var features));
-        Assert.True(features.HasFlag(PbrFeatures.EmissiveStrength));
+        Assert.Equal(ShaderIds.Pbr, shaderId);
     }
 
 
