@@ -1,3 +1,4 @@
+using Serilog;
 using Silk.NET.OpenGL;
 using System;
 
@@ -9,6 +10,7 @@ namespace Avalonia3D.Rendering
         private uint _framebufferId;
         private int _width;
         private int _height;
+        private bool _loggedIncompleteFramebuffer;
 
         public unsafe void Ensure(GL gl, RenderFrameState frameState, int width, int height)
         {
@@ -46,6 +48,22 @@ namespace Avalonia3D.Rendering
 
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, _framebufferId);
             gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment1, TextureTarget.Texture2D, _textureId, 0);
+
+            var framebufferStatus = gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
+            if (framebufferStatus != GLEnum.FramebufferComplete)
+            {
+                gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment1, TextureTarget.Texture2D, 0, 0);
+                frameState.EmissiveFramebufferId = 0;
+                frameState.EmissiveTextureId = 0;
+
+                if (!_loggedIncompleteFramebuffer)
+                {
+                    _loggedIncompleteFramebuffer = true;
+                    Log.Warning("Emissive render target disabled: framebuffer is incomplete. status={FramebufferStatus}, framebuffer={FramebufferId}", framebufferStatus, _framebufferId);
+                }
+
+                return;
+            }
 
             frameState.EmissiveFramebufferId = _framebufferId;
             frameState.EmissiveTextureId = _textureId;

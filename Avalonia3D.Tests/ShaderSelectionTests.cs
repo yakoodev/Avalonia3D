@@ -173,7 +173,7 @@ public class ShaderSelectionTests
     }
 
     [Fact]
-    public void ResolvePbrShaderId_ReturnsDynamicVariant_ForEmissiveAndMetallicWithoutNormalMap()
+    public void ResolvePbrShaderId_UsesStableLegacyShader_ForEmissiveAndMetallicWithoutNormalMap()
     {
         var scene = CreateScene();
         var material = new Material
@@ -185,11 +185,7 @@ public class ShaderSelectionTests
 
         var shaderId = ShaderSelectionPolicy.ResolvePbrShaderId(material, scene);
 
-        Assert.StartsWith(ShaderIds.PbrVariantPrefix, shaderId);
-        Assert.True(ShaderIds.TryParsePbrVariantId(shaderId, out var features));
-        Assert.True(features.HasFlag(PbrFeatures.MetallicRoughnessMap));
-        Assert.True(features.HasFlag(PbrFeatures.EmissiveMap));
-        Assert.False(features.HasFlag(PbrFeatures.NormalMap));
+        Assert.Equal(ShaderIds.PbrBaseColorNormalMetallicRoughnessAoEmissive, shaderId);
     }
 
     [Fact]
