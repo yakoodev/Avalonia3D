@@ -1,10 +1,13 @@
-using Avalonia3D.Model;
 using Avalonia3D.Loaders;
+using Avalonia3D.Model;
+using Avalonia3D.Model.StandObjects;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Avalonia3D.Sandbox.Services;
 
@@ -61,6 +64,67 @@ public static class GltfAssetDiagnostics
         }
     }
 
+    public static string WriteCompactModelReport(string gltfPath, Scene3D scene)
+    {
+        if (string.IsNullOrWhiteSpace(gltfPath) || scene == null)
+        {
+            return string.Empty;
+        }
+
+        var fullPath = Path.GetFullPath(gltfPath);
+        var preflight = GltfDependencyInspector.ReadPreflight(fullPath);
+        var dependencies = preflight.ExternalUris;
+        var missingDependencies = CountMissingDependencies(fullPath, dependencies);
+
+        var meshes = scene.SceneGraph.RootObjects.OfType<MeshObject>().ToArray();
+        var materials = meshes
+            .Select(mesh => mesh.Material)
+            .Where(material => material != null)
+            .Cast<Material>()
+            .ToArray();
+
+        var emissiveTextureMaterials = materials.Count(material => material.EmissiveTexture != null);
+        var maxEmissiveFactor = materials.Length == 0
+            ? 0f
+            : materials.Max(material => material.EmissiveFactor.Length());
+        var maxEmissiveIntensity = materials.Length == 0
+            ? 0f
+            : materials.Max(material => material.EmissiveIntensity);
+
+        var reportDirectory = Path.Combine(AppContext.BaseDirectory, "ModelDiagnostics");
+        Directory.CreateDirectory(reportDirectory);
+
+        var reportPath = Path.Combine(reportDirectory, BuildReportFileName(fullPath));
+
+        var issuesPreview = scene.LastImportReport.Issues.Take(3).ToArray();
+        var report = new StringBuilder(512)
+            .AppendLine($"file={Path.GetFileName(fullPath)}")
+            .AppendLine($"fullPath={fullPath}")
+            .AppendLine($"importStatus={scene.LastImportReport.Status}")
+            .AppendLine($"importIssues={scene.LastImportReport.Issues.Count}")
+            .AppendLine($"objectsRoot={scene.SceneGraph.RootObjects.Count}")
+            .AppendLine($"objectsMesh={meshes.Length}")
+            .AppendLine($"lights={scene.Lights.Count}")
+            .AppendLine($"materials={materials.Length}")
+            .AppendLine($"materialsWithEmissiveTexture={emissiveTextureMaterials}")
+            .AppendLine($"maxEmissiveFactorLength={maxEmissiveFactor:0.###}")
+            .AppendLine($"maxEmissiveIntensity={maxEmissiveIntensity:0.###}")
+            .AppendLine($"depsExternal={dependencies.Count}")
+            .AppendLine($"depsMissing={missingDependencies}")
+            .AppendLine($"renderMode={scene.RenderMode}")
+            .AppendLine($"pbrDebugView={scene.PbrDebugViewMode}")
+            .AppendLine($"timeUtc={DateTime.UtcNow:O}");
+
+        if (issuesPreview.Length > 0)
+        {
+            report.AppendLine($"issuesPreview={string.Join(" | ", issuesPreview)}");
+        }
+
+        File.WriteAllText(reportPath, report.ToString());
+        Log.Information("Compact model report written: {Path}", reportPath);
+        return reportPath;
+    }
+
     public static void LogNodeIdConflicts(SceneGraph graph, string sceneLabel)
     {
         if (graph == null)
@@ -97,6 +161,31 @@ public static class GltfAssetDiagnostics
                 clipGroup.Key,
                 clipSummary);
         }
+    }
+
+    private static int CountMissingDependencies(string gltfPath, IReadOnlyList<string> dependencies)
+    {
+        var baseDir = Path.GetDirectoryName(gltfPath) ?? string.Empty;
+        var missing = 0;
+        foreach (var uri in dependencies)
+        {
+            var fullPath = Path.GetFullPath(Path.Combine(baseDir, uri));
+            if (!File.Exists(fullPath))
+            {
+                missing++;
+            }
+        }
+
+        return missing;
+    }
+
+    private static string BuildReportFileName(string fullPath)
+    {
+        var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(fullPath);
+        var safeFileName = string.Concat(fileNameWithoutExtension.Select(ch => char.IsLetterOrDigit(ch) ? ch : '_'));
+
+        var hash = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(fullPath))).ToLowerInvariant();
+        return $"{safeFileName}_{hash[..8]}.log";
     }
 
     private static void LogDuplicateIds(SceneGraph graph, string sceneLabel, Func<SceneNode, string?> selector, string idKind)
@@ -140,5 +229,4 @@ public static class GltfAssetDiagnostics
             CollectIds(child, selector, map);
         }
     }
-
 }

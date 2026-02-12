@@ -1,5 +1,6 @@
 using Avalonia3D.Lights;
 using Avalonia3D.Model;
+using Avalonia3D.Sandbox.Services;
 using System.IO;
 using System.Numerics;
 
@@ -22,5 +23,7 @@ public sealed class HierarchyScene : ISandboxScene
             Color = new Vector3(1f, 0.95f, 0.9f),
             Intensity = 1.1f
         });
+
+        GltfAssetDiagnostics.WriteCompactModelReport(path, scene);
     }
 }

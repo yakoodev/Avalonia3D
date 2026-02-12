@@ -1,5 +1,6 @@
 using Avalonia3D.Lights;
 using Avalonia3D.Model;
+using Avalonia3D.Sandbox.Services;
 using Serilog;
 using System.IO;
 using System.Linq;
@@ -68,6 +69,8 @@ public sealed class PbrRegressionScene : ISandboxScene, ISceneLoadOptionsProvide
             Color = new Vector3(0.75f, 0.82f, 1f),
             Intensity = 0.55f
         });
+
+        GltfAssetDiagnostics.WriteCompactModelReport(path, scene);
     }
 
     private static string ToSceneToken(string value)

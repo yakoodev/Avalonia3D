@@ -78,5 +78,7 @@ public sealed class GltfFileScene : ISandboxScene
                 Intensity = 0.65f
             });
         }
+
+        GltfAssetDiagnostics.WriteCompactModelReport(path, scene);
     }
 }
