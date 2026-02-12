@@ -47,7 +47,7 @@ namespace Avalonia3D.Plugins.Wheel
                 throw new ArgumentNullException(nameof(importer));
             }
 
-            _scene.ResetSceneGraph();
+            _scene.ResetSceneGraph(clearGlobalCaches: false);
 
             Wheel = new Wheel(_scene);
             WheelCut = new WheelCut(_scene);

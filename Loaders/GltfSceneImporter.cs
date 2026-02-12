@@ -271,7 +271,6 @@ namespace Avalonia3D.Loaders
             var materialTargetMap = BuildMaterialTargetMap(gltf, nodeKeys);
             var (clips, unsupportedChannels, channelKindSummary) = ExtractAnimationClips(gltf, nodeKeys, materialTargetMap);
 
-            ModelLoader.ClearAllCaches();
             MemoryManager.PerformAggressiveCleanup();
             MemoryManager.LogMemoryState("After GLTF load");
             return new SceneImportResult(
@@ -308,7 +307,6 @@ namespace Avalonia3D.Loaders
                 target.Add(meshObject);
             }
 
-            ModelLoader.ClearAllCaches();
             MemoryManager.PerformAggressiveCleanup();
         }
 
