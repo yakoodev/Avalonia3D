@@ -56,11 +56,11 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
                     : "texture_alpha_signal";
 
             if (resolved == MaterialAlphaMode.Blend &&
-                alphaProfile != MaterialAlphaImportProfile.Legacy &&
+                alphaProfile == MaterialAlphaImportProfile.Strict &&
                 !context.IsAnimatedMaterial)
             {
                 resolved = MaterialAlphaMode.Mask;
-                reasonCode += "_promoted_to_mask";
+                reasonCode += "_strict_profile_promoted_to_mask";
             }
 
             LogAlphaDecision(material, context, sourceAlphaMode, resolved, reasonCode);
