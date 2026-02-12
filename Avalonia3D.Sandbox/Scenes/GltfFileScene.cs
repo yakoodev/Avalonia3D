@@ -8,7 +8,7 @@ using System.Numerics;
 
 namespace Avalonia3D.Sandbox.Scenes;
 
-public sealed class GltfFileScene : ISandboxScene
+public sealed class GltfFileScene : ISandboxScene, ISceneAssetCacheKeyProvider
 {
     private readonly string _relativePath;
 
@@ -40,7 +40,21 @@ public sealed class GltfFileScene : ISandboxScene
     public string FileName { get; }
     public string Directory { get; }
     public string Extension { get; }
+    public TimeSpan? CacheTtl => TimeSpan.FromMinutes(30);
 
+    public string BuildCacheKey(string assetsRoot)
+    {
+        var fullPath = Path.GetFullPath(Path.Combine(assetsRoot, _relativePath));
+        var relative = _relativePath.Replace(Path.DirectorySeparatorChar, '/').Replace(Path.AltDirectorySeparatorChar, '/').ToLowerInvariant();
+
+        if (!File.Exists(fullPath))
+        {
+            return $"gltf:{relative}:missing";
+        }
+
+        var fileInfo = new FileInfo(fullPath);
+        return $"gltf:{relative}:ticks={fileInfo.LastWriteTimeUtc.Ticks}:len={fileInfo.Length}";
+    }
 
     private static string NormalizeDirectory(string? directory)
     {
