@@ -289,12 +289,10 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
             return TextureAlphaSignal.None;
         }
 
-        var opaqueRatio = opaque / (float)sampled;
         var deepTransparentRatio = deepTransparent / (float)sampled;
         var denseDeepMaskThreshold = TextureAlphaHeuristics.GetDenseDeepMaskRatioThreshold();
 
-        if (deepTransparentRatio > denseDeepMaskThreshold &&
-            opaqueRatio >= TextureAlphaHeuristics.DenseDeepMaskOpaqueRatio)
+        if (deepTransparentRatio > denseDeepMaskThreshold)
         {
             return TextureAlphaSignal.MaskCutout;
         }
