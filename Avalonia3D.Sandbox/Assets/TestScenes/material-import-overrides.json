@@ -1,7 +1,15 @@
 {
   "scenes": {
     "Assets/TestScenes/droid/scene.gltf": {
-      "preserveBlendWithoutAlphaSignalForEmissive": true
+      "preserveBlendWithoutAlphaSignalForEmissive": false,
+      "materials": {
+        "body": {
+          "forceAlphaMode": "opaque"
+        },
+        "Boden": {
+          "forceAlphaMode": "opaque"
+        }
+      }
     }
   }
 }
