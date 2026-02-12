@@ -35,20 +35,8 @@ namespace Avalonia3D.Rendering
             gl.BindFramebuffer(FramebufferTarget.Framebuffer, context.RenderContext.FrameState.OutputFramebufferId);
             gl.Enable(EnableCap.DepthTest);
 
-            if (context.RenderContext.FrameState.HasEmissiveTarget)
-            {
-                Span<GLEnum> drawBuffers = stackalloc GLEnum[]
-                {
-                    GLEnum.ColorAttachment0,
-                    GLEnum.ColorAttachment1
-                };
-                gl.DrawBuffers(drawBuffers);
-            }
-            else
-            {
-                Span<GLEnum> drawBuffers = stackalloc GLEnum[] { GLEnum.ColorAttachment0 };
-                gl.DrawBuffers(drawBuffers);
-            }
+            var hasEmissiveTarget = context.RenderContext.FrameState.HasEmissiveTarget;
+            ConfigureDrawBuffers(gl, hasEmissiveTarget);
 
             if (_settings.MsaaPolicy == MsaaPolicy.Disabled)
             {
@@ -61,8 +49,7 @@ namespace Avalonia3D.Rendering
 
             gl.Disable(EnableCap.Blend);
             gl.DepthMask(true);
-            gl.ClearColor(_settings.Background.Red, _settings.Background.Green, _settings.Background.Blue, 1f);
-            gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+            ClearForwardTargets(gl, hasEmissiveTarget);
 
             foreach (var obj in context.OpaqueObjects)
             {
@@ -84,5 +71,42 @@ namespace Avalonia3D.Rendering
                 gl.Disable(EnableCap.Blend);
             }
         }
+
+        private void ConfigureDrawBuffers(GL gl, bool hasEmissiveTarget)
+        {
+            if (hasEmissiveTarget)
+            {
+                Span<GLEnum> drawBuffers = stackalloc GLEnum[]
+                {
+                    GLEnum.ColorAttachment0,
+                    GLEnum.ColorAttachment1
+                };
+                gl.DrawBuffers(drawBuffers);
+                return;
+            }
+
+            Span<GLEnum> colorOnlyBuffer = stackalloc GLEnum[] { GLEnum.ColorAttachment0 };
+            gl.DrawBuffers(colorOnlyBuffer);
+        }
+
+        private void ClearForwardTargets(GL gl, bool hasEmissiveTarget)
+        {
+            gl.ClearColor(_settings.Background.Red, _settings.Background.Green, _settings.Background.Blue, 1f);
+            gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+            if (!hasEmissiveTarget)
+            {
+                return;
+            }
+
+            Span<GLEnum> emissiveOnlyBuffer = stackalloc GLEnum[] { GLEnum.ColorAttachment1 };
+            gl.DrawBuffers(emissiveOnlyBuffer);
+            gl.ClearColor(0f, 0f, 0f, 1f);
+            gl.Clear(ClearBufferMask.ColorBufferBit);
+
+            ConfigureDrawBuffers(gl, hasEmissiveTarget: true);
+            gl.ClearColor(_settings.Background.Red, _settings.Background.Green, _settings.Background.Blue, 1f);
+        }
+
     }
 }
