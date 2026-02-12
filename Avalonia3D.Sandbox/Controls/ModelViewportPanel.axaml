@@ -1,0 +1,27 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:viewModels="clr-namespace:Avalonia3D.Sandbox.ViewModels"
+             x:Class="Avalonia3D.Sandbox.Controls.ModelViewportPanel"
+             x:DataType="viewModels:MainWindowViewModel"
+             mc:Ignorable="d">
+  <StackPanel Spacing="10">
+    <TextBlock Text="Модели" Foreground="White" FontWeight="SemiBold" />
+    <ComboBox ItemsSource="{Binding Scenes}" SelectedValue="{Binding SelectedSceneId}" SelectedValueBinding="{Binding Id}" DisplayMemberBinding="{Binding Title}" />
+    <Button Content="Загрузить" Command="{Binding LoadSceneCommand}" CommandParameter="{Binding SelectedSceneId}" HorizontalAlignment="Left" />
+
+    <Separator />
+    <TextBlock Text="Статус загрузки" Foreground="White" FontWeight="SemiBold" />
+    <TextBlock Text="{Binding LoadStatusText}" Foreground="#FFD36B" TextWrapping="Wrap" />
+    <TextBlock Text="{Binding CacheStatusText}" Foreground="#D0D0D0" TextWrapping="Wrap" />
+
+    <Separator />
+    <TextBlock Text="Preview камеры" Foreground="White" FontWeight="SemiBold" />
+    <TextBlock Text="{Binding CameraPreviewText}" Foreground="#D0D0D0" TextWrapping="Wrap" />
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <Button Content="Frame" Command="{Binding FrameAllCommand}" />
+      <Button Content="Reset" Command="{Binding ResetViewCommand}" />
+    </StackPanel>
+  </StackPanel>
+</UserControl>

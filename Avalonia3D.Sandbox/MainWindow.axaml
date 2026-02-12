@@ -3,6 +3,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Avalonia3D.Sandbox"
+        xmlns:controls="clr-namespace:Avalonia3D.Sandbox.Controls"
         xmlns:viewModels="clr-namespace:Avalonia3D.Sandbox.ViewModels"
         mc:Ignorable="d"
         x:Class="Avalonia3D.Sandbox.MainWindow"
@@ -16,178 +17,17 @@
     <KeyBinding Gesture="Space" Command="{Binding TogglePlayPauseCommand}" />
   </Window.KeyBindings>
 
-  <Grid ColumnDefinitions="420,6,*" Background="#1B1B1D">
-    <Border Grid.Column="0"
-            MinWidth="320"
-            MaxWidth="700"
-            Background="#222226"
-            Padding="14"
-            BorderBrush="#3A3A40"
-            BorderThickness="0,0,1,0">
-      <DockPanel LastChildFill="True">
-        <Border DockPanel.Dock="Top" Background="#2B2B31" CornerRadius="8" Padding="10" Margin="0,0,0,10">
-          <StackPanel>
-            <TextBlock Text="Avalonia3D Sandbox" FontSize="18" FontWeight="Bold" Foreground="White" />
-            <TextBlock Text="Быстрые клавиши: F = Frame All, R = Reset, Space = Play/Pause" Foreground="#BDBDC7" FontSize="12" Margin="0,4,0,0" />
-          </StackPanel>
-        </Border>
-
-        <TabControl>
-          <TabItem Header="Сцены">
-            <ScrollViewer>
-              <StackPanel Spacing="10" Margin="0,8,0,0">
-                <TextBlock Text="Выберите тестовую сцену" Foreground="White" FontWeight="SemiBold" />
-                <ItemsControl ItemsSource="{Binding Scenes}">
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="viewModels:SceneItemViewModel">
-                      <Border Background="#2D2D33" Padding="10" CornerRadius="8" Margin="0,0,0,8">
-                        <StackPanel Spacing="6">
-                          <TextBlock Text="{Binding Title}" FontWeight="Bold" Foreground="White" />
-                          <TextBlock Text="{Binding Description}" Foreground="#CFCFCF" TextWrapping="Wrap" />
-                          <WrapPanel Orientation="Horizontal" Margin="0,2,0,0">
-                            <Border Background="#3E4454" CornerRadius="12" Padding="8,2" Margin="0,0,6,4">
-                              <TextBlock Text="{Binding FileNameBadge}" Foreground="#EAF1FF" FontSize="11" />
-                            </Border>
-                            <Border Background="#2F4A3A" CornerRadius="12" Padding="8,2" Margin="0,0,6,4">
-                              <TextBlock Text="{Binding DirectoryBadge}" Foreground="#D5F7E1" FontSize="11" />
-                            </Border>
-                            <Border Background="#4D344D" CornerRadius="12" Padding="8,2" Margin="0,0,6,4">
-                              <TextBlock Text="{Binding ExtensionBadge}" Foreground="#F8D7FF" FontSize="11" />
-                            </Border>
-                          </WrapPanel>
-                          <Button Content="Открыть сцену" Command="{Binding LoadCommand}" HorizontalAlignment="Left" />
-                        </StackPanel>
-                      </Border>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-              </StackPanel>
-            </ScrollViewer>
-          </TabItem>
-
-          <TabItem Header="Камера">
-            <ScrollViewer>
-              <StackPanel Spacing="10" Margin="0,8,0,0">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button Content="Frame All" Command="{Binding FrameAllCommand}" />
-                  <Button Content="Reset" Command="{Binding ResetViewCommand}" />
-                  <Button Content="Toggle Mode" Command="{Binding ToggleCameraModeCommand}" />
-                </StackPanel>
-                <TextBlock Text="Текущий режим камеры:" Foreground="#D6D6D6" />
-                <TextBlock Text="{Binding CurrentCameraMode}" Foreground="White" FontWeight="SemiBold" />
-
-                <TextBlock Text="Orbit sensitivity" Foreground="#D6D6D6" />
-                <Slider Minimum="0.001" Maximum="0.1" Value="{Binding OrbitSensitivity}" />
-                <TextBlock Text="Pan sensitivity" Foreground="#D6D6D6" />
-                <Slider Minimum="0.001" Maximum="0.1" Value="{Binding PanSensitivity}" />
-                <TextBlock Text="Dolly sensitivity" Foreground="#D6D6D6" />
-                <Slider Minimum="0.1" Maximum="10" Value="{Binding DollySensitivity}" />
-              </StackPanel>
-            </ScrollViewer>
-          </TabItem>
-
-          <TabItem Header="Графика / QA">
-            <ScrollViewer>
-              <StackPanel Spacing="10" Margin="0,8,0,0">
-                <TextBlock Text="Профиль качества" FontWeight="SemiBold" Foreground="White" />
-                <ComboBox ItemsSource="{Binding QualityPresets}" SelectedItem="{Binding SelectedQualityPreset}" HorizontalAlignment="Stretch" />
-                <TextBlock Text="{Binding ActiveQualitySummary}" Foreground="#D6D6D6" TextWrapping="Wrap" />
-                <TextBlock Text="{Binding GraphicsTuningHint}" Foreground="#9FD0FF" TextWrapping="Wrap" />
-
-                <TextBlock Text="Режим шейдера" FontWeight="SemiBold" Foreground="White" Margin="0,6,0,0" />
-                <ComboBox ItemsSource="{Binding ShaderModes}" SelectedItem="{Binding SelectedRenderMode}" HorizontalAlignment="Stretch" />
-                <Button Content="Применить режим" Command="{Binding SwitchShaderModeCommand}" CommandParameter="{Binding SelectedRenderMode}" HorizontalAlignment="Left" />
-                <Button Content="Toggle PBR/Unlit" Command="{Binding TogglePbrUnlitCommand}" HorizontalAlignment="Left" />
-
-                <TextBlock Text="Debug emissive texture" FontWeight="SemiBold" Foreground="White" Margin="0,6,0,0" />
-                <ComboBox ItemsSource="{Binding EmissiveTextureDebugModes}" SelectedItem="{Binding SelectedEmissiveTextureDebugMode}" HorizontalAlignment="Stretch" />
-                <TextBlock Text="Normal = как в материале; IgnoreTexture = игнор карты; ForceWhite = принудительно белый сэмпл (проверка UV/texture против pipeline)." Foreground="#D6D6D6" TextWrapping="Wrap" />
-
-                <TextBlock Text="PBR debug view mode" FontWeight="SemiBold" Foreground="White" Margin="0,6,0,0" />
-                <ComboBox ItemsSource="{Binding PbrDebugViewModes}" SelectedItem="{Binding SelectedPbrDebugViewMode}" HorizontalAlignment="Stretch" />
-                <TextBlock Text="Централизованный debug-режим PBR (BaseColorOnly, DirectLightOnly, IBLOnly, EmissiveOnly, AOOnly, NormalsOnly)." Foreground="#D6D6D6" TextWrapping="Wrap" />
-
-                <CheckBox Content="Dump PBR material diagnostics" IsChecked="{Binding DumpPbrMaterialDiagnostics}" Foreground="White" Margin="0,6,0,0" />
-                <TextBlock Text="Логирует snapshot материала перед draw (семантики текстур, UV transform, factors и вычисленные PbrFeatures)." Foreground="#D6D6D6" TextWrapping="Wrap" />
-
-                <TextBlock Text="Цвет фона сцены" FontWeight="SemiBold" Foreground="White" Margin="0,6,0,0" />
-                <Border Background="#2D2D33" CornerRadius="6" Padding="10">
-                  <StackPanel Spacing="6">
-                    <TextBlock Text="R" Foreground="#D6D6D6" />
-                    <Slider Minimum="0" Maximum="255" Value="{Binding BackgroundRed}" />
-                    <TextBlock Text="G" Foreground="#D6D6D6" />
-                    <Slider Minimum="0" Maximum="255" Value="{Binding BackgroundGreen}" />
-                    <TextBlock Text="B" Foreground="#D6D6D6" />
-                    <Slider Minimum="0" Maximum="255" Value="{Binding BackgroundBlue}" />
-                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                      <Border Width="28" Height="28" CornerRadius="4" BorderBrush="#808080" BorderThickness="1" Background="{Binding BackgroundPreviewBrush}" />
-                      <TextBlock Text="{Binding BackgroundHex}" Foreground="White" VerticalAlignment="Center" />
-                    </StackPanel>
-                  </StackPanel>
-                </Border>
-
-                <TextBlock Text="JSON профиля (импорт/экспорт)" FontWeight="SemiBold" Foreground="White" Margin="0,8,0,0" />
-                <TextBox Text="{Binding ProfileJsonEditor}" AcceptsReturn="True" TextWrapping="Wrap" Height="180" FontFamily="Consolas" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button Content="Применить JSON" Command="{Binding ApplyProfileJsonCommand}" />
-                  <Button Content="Сбросить к активному" Command="{Binding ResetProfileJsonCommand}" />
-                </StackPanel>
-                <TextBlock Text="{Binding ProfileStatusMessage}" Foreground="#C9F7A5" TextWrapping="Wrap" />
-              </StackPanel>
-            </ScrollViewer>
-          </TabItem>
-
-          <TabItem Header="Анимация">
-            <ScrollViewer>
-              <StackPanel Spacing="10" Margin="0,8,0,0">
-                <TextBlock Text="Список анимаций" Foreground="White" FontWeight="SemiBold" />
-                <Border Background="#2D2D33" CornerRadius="6" Padding="8" MaxHeight="180">
-                  <ListBox ItemsSource="{Binding AvailableClips}" SelectedItem="{Binding SelectedClipName}" />
-                </Border>
-
-                <TextBlock Text="Выбранная анимация" Foreground="#D6D6D6" />
-                <ComboBox ItemsSource="{Binding AvailableClips}" SelectedItem="{Binding SelectedClipName}" HorizontalAlignment="Stretch" />
-                <CheckBox Content="Loop" IsChecked="{Binding IsLoopEnabled}" Foreground="White" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBlock Text="Speed" Foreground="White" VerticalAlignment="Center"/>
-                  <NumericUpDown Minimum="0.1" Maximum="4" Increment="0.1" Value="{Binding PlaybackSpeed}" Width="120"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button Content="Play" Command="{Binding PlayClipCommand}" />
-                  <Button Content="Pause" Command="{Binding PauseClipCommand}" />
-                  <Button Content="Stop" Command="{Binding StopClipCommand}" />
-                </StackPanel>
-                <TextBlock Text="{Binding ClipStateText}" Foreground="#CFCFCF" TextWrapping="Wrap" />
-
-                <Separator Margin="0,8,0,2" />
-                <TextBlock Text="Команды поведения (semantic id)" Foreground="White" FontWeight="SemiBold" />
-                <TextBox Text="{Binding BehaviorTargetSemanticId}" Watermark="например: door.main или wheel.front.left" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button Content="Open" Command="{Binding OpenSemanticTargetCommand}" />
-                  <Button Content="Close" Command="{Binding CloseSemanticTargetCommand}" />
-                  <Button Content="Toggle" Command="{Binding ToggleSemanticTargetCommand}" />
-                </StackPanel>
-              </StackPanel>
-            </ScrollViewer>
-          </TabItem>
-        </TabControl>
-      </DockPanel>
+  <Grid ColumnDefinitions="380,6,*" Background="#1B1B1D">
+    <Border Grid.Column="0" Background="#222226" Padding="14" BorderBrush="#3A3A40" BorderThickness="0,0,1,0">
+      <controls:ModelViewportPanel />
     </Border>
 
-    <GridSplitter Grid.Column="1"
-                  HorizontalAlignment="Stretch"
-                  VerticalAlignment="Stretch"
-                  Background="#3E3E45"
-                  ResizeDirection="Columns"
-                  ShowsPreview="True" />
+    <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="#3E3E45" ResizeDirection="Columns" ShowsPreview="True" />
 
     <Grid Grid.Column="2">
-      <Grid>
-        <Border Background="Gray">
-          <local:SandboxModel3DControl x:Name="Viewport" />
-        </Border>
-        <Border x:Name="InputOverlay" Background="Transparent" IsHitTestVisible="True" />
-      </Grid>
+      <Border Background="Gray">
+        <local:SandboxModel3DControl x:Name="Viewport" />
+      </Border>
       <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16" Background="#88000000" Padding="10" CornerRadius="6">
         <StackPanel>
           <TextBlock Text="{Binding CurrentSceneTitle}" Foreground="White" FontWeight="SemiBold" />

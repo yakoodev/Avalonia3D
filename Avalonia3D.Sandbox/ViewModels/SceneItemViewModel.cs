@@ -4,8 +4,9 @@ namespace Avalonia3D.Sandbox.ViewModels;
 
 public sealed class SceneItemViewModel
 {
-    public SceneItemViewModel(string title, string description, string fileNameBadge, string directoryBadge, string extensionBadge, ICommand loadCommand)
+    public SceneItemViewModel(string id, string title, string description, string fileNameBadge, string directoryBadge, string extensionBadge, ICommand loadCommand)
     {
+        Id = id;
         Title = title;
         Description = description;
         FileNameBadge = fileNameBadge;
@@ -14,6 +15,7 @@ public sealed class SceneItemViewModel
         LoadCommand = loadCommand;
     }
 
+    public string Id { get; }
     public string Title { get; }
     public string Description { get; }
     public string FileNameBadge { get; }

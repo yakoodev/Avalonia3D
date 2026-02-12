@@ -8,10 +8,12 @@ using Avalonia3D.Rendering;
 using Avalonia3D.Rendering.Diagnostics;
 using Avalonia3D.Sandbox.Scenes;
 using Avalonia3D.Sandbox.Services;
+using Avalonia3D.Sandbox;
 using Avalonia3D.Sandbox.Utilities;
 using Avalonia3D.Shaders;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
@@ -25,6 +27,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly CameraController _cameraController;
     private readonly IRenderThreadScheduler _renderThreadScheduler;
     private readonly Action<GraphicsProfile> _applyGraphicsProfile;
+    private readonly SandboxModel3DControl _viewport;
+    private readonly string _assetsRoot;
+    private readonly Dictionary<string, ISandboxScene> _scenesById;
     private string _currentSceneTitle = "Сцена не выбрана";
     private ShaderRenderMode _selectedRenderMode;
     private string? _selectedClipName;
@@ -45,36 +50,51 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private EmissiveTextureDebugMode _selectedEmissiveTextureDebugMode = EmissiveTextureDebugMode.Normal;
     private PbrDebugViewMode _selectedPbrDebugViewMode = PbrDebugViewMode.None;
     private bool _dumpPbrMaterialDiagnostics;
+    private bool _isLoading;
+    private bool _isRendererReady;
+    private string? _lastLoadError;
+    private string? _selectedSceneId;
+    private readonly HashSet<string> _loadedSceneIds = new(StringComparer.OrdinalIgnoreCase);
+    private string _cameraPreviewText = "camera: n/a";
 
-    public MainWindowViewModel(Scene3D scene, CameraController cameraController, string assetsRoot, IRenderThreadScheduler renderThreadScheduler, Action<GraphicsProfile> applyGraphicsProfile)
+    public MainWindowViewModel(Scene3D scene, CameraController cameraController, string assetsRoot, IRenderThreadScheduler renderThreadScheduler, Action<GraphicsProfile> applyGraphicsProfile, SandboxModel3DControl viewport)
     {
+        _viewport = viewport;
         _scene = scene;
         _cameraController = cameraController;
         _renderThreadScheduler = renderThreadScheduler;
         _applyGraphicsProfile = applyGraphicsProfile;
+        _assetsRoot = assetsRoot;
         _sceneLoader = new SceneLoader(scene, assetsRoot, renderThreadScheduler);
         _sceneLoader.SceneChanged += sceneInfo =>
         {
             Dispatcher.UIThread.Post(() =>
             {
+                IsLoading = false;
+                _loadedSceneIds.Add(sceneInfo.Id);
+                SelectedSceneId = sceneInfo.Id;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CacheStatusText)));
                 CurrentSceneTitle = sceneInfo.Title;
                 UpdateImportStatus();
                 RefreshClips();
                 AutoPlayFirstClipIfAvailable();
+                UpdateCameraPreview();
                 ExecuteOnRenderThread(() => _cameraController.CaptureHomeView());
             });
         };
 
         var scenes = SceneCatalog.CreateDefault(assetsRoot);
+        _scenesById = scenes.ToDictionary(scene => scene.Id, scene => scene, StringComparer.OrdinalIgnoreCase);
         Scenes = new ObservableCollection<SceneItemViewModel>(
             scenes.Select(sceneInfo =>
                 new SceneItemViewModel(
+                    sceneInfo.Id,
                     sceneInfo.Title,
                     sceneInfo.Description,
                     sceneInfo is GltfFileScene gltfScene ? gltfScene.FileName : sceneInfo.Title,
                     sceneInfo is GltfFileScene gltfSceneDir ? gltfSceneDir.Directory : "n/a",
                     sceneInfo is GltfFileScene gltfSceneExt ? gltfSceneExt.Extension : "internal",
-                    new RelayCommand(_ => _sceneLoader.Load(sceneInfo)))));
+                    new RelayCommand(_ => LoadScene(sceneInfo.Id)))));
 
         ShaderModes = new ObservableCollection<ShaderRenderMode>(new[]
         {
@@ -147,6 +167,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
         ApplyProfileJsonCommand = new RelayCommand(_ => ApplyProfileJson());
         ResetProfileJsonCommand = new RelayCommand(_ => ResetProfileJson());
+        LoadSceneCommand = new RelayCommand(sceneId => LoadScene(sceneId as string ?? SelectedSceneId));
 
         ApplyRenderQualityPreset(RenderQualityPreset.Medium);
 
@@ -159,7 +180,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
         if (scenes.Count > 0)
         {
-            _sceneLoader.Load(scenes[0]);
+            SelectedSceneId = scenes[0].Id;
+            LoadScene(scenes[0].Id);
         }
     }
 
@@ -183,8 +205,82 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public RelayCommand ToggleCameraModeCommand { get; }
     public RelayCommand ApplyProfileJsonCommand { get; }
     public RelayCommand ResetProfileJsonCommand { get; }
+    public RelayCommand LoadSceneCommand { get; }
 
     public string CurrentCameraMode => _cameraController.ControlMode.ToString();
+
+
+    public bool IsLoading
+    {
+        get => _isLoading;
+        private set
+        {
+            if (_isLoading == value)
+            {
+                return;
+            }
+
+            _isLoading = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsLoading)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LoadStatusText)));
+        }
+    }
+
+    public bool IsRendererReady
+    {
+        get => _isRendererReady;
+        private set
+        {
+            if (_isRendererReady == value)
+            {
+                return;
+            }
+
+            _isRendererReady = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsRendererReady)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LoadStatusText)));
+        }
+    }
+
+    public string? LastLoadError
+    {
+        get => _lastLoadError;
+        private set
+        {
+            if (_lastLoadError == value)
+            {
+                return;
+            }
+
+            _lastLoadError = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LastLoadError)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LoadStatusText)));
+        }
+    }
+
+    public string? SelectedSceneId
+    {
+        get => _selectedSceneId;
+        set
+        {
+            if (_selectedSceneId == value)
+            {
+                return;
+            }
+
+            _selectedSceneId = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedSceneId)));
+        }
+    }
+
+    public string LoadStatusText =>
+        LastLoadError is not null ? $"Ошибка загрузки: {LastLoadError}" :
+        IsLoading ? "Загрузка сцены..." :
+        IsRendererReady ? "Renderer готов" : "Renderer не готов";
+
+    public string CacheStatusText => $"Cache: загружено {_loadedSceneIds.Count} сцен(ы) | source: {_assetsRoot}";
+
+    public string CameraPreviewText => _cameraPreviewText;
 
 
     public string BehaviorTargetSemanticId
@@ -466,13 +562,35 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    public void MarkRendererReady() => _sceneLoader.MarkRendererReady();
-
-    public void HandleShortcutFrame() => ExecuteOnRenderThread(() => _cameraController.FrameAll());
-    public void HandleShortcutReset() => ExecuteOnRenderThread(() => _cameraController.ResetView());
-    public void HandleShortcutPlayPause() => TogglePlayPause();
 
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    private void LoadScene(string? sceneId)
+    {
+        if (string.IsNullOrWhiteSpace(sceneId) || !_scenesById.TryGetValue(sceneId, out var scene))
+        {
+            LastLoadError = $"Scene '{sceneId}' not found";
+            return;
+        }
+
+        LastLoadError = null;
+        IsLoading = true;
+        SelectedSceneId = sceneId;
+
+        _viewport.SelectedSceneId = sceneId;
+        _viewport.LoadSceneCommand.Execute(sceneId);
+
+        _sceneLoader.Load(scene);
+    }
+
+    private void UpdateCameraPreview()
+    {
+        var pos = _scene.Camera.Position;
+        var target = _scene.Camera.Target;
+        _cameraPreviewText = $"pos=({pos.X:0.00}, {pos.Y:0.00}, {pos.Z:0.00}) | target=({target.X:0.00}, {target.Y:0.00}, {target.Z:0.00})";
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CameraPreviewText)));
+    }
+
 
     private ClipPlaybackState SelectedClipState
     {
