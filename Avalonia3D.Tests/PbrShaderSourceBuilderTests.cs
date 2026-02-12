@@ -160,7 +160,7 @@ public class PbrShaderSourceBuilderTests
         Assert.Contains("uReflectionContributionClamp", fragmentSource);
         Assert.Contains("uAmbientStrengthClamp", fragmentSource);
         Assert.Contains("iblDiffuse", fragmentSource);
-        Assert.Contains("min(reflection + iblDiffuse", fragmentSource);
+        Assert.Contains("min((reflection + iblDiffuse)*ao", fragmentSource);
     }
     [Fact]
     public void Build_IncludesSeparateEmissiveSurfaceControls()
@@ -187,6 +187,8 @@ public class PbrShaderSourceBuilderTests
         Assert.Contains("resultLight=diffuseColor*0.04+fallbackSpecular", fragmentSource);
         Assert.Contains("iblDiffuse = diffuseColor * max(uIblDiffuseIntensity,0.0) * (1.0-metallic)", fragmentSource);
         Assert.Contains("metallicReflectionBoost", fragmentSource);
+        Assert.Contains("reflection *= metallicReflectionBoost*(1.0-0.55*clamp(roughness,0.0,1.0))", fragmentSource);
+        Assert.Contains("iblComponent = min((reflection + iblDiffuse)*ao", fragmentSource);
     }
 
     [Fact]
