@@ -76,19 +76,17 @@ namespace Avalonia3D.Rendering
 
         private void ConfigureDrawBuffers(GL gl, bool hasEmissiveTarget)
         {
-            if (hasEmissiveTarget)
+            if (!hasEmissiveTarget)
             {
-                Span<GLEnum> drawBuffers = stackalloc GLEnum[]
-                {
-                    GLEnum.ColorAttachment0,
-                    GLEnum.ColorAttachment1
-                };
-                gl.DrawBuffers(drawBuffers);
                 return;
             }
 
-            Span<GLEnum> colorOnlyBuffer = stackalloc GLEnum[] { GLEnum.ColorAttachment0 };
-            gl.DrawBuffers(colorOnlyBuffer);
+            Span<GLEnum> drawBuffers = stackalloc GLEnum[]
+            {
+                GLEnum.ColorAttachment0,
+                GLEnum.ColorAttachment1
+            };
+            gl.DrawBuffers(drawBuffers);
         }
 
         private void ClearForwardTargets(GL gl, bool hasEmissiveTarget)
