@@ -49,7 +49,7 @@ namespace Avalonia3D.Rendering
         public float ReflectionContributionClamp { get; init; } = 1.25f;
         public float AmbientStrengthClamp { get; init; } = 0.35f;
         public float AmbientOcclusionStrength { get; init; } = 1.0f;
-        public float SeparateEmissiveSurfaceScale { get; init; } = 0.05f;
+        public float SeparateEmissiveSurfaceScale { get; init; } = 0.0f;
     }
 
     public sealed record BackgroundProfile
@@ -235,7 +235,7 @@ namespace Avalonia3D.Rendering
                 Gamma = 2.2f,
                 Bloom = new BloomProfile
                 {
-                    Enabled = true,
+                    Enabled = false,
                     Threshold = 0.35f,
                     Intensity = 1.2f,
                     Radius = 1.4f,

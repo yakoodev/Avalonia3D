@@ -675,6 +675,35 @@ public sealed class MaterialAlphaAndLoaderTests
     }
 
     [Fact]
+    public void MaterialImportOverrideConfiguration_ResolveForMaterial_CanUseTextureTransparencySignalOverride()
+    {
+        MaterialImportOverrideConfiguration.ConfigureAssetOverrides(new System.Collections.Generic.Dictionary<string, MaterialAssetImportOverride>
+        {
+            ["Assets/TestScenes/droid/scene.gltf"] = new()
+            {
+                Materials = new System.Collections.Generic.Dictionary<string, MaterialSceneImportOverride>
+                {
+                    ["Boden"] = new() { ForceTextureTransparencySignal = true }
+                }
+            }
+        });
+
+        try
+        {
+            var resolved = MaterialImportOverrideConfiguration.ResolveForMaterial(
+                "/workspace/Avalonia3D/Avalonia3D.Sandbox/Assets/TestScenes/droid/scene.gltf",
+                "Boden");
+
+            Assert.NotNull(resolved);
+            Assert.True(resolved!.ForceTextureTransparencySignal);
+        }
+        finally
+        {
+            MaterialImportOverrideConfiguration.Configure(null);
+        }
+    }
+
+    [Fact]
     public void MaterialImportOverrideConfiguration_ResolveForMaterial_UsesMaterialLevelOverride()
     {
         MaterialImportOverrideConfiguration.ConfigureAssetOverrides(new System.Collections.Generic.Dictionary<string, MaterialAssetImportOverride>
