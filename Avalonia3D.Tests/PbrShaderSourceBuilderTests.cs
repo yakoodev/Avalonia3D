@@ -181,10 +181,12 @@ public class PbrShaderSourceBuilderTests
 
         var (_, fragmentSource) = builder.Build(PbrFeatures.None, maxLights: 4);
 
-        Assert.Contains("ambient=ambientStrength*diffuseColor*uLightColor[i]", fragmentSource);
+        Assert.Contains("ambient=ambientStrength*0.35*diffuseColor*uLightColor[i]", fragmentSource);
         Assert.Contains("if(uLightCount==0){", fragmentSource);
         Assert.Contains("fallbackSpecular=specularColor", fragmentSource);
         Assert.Contains("resultLight=diffuseColor*0.04+fallbackSpecular", fragmentSource);
+        Assert.Contains("iblDiffuse = diffuseColor * max(uIblDiffuseIntensity,0.0) * (1.0-metallic)", fragmentSource);
+        Assert.Contains("metallicReflectionBoost", fragmentSource);
     }
 
     [Fact]

@@ -49,7 +49,7 @@ namespace Avalonia3D.Rendering
         public float ReflectionContributionClamp { get; init; } = 1.25f;
         public float AmbientStrengthClamp { get; init; } = 0.35f;
         public float AmbientOcclusionStrength { get; init; } = 1.0f;
-        public float SeparateEmissiveSurfaceScale { get; init; } = 0.2f;
+        public float SeparateEmissiveSurfaceScale { get; init; } = 0.05f;
     }
 
     public sealed record BackgroundProfile
@@ -259,7 +259,7 @@ namespace Avalonia3D.Rendering
                 Exposure = 1.0f,
                 PbrWhitePoint = 1.35f,
                 IblDiffuseIntensity = 0.15f,
-                IblSpecularIntensity = 1.15f,
+                IblSpecularIntensity = 0.95f,
                 ReflectionContributionClamp = 1.0f,
                 AmbientStrengthClamp = 0.22f,
                 AmbientOcclusionStrength = 1.0f
