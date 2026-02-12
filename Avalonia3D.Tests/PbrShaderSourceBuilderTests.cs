@@ -174,4 +174,27 @@ public class PbrShaderSourceBuilderTests
         Assert.Contains("totalEmissiveForSurface", fragmentSource);
     }
 
+    [Fact]
+    public void Build_PbrLighting_UsesNonWhiteningAmbientTerm()
+    {
+        var builder = new PbrShaderSourceBuilder();
+
+        var (_, fragmentSource) = builder.Build(PbrFeatures.None, maxLights: 4);
+
+        Assert.Contains("ambient=ambientStrength*diffuseColor*uLightColor[i]", fragmentSource);
+        Assert.Contains("if(uLightCount==0) resultLight=diffuseColor*0.04", fragmentSource);
+    }
+
+    [Fact]
+    public void Build_WithTransmission_UsesTintedSurfaceInsteadOfSyntheticBlueBackground()
+    {
+        var builder = new PbrShaderSourceBuilder();
+
+        var (_, fragmentSource) = builder.Build(PbrFeatures.Transmission, maxLights: 4);
+
+        Assert.Contains("attenuationTint=mix(vec3(1.0), clamp(uTransmissionAttenuationColor", fragmentSource);
+        Assert.Contains("transmittedLight=surfaceResult*attenuationTint", fragmentSource);
+        Assert.Contains("mix(surfaceResult, transmittedLight, transmissionWeight)", fragmentSource);
+    }
+
 }
