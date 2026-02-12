@@ -223,6 +223,12 @@ namespace Avalonia3D.Loaders
                 return prim.Material;
             }
 
+            var reflectionMaterial = TryResolveMaterialViaReflection(prim);
+            if (reflectionMaterial != null)
+            {
+                return reflectionMaterial;
+            }
+
             try
             {
                 var mesh = prim.LogicalParent;
@@ -246,6 +252,63 @@ namespace Avalonia3D.Loaders
             {
                 return null;
             }
+        }
+
+        private static SharpGLTF.Schema2.Material? TryResolveMaterialViaReflection(MeshPrimitive prim)
+        {
+            try
+            {
+                var type = prim.GetType();
+
+                var logicalMaterialProperty = type.GetProperty("LogicalMaterial");
+                if (logicalMaterialProperty?.GetValue(prim) is SharpGLTF.Schema2.Material logicalMaterial)
+                {
+                    Log.Warning("GLTF primitive material resolved via reflection property LogicalMaterial. materialIndex={MaterialIndex}, materialName={MaterialName}", logicalMaterial.LogicalIndex, logicalMaterial.Name ?? "<unnamed>");
+                    return logicalMaterial;
+                }
+
+                var materialProperty = type.GetProperty("Material");
+                if (materialProperty?.GetValue(prim) is SharpGLTF.Schema2.Material reflectedMaterial)
+                {
+                    Log.Warning("GLTF primitive material resolved via reflection property Material. materialIndex={MaterialIndex}, materialName={MaterialName}", reflectedMaterial.LogicalIndex, reflectedMaterial.Name ?? "<unnamed>");
+                    return reflectedMaterial;
+                }
+
+                var materialIndex = TryReadMaterialIndex(type, prim);
+                if (materialIndex.HasValue)
+                {
+                    var materials = prim.LogicalParent?.LogicalParent?.LogicalMaterials;
+                    if (materials != null && materialIndex.Value >= 0 && materialIndex.Value < materials.Count)
+                    {
+                        var indexedMaterial = materials[materialIndex.Value];
+                        Log.Warning("GLTF primitive material resolved via reflection index. materialIndex={MaterialIndex}, materialName={MaterialName}", indexedMaterial.LogicalIndex, indexedMaterial.Name ?? "<unnamed>");
+                        return indexedMaterial;
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore reflection failures.
+            }
+
+            return null;
+        }
+
+        private static int? TryReadMaterialIndex(Type primitiveType, MeshPrimitive primitive)
+        {
+            var materialIndexProperty = primitiveType.GetProperty("MaterialIndex") ?? primitiveType.GetProperty("LogicalMaterialIndex");
+            if (materialIndexProperty?.GetValue(primitive) is int materialIndex)
+            {
+                return materialIndex;
+            }
+
+            var rawValue = materialIndexProperty?.GetValue(primitive);
+            if (rawValue != null && int.TryParse(rawValue.ToString(), out var parsed))
+            {
+                return parsed;
+            }
+
+            return null;
         }
 
         private static MorphTarget[] ReadMorphTargets(MeshPrimitive prim, int vertexCount)

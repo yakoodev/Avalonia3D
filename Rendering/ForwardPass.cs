@@ -112,6 +112,7 @@ namespace Avalonia3D.Rendering
             gl.Clear(ClearBufferMask.ColorBufferBit);
 
             ConfigureDrawBuffers(gl, hasEmissiveTarget: true);
+            gl.ClearColor(_settings.Background.Red, _settings.Background.Green, _settings.Background.Blue, 1f);
         }
     }
 }

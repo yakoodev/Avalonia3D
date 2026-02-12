@@ -117,6 +117,7 @@ public static class GltfAssetDiagnostics
             .AppendLine($"depsMissing={missingDependencies}")
             .AppendLine($"renderMode={scene.RenderMode}")
             .AppendLine($"pbrDebugView={scene.PbrDebugViewMode}")
+            .AppendLine($"backgroundRgb={scene.ActiveGraphicsProfile.Background.Red:0.###},{scene.ActiveGraphicsProfile.Background.Green:0.###},{scene.ActiveGraphicsProfile.Background.Blue:0.###}")
             .AppendLine($"timeUtc={DateTime.UtcNow:O}");
 
         if (issuesPreview.Length > 0)
