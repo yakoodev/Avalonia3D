@@ -76,13 +76,15 @@ public static class GltfAssetDiagnostics
         var dependencies = preflight.ExternalUris;
         var missingDependencies = CountMissingDependencies(fullPath, dependencies);
 
-        var meshes = scene.SceneGraph.RootObjects.OfType<MeshObject>().ToArray();
+        var meshes = CollectMeshes(scene.SceneGraph).ToArray();
         var materials = meshes
             .Select(mesh => mesh.Material)
             .Where(material => material != null)
             .Cast<Material>()
             .ToArray();
 
+        var meshesWithMaterial = meshes.Count(mesh => mesh.Material != null);
+        var meshesWithoutMaterial = meshes.Length - meshesWithMaterial;
         var emissiveTextureMaterials = materials.Count(material => material.EmissiveTexture != null);
         var maxEmissiveFactor = materials.Length == 0
             ? 0f
@@ -104,6 +106,8 @@ public static class GltfAssetDiagnostics
             .AppendLine($"importIssues={scene.LastImportReport.Issues.Count}")
             .AppendLine($"objectsRoot={scene.SceneGraph.RootObjects.Count}")
             .AppendLine($"objectsMesh={meshes.Length}")
+            .AppendLine($"meshesWithMaterial={meshesWithMaterial}")
+            .AppendLine($"meshesWithoutMaterial={meshesWithoutMaterial}")
             .AppendLine($"lights={scene.Lights.Count}")
             .AppendLine($"materials={materials.Length}")
             .AppendLine($"materialsWithEmissiveTexture={emissiveTextureMaterials}")
@@ -120,9 +124,53 @@ public static class GltfAssetDiagnostics
             report.AppendLine($"issuesPreview={string.Join(" | ", issuesPreview)}");
         }
 
+        var materialPreview = meshes
+            .Take(3)
+            .Select(mesh => !string.IsNullOrWhiteSpace(mesh.MaterialKey) ? mesh.MaterialKey : (mesh.Material != null ? "<material-without-key>" : "<null>"))
+            .ToArray();
+
+        report.AppendLine($"materialPreview={string.Join(",", materialPreview)}");
+
+        if (meshesWithoutMaterial > 0)
+        {
+            Log.Warning("Compact model report: {WithoutMaterial} mesh(es) have no Material. File={File}", meshesWithoutMaterial, Path.GetFileName(fullPath));
+        }
+
         File.WriteAllText(reportPath, report.ToString());
         Log.Information("Compact model report written: {Path}", reportPath);
         return reportPath;
+    }
+
+
+    private static IEnumerable<MeshObject> CollectMeshes(SceneGraph graph)
+    {
+        foreach (var root in graph.RootObjects)
+        {
+            foreach (var mesh in CollectMeshesRecursive(root))
+            {
+                yield return mesh;
+            }
+        }
+    }
+
+    private static IEnumerable<MeshObject> CollectMeshesRecursive(SceneObject node)
+    {
+        if (node is MeshObject mesh)
+        {
+            yield return mesh;
+            yield break;
+        }
+
+        if (node is MeshGroup group)
+        {
+            foreach (var child in group)
+            {
+                foreach (var childMesh in CollectMeshesRecursive(child))
+                {
+                    yield return childMesh;
+                }
+            }
+        }
     }
 
     public static void LogNodeIdConflicts(SceneGraph graph, string sceneLabel)
