@@ -101,6 +101,13 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
                 : MaterialEmissiveBehavior.IgnoreForTransparencyFallback;
         }
 
+        var alphaProfile = context.SceneOverride?.AlphaProfile ?? context.AlphaProfile;
+        var allowEmissiveTransparencyFallback = context.IsAnimatedMaterial || alphaProfile == MaterialAlphaImportProfile.Legacy;
+        if (!allowEmissiveTransparencyFallback)
+        {
+            return MaterialEmissiveBehavior.IgnoreForTransparencyFallback;
+        }
+
         if (material.EmissiveTexture != null)
         {
             return MaterialEmissiveBehavior.TreatAsTransparencySignal;

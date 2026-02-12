@@ -855,6 +855,29 @@ public sealed class MaterialAlphaAndLoaderTests
     }
 
     [Fact]
+    public void DefaultMaterialImportPolicy_BalancedProfile_DoesNotUseEmissiveAsTransparencySignal()
+    {
+        var material = new Avalonia3D.Model.Material
+        {
+            AlphaMode = MaterialAlphaMode.Blend,
+            BaseColorFactor = new Vector4(1f, 1f, 1f, 1f),
+            EmissiveFactor = new Vector3(0.3f, 0f, 0f)
+        };
+
+        var context = new MaterialImportPolicyContext
+        {
+            AlphaProfile = MaterialAlphaImportProfile.Balanced,
+            SourceAlphaMode = MaterialAlphaMode.Blend,
+            IsAnimatedMaterial = false
+        };
+
+        var policy = new DefaultMaterialImportPolicy();
+        var mode = policy.ResolveAlphaMode(material, context);
+
+        Assert.Equal(MaterialAlphaMode.Opaque, mode);
+    }
+
+    [Fact]
     public void OpaqueMaterialDefaults_DoNotRegress()
     {
         var material = new Avalonia3D.Model.Material();
