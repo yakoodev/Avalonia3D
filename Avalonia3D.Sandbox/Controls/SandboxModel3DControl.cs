@@ -219,9 +219,8 @@ public class SandboxModel3DControl : OpenGlControlBase
 
     private int _lastFramebuffer = -1;
 
-    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    public void HandlePointerPressed(PointerPressedEventArgs e)
     {
-        base.OnPointerPressed(e);
         var point = e.GetPosition(this);
         _activeMouseButton = ResolveMouseButton(e);
 
@@ -237,9 +236,8 @@ public class SandboxModel3DControl : OpenGlControlBase
         e.Handled = true;
     }
 
-    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    public void HandlePointerReleased(PointerReleasedEventArgs e)
     {
-        base.OnPointerReleased(e);
         var point = e.GetPosition(this);
         var releasedButton = e.InitialPressMouseButton == MouseButton.None ? _activeMouseButton : e.InitialPressMouseButton;
 
@@ -255,6 +253,35 @@ public class SandboxModel3DControl : OpenGlControlBase
         e.Handled = true;
     }
 
+    public void HandlePointerMoved(PointerEventArgs e)
+    {
+        var point = e.GetPosition(this);
+
+        if (_isPointerDragActive)
+        {
+            _inputHandler.OnMouseMove(new Vector2((float)point.X, (float)point.Y));
+            e.Handled = true;
+        }
+    }
+
+    public void HandlePointerWheelChanged(PointerWheelEventArgs e)
+    {
+        _inputHandler.OnMouseWheel((float)e.Delta.Y);
+        e.Handled = true;
+    }
+
+    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    {
+        base.OnPointerPressed(e);
+        HandlePointerPressed(e);
+    }
+
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+        HandlePointerReleased(e);
+    }
+
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
     {
         base.OnPointerCaptureLost(e);
@@ -265,20 +292,13 @@ public class SandboxModel3DControl : OpenGlControlBase
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
-        var point = e.GetPosition(this);
-
-        if (_isPointerDragActive)
-        {
-            _inputHandler.OnMouseMove(new Vector2((float)point.X, (float)point.Y));
-            e.Handled = true;
-        }
+        HandlePointerMoved(e);
     }
 
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
-        _inputHandler.OnMouseWheel((float)e.Delta.Y);
-        e.Handled = true;
+        HandlePointerWheelChanged(e);
     }
 
     protected override void OnKeyDown(KeyEventArgs e)

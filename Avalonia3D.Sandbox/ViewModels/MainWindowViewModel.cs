@@ -577,9 +577,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         IsLoading = true;
         SelectedSceneId = sceneId;
 
-        _viewport.SelectedSceneId = sceneId;
-        _viewport.LoadSceneCommand.Execute(sceneId);
-
         _sceneLoader.Load(scene);
     }
 

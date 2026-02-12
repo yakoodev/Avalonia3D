@@ -17,17 +17,34 @@
     <KeyBinding Gesture="Space" Command="{Binding TogglePlayPauseCommand}" />
   </Window.KeyBindings>
 
-  <Grid ColumnDefinitions="380,6,*" Background="#1B1B1D">
-    <Border Grid.Column="0" Background="#222226" Padding="14" BorderBrush="#3A3A40" BorderThickness="0,0,1,0">
+  <Grid ColumnDefinitions="420,6,*" Background="#1B1B1D">
+    <Border Grid.Column="0"
+            MinWidth="320"
+            MaxWidth="700"
+            Background="#222226"
+            Padding="14"
+            BorderBrush="#3A3A40"
+            BorderThickness="0,0,1,0">
       <controls:ModelViewportPanel />
     </Border>
 
-    <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="#3E3E45" ResizeDirection="Columns" ShowsPreview="True" />
+    <GridSplitter Grid.Column="1"
+                  HorizontalAlignment="Stretch"
+                  VerticalAlignment="Stretch"
+                  Background="#3E3E45"
+                  ResizeDirection="Columns"
+                  ShowsPreview="True" />
 
     <Grid Grid.Column="2">
-      <Border Background="Gray">
-        <local:SandboxModel3DControl x:Name="Viewport" />
-      </Border>
+      <Grid>
+        <Border Background="Gray">
+          <local:SandboxModel3DControl x:Name="Viewport" />
+        </Border>
+        <Border Background="Transparent"
+                IsHitTestVisible="True"
+                controls:PointerForwardingBehavior.Target="{Binding #Viewport}" />
+      </Grid>
+
       <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16" Background="#88000000" Padding="10" CornerRadius="6">
         <StackPanel>
           <TextBlock Text="{Binding CurrentSceneTitle}" Foreground="White" FontWeight="SemiBold" />
