@@ -14,15 +14,26 @@ public sealed class SceneLoader : ISceneLoadService
     }
 
     public SceneLoader(Scene3D scene, string assetsRoot, IRenderThreadScheduler renderThreadScheduler)
-        : this(new RenderThreadSceneLoadOrchestrator(
+        : this(CreateOrchestrator(scene, assetsRoot, renderThreadScheduler))
+    {
+    }
+
+    private static RenderThreadSceneLoadOrchestrator CreateOrchestrator(Scene3D scene, string assetsRoot, IRenderThreadScheduler renderThreadScheduler)
+    {
+        var coordinator = new CacheCoordinator(
+            new InMemorySceneAssetCache(),
+            new HybridSceneImportResultCache());
+
+        CacheCoordinator.Configure(coordinator);
+
+        return new RenderThreadSceneLoadOrchestrator(
             new SceneLoadService(
                 scene,
                 assetsRoot,
                 new DefaultSceneCameraPolicy(),
                 new DefaultSceneDiagnosticsReporter(),
-                new InMemorySceneAssetCache()),
-            renderThreadScheduler))
-    {
+                coordinator),
+            renderThreadScheduler);
     }
 
     public event Action<ISandboxScene>? SceneChanged

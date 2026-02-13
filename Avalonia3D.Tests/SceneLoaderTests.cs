@@ -58,7 +58,7 @@ public sealed class SceneLoaderTests
     {
         var trackingCache = new TrackingSceneAssetCache();
         var scene = new Scene3D();
-        var loader = new SceneLoadService(scene, "/tmp/assets", new NoopCameraPolicy(), new NoopDiagnosticsReporter(), trackingCache);
+        var loader = new SceneLoadService(scene, "/tmp/assets", new NoopCameraPolicy(), new NoopDiagnosticsReporter(), new CacheCoordinator(trackingCache, new NullSceneImportResultCache()));
         var cacheable = new CacheableScene("cache-scene", "stable-key-1");
 
         loader.LoadNow(cacheable);
@@ -75,7 +75,7 @@ public sealed class SceneLoaderTests
     public void SceneLoadService_CallsCameraPolicy_WithExpectedAutoFrameFlag(bool autoFrame)
     {
         var policy = new TrackingCameraPolicy();
-        var loader = new SceneLoadService(new Scene3D(), "/tmp/assets", policy, new NoopDiagnosticsReporter(), new InMemorySceneAssetCache());
+        var loader = new SceneLoadService(new Scene3D(), "/tmp/assets", policy, new NoopDiagnosticsReporter(), new CacheCoordinator(new InMemorySceneAssetCache(), new NullSceneImportResultCache()));
         var scene = new SceneWithOptions("opts", autoFrame);
 
         loader.LoadNow(scene);
@@ -146,7 +146,7 @@ public sealed class SceneLoaderTests
 
     private static SceneLoadService CreateCoreLoader()
     {
-        return new SceneLoadService(new Scene3D(), "/tmp/assets", new DefaultSceneCameraPolicy(), new DefaultSceneDiagnosticsReporter(), new InMemorySceneAssetCache());
+        return new SceneLoadService(new Scene3D(), "/tmp/assets", new DefaultSceneCameraPolicy(), new DefaultSceneDiagnosticsReporter(), new CacheCoordinator(new InMemorySceneAssetCache(), new NullSceneImportResultCache()));
     }
 
     private sealed class ImmediateScheduler : IRenderThreadScheduler
@@ -282,6 +282,11 @@ public sealed class SceneLoaderTests
         public void Invalidate(string key)
         {
             _entries.Remove(key);
+        }
+
+        public void InvalidateAll()
+        {
+            _entries.Clear();
         }
     }
 }
