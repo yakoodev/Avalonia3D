@@ -46,6 +46,10 @@ namespace Avalonia3D.Model
 
         private RenderResourceManager? _resourceManager;
         private readonly Dictionary<ShaderRenderMode, string> _renderModeBindings = new();
+        private readonly Queue<MeshObject> _pendingResourceBuildQueue = new();
+        private const int ResourceBuildsPerFrameBudget = 12;
+        private const int InitialResourceBuildWarmupBudget = 64;
+        private bool _isResourceBuildWarmupPending;
 
         public SceneGraph SceneGraph { get; private set; } = new();
         public GltfSceneImporter Importer { get; } = new();
@@ -220,6 +224,7 @@ namespace Avalonia3D.Model
         public void Render(IRenderContext context)
         {
             UpdateFrame();
+            ProcessPendingResourceBuilds();
             foreach (var obj in SceneGraph.RootObjects)
             {
                 if (obj.IsVisible)
@@ -254,6 +259,8 @@ namespace Avalonia3D.Model
             }
 
             SceneGraph.Clear();
+            _pendingResourceBuildQueue.Clear();
+            _isResourceBuildWarmupPending = false;
 
             if (!clearGlobalCaches)
             {
@@ -312,6 +319,7 @@ namespace Avalonia3D.Model
                 return;
             }
 
+            _isResourceBuildWarmupPending = true;
 
             foreach (var obj in SceneGraph.RootObjects)
             {
@@ -323,7 +331,7 @@ namespace Avalonia3D.Model
         {
             if (obj is MeshObject meshObject)
             {
-                meshObject.BuildRenderResources(_resourceManager);
+                _pendingResourceBuildQueue.Enqueue(meshObject);
             }
 
             if (obj is MeshGroup meshGroup)
@@ -335,6 +343,27 @@ namespace Avalonia3D.Model
             }
         }
 
+
+        private void ProcessPendingResourceBuilds()
+        {
+            if (_resourceManager == null || _pendingResourceBuildQueue.Count == 0)
+            {
+                return;
+            }
+
+            var budget = _isResourceBuildWarmupPending
+                ? InitialResourceBuildWarmupBudget
+                : ResourceBuildsPerFrameBudget;
+
+            while (budget > 0 && _pendingResourceBuildQueue.Count > 0)
+            {
+                var meshObject = _pendingResourceBuildQueue.Dequeue();
+                meshObject.BuildRenderResources(_resourceManager);
+                budget--;
+            }
+
+            _isResourceBuildWarmupPending = false;
+        }
 
         private void ReattachBehaviors()
         {
