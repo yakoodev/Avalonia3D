@@ -1,4 +1,6 @@
 using Avalonia3D.Lights;
+using Avalonia3D.Loaders;
+using Avalonia3D.Loaders.Policies;
 using Avalonia3D.Model;
 using Avalonia3D.Sandbox.Services;
 using Serilog;
@@ -62,7 +64,13 @@ public sealed class GltfFileScene : ISandboxScene, ISceneAssetCacheKeyProvider, 
     {
         var path = Path.Combine(assetsRoot, _relativePath);
         var modelRoot = ModelRoot.Load(path);
-        return new PreparedGltfPayload(path, modelRoot);
+        var importer = new GltfSceneImporter
+        {
+            ValidationPolicy = ImportValidationConfiguration.CurrentPolicy
+        };
+
+        var importResult = importer.ImportWithAnimations(modelRoot);
+        return new PreparedGltfPayload(path, importResult);
     }
 
     public void LoadPrepared(Scene3D scene, string assetsRoot, object preparedPayload)
@@ -75,7 +83,7 @@ public sealed class GltfFileScene : ISandboxScene, ISceneAssetCacheKeyProvider, 
 
         Log.Information("Loading prepared GLTF scene from: {Path}", payload.Path);
         GltfAssetDiagnostics.LogAssetStatus(payload.Path);
-        scene.LoadScene(payload.ModelRoot, payload.Path);
+        scene.LoadPrepared(payload.ImportResult);
         GltfAssetDiagnostics.LogNodeIdConflicts(scene.SceneGraph, Path.GetFileName(payload.Path));
         GltfAssetDiagnostics.LogAnimationChannelKinds(scene.LastImportReport, Path.GetFileName(payload.Path));
 
@@ -134,5 +142,5 @@ public sealed class GltfFileScene : ISandboxScene, ISceneAssetCacheKeyProvider, 
         }
     }
 
-    private sealed record PreparedGltfPayload(string Path, ModelRoot ModelRoot);
+    private sealed record PreparedGltfPayload(string Path, SceneImportResult ImportResult);
 }

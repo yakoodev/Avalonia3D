@@ -264,10 +264,8 @@ namespace Avalonia3D.Model
             ModelLoader.ClearAllCaches();
         }
 
-        public SceneGraph LoadScene(string gltfPath)
+        private SceneGraph ApplyImportResult(SceneImportResult importResult)
         {
-            ResetSceneGraph(clearGlobalCaches: false);
-            var importResult = Importer.ImportWithAnimations(gltfPath);
             LastImportReport = new SceneImportReport(
                 importResult.Status,
                 importResult.Issues,
@@ -286,27 +284,25 @@ namespace Avalonia3D.Model
             return SceneGraph;
         }
 
+        public SceneGraph LoadScene(string gltfPath)
+        {
+            ResetSceneGraph(clearGlobalCaches: false);
+            var importResult = Importer.ImportWithAnimations(gltfPath);
+            return ApplyImportResult(importResult);
+        }
+
         public SceneGraph LoadScene(ModelRoot modelRoot, string sourcePath)
         {
             _ = sourcePath;
             ResetSceneGraph(clearGlobalCaches: false);
             var importResult = Importer.ImportWithAnimations(modelRoot);
-            LastImportReport = new SceneImportReport(
-                importResult.Status,
-                importResult.Issues,
-                importResult.UnsupportedAnimationChannels,
-                importResult.AnimationChannelKinds);
-            SceneGraph = importResult.Graph;
-            AnimatorComponent.SetSceneGraph(SceneGraph);
-            foreach (var clip in importResult.Clips)
-            {
-                AnimatorComponent.RegisterClip(clip);
-            }
+            return ApplyImportResult(importResult);
+        }
 
-            ReattachBehaviors();
-            BuildRenderResources();
-            LookChanged?.Invoke(this, _lookState);
-            return SceneGraph;
+        public SceneGraph LoadPrepared(SceneImportResult importResult)
+        {
+            ResetSceneGraph(clearGlobalCaches: false);
+            return ApplyImportResult(importResult);
         }
 
         internal void BuildRenderResources()
