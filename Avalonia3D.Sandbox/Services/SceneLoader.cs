@@ -42,6 +42,12 @@ public sealed class SceneLoader : ISceneLoadService
         remove => _sceneLoadService.SceneChanged -= value;
     }
 
+    public bool UnloadBeforePrepare
+    {
+        get => _sceneLoadService.UnloadBeforePrepare;
+        set => _sceneLoadService.UnloadBeforePrepare = value;
+    }
+
     public void MarkRendererReady() => _sceneLoadService.MarkRendererReady();
 
     public void Load(ISandboxScene scene) => _sceneLoadService.Load(scene);

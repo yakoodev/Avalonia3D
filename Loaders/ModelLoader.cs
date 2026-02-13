@@ -11,6 +11,7 @@ using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using SixLabors.ImageSharp.Processing.Processors.Transforms;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -28,11 +29,30 @@ namespace Avalonia3D.Loaders
         private static readonly IMaterialImportPolicy _materialImportPolicy = new DefaultMaterialImportPolicy();
         private static IMemoryPressurePolicy _memoryPressurePolicy = DefaultMemoryPressurePolicy.Instance;
 
-        private static readonly Dictionary<string, Dictionary<(int MeshIndex, int PrimitiveIndex), int>> _materialIndexMapCache = new(StringComparer.OrdinalIgnoreCase);
+        private static readonly ConcurrentDictionary<string, MaterialIndexMapCacheEntry> _materialIndexMapCache = new(StringComparer.OrdinalIgnoreCase);
+        private static readonly ConcurrentDictionary<PrimitiveMaterialCacheKey, int?> _reflectionMaterialFallbackCache = new();
+        private static readonly TimeSpan MaterialIndexMapCacheTtl = TimeSpan.FromMinutes(10);
+        private const int MaterialIndexMapCacheSizeLimit = 64;
         private static readonly LruTextureDecodeCache _textureDecodeCache = new();
         private static ITextureDecodePolicy _textureDecodePolicy = TextureDecodePolicies.Balanced;
         private const uint GlbMagic = 0x46546C67;
         private const uint JsonChunkType = 0x4E4F534A;
+
+        private readonly record struct PrimitiveMaterialCacheKey(string AssetPath, int MeshIndex, int PrimitiveIndex);
+
+        private sealed class MaterialIndexMapCacheEntry
+        {
+            public required IReadOnlyDictionary<(int MeshIndex, int PrimitiveIndex), int> Map { get; init; }
+            public required DateTimeOffset ExpiresAtUtc { get; init; }
+            public required DateTimeOffset LastAccessUtc { get; init; }
+
+            public MaterialIndexMapCacheEntry WithAccess(DateTimeOffset now) => new()
+            {
+                Map = Map,
+                ExpiresAtUtc = ExpiresAtUtc,
+                LastAccessUtc = now
+            };
+        }
 
         private unsafe static long EstimateModelMemory(Model.Model m)
         {
@@ -115,11 +135,16 @@ namespace Avalonia3D.Loaders
                 AlphaProfile = MaterialAlphaImportConfiguration.CurrentProfile
             };
 
+            var precomputedMaterialIndexMap = policyContext.PrecomputedMaterialIndexMap
+                ?? BuildPrecomputedMaterialIndexMap(gltf, policyContext.AssetPath);
+
+            var effectivePolicyContext = CreatePolicyContextWithMaterialMap(policyContext, precomputedMaterialIndexMap);
+
             try
             {
                 foreach (var node in gltf.LogicalNodes)
                 {
-                    models.AddRange(LoadModelsForNode(node, policyContext));
+                    models.AddRange(LoadModelsForNode(node, effectivePolicyContext));
                 }
 
                 pressurePolicy.OnImportCompleted("ModelLoader.LoadModels");
@@ -144,6 +169,12 @@ namespace Avalonia3D.Loaders
             {
                 AlphaProfile = MaterialAlphaImportConfiguration.CurrentProfile
             };
+
+            if (policyContext.PrecomputedMaterialIndexMap == null)
+            {
+                var precomputedMap = BuildPrecomputedMaterialIndexMap(node.LogicalParent, policyContext.AssetPath);
+                policyContext = CreatePolicyContextWithMaterialMap(policyContext, precomputedMap);
+            }
 
             foreach (var prim in node.Mesh.Primitives)
             {
@@ -216,7 +247,7 @@ namespace Avalonia3D.Loaders
                 }
             }
 
-            var resolvedMaterial = ResolvePrimitiveMaterial(prim, policyContext?.AssetPath);
+            var resolvedMaterial = ResolvePrimitiveMaterial(prim, policyContext);
 
             var model = new Model.Model
             {
@@ -242,7 +273,7 @@ namespace Avalonia3D.Loaders
 
 
 
-        private static SharpGLTF.Schema2.Material? ResolvePrimitiveMaterial(MeshPrimitive prim, string? assetPath)
+        private static SharpGLTF.Schema2.Material? ResolvePrimitiveMaterial(MeshPrimitive prim, MaterialImportPolicyContext? policyContext)
         {
             if (prim == null)
             {
@@ -254,13 +285,7 @@ namespace Avalonia3D.Loaders
                 return prim.Material;
             }
 
-            var reflectionMaterial = TryResolveMaterialViaReflection(prim);
-            if (reflectionMaterial != null)
-            {
-                return reflectionMaterial;
-            }
-
-            var documentMaterial = TryResolveMaterialFromSourceDocument(prim, assetPath);
+            var documentMaterial = TryResolveMaterialFromSourceDocument(prim, policyContext);
             if (documentMaterial != null)
             {
                 return documentMaterial;
@@ -331,13 +356,8 @@ namespace Avalonia3D.Loaders
             return null;
         }
 
-        private static SharpGLTF.Schema2.Material? TryResolveMaterialFromSourceDocument(MeshPrimitive prim, string? assetPath)
+        private static SharpGLTF.Schema2.Material? TryResolveMaterialFromSourceDocument(MeshPrimitive prim, MaterialImportPolicyContext? policyContext)
         {
-            if (string.IsNullOrWhiteSpace(assetPath) || !File.Exists(assetPath))
-            {
-                return null;
-            }
-
             var meshIndex = prim.LogicalParent?.LogicalIndex ?? -1;
             var primitiveIndex = ResolvePrimitiveIndexWithinMesh(prim);
             if (meshIndex < 0 || primitiveIndex < 0)
@@ -345,25 +365,43 @@ namespace Avalonia3D.Loaders
                 return null;
             }
 
-            if (!TryGetMaterialIndexMap(assetPath, out var map))
+            var map = policyContext?.PrecomputedMaterialIndexMap;
+            if (map == null && !string.IsNullOrWhiteSpace(policyContext?.AssetPath) && TryGetMaterialIndexMap(policyContext.AssetPath, out var fileMap))
             {
-                return null;
+                map = fileMap;
             }
 
-            if (!map.TryGetValue((meshIndex, primitiveIndex), out var materialIndex))
+            if (map != null && map.TryGetValue((meshIndex, primitiveIndex), out var materialIndexFromMap))
             {
-                return null;
+                var mappedMaterial = ResolveMaterialByIndex(prim, materialIndexFromMap);
+                if (mappedMaterial != null)
+                {
+                    Log.Warning("GLTF primitive material resolved from material index map. meshIndex={MeshIndex}, primitiveIndex={PrimitiveIndex}, materialIndex={MaterialIndex}, materialName={MaterialName}", meshIndex, primitiveIndex, mappedMaterial.LogicalIndex, mappedMaterial.Name ?? "<unnamed>");
+                    return mappedMaterial;
+                }
             }
 
+            var fallbackKey = new PrimitiveMaterialCacheKey(policyContext?.AssetPath ?? string.Empty, meshIndex, primitiveIndex);
+            if (_reflectionMaterialFallbackCache.TryGetValue(fallbackKey, out var cachedMaterialIndex))
+            {
+                return cachedMaterialIndex.HasValue ? ResolveMaterialByIndex(prim, cachedMaterialIndex.Value) : null;
+            }
+
+            var reflectionMaterial = TryResolveMaterialViaReflection(prim);
+            var resolvedIndex = reflectionMaterial?.LogicalIndex;
+            _reflectionMaterialFallbackCache[fallbackKey] = resolvedIndex;
+            return reflectionMaterial;
+        }
+
+        private static SharpGLTF.Schema2.Material? ResolveMaterialByIndex(MeshPrimitive prim, int materialIndex)
+        {
             var materials = prim.LogicalParent?.LogicalParent?.LogicalMaterials;
             if (materials == null || materialIndex < 0 || materialIndex >= materials.Count)
             {
                 return null;
             }
 
-            var material = materials[materialIndex];
-            Log.Warning("GLTF primitive material resolved from source JSON mapping. meshIndex={MeshIndex}, primitiveIndex={PrimitiveIndex}, materialIndex={MaterialIndex}, materialName={MaterialName}", meshIndex, primitiveIndex, material.LogicalIndex, material.Name ?? "<unnamed>");
-            return material;
+            return materials[materialIndex];
         }
 
         private static int ResolvePrimitiveIndexWithinMesh(MeshPrimitive prim)
@@ -385,10 +423,19 @@ namespace Avalonia3D.Loaders
             return -1;
         }
 
-        private static bool TryGetMaterialIndexMap(string assetPath, out Dictionary<(int MeshIndex, int PrimitiveIndex), int> map)
+        private static bool TryGetMaterialIndexMap(string assetPath, out IReadOnlyDictionary<(int MeshIndex, int PrimitiveIndex), int> map)
         {
-            if (_materialIndexMapCache.TryGetValue(assetPath, out map!))
+            map = new Dictionary<(int MeshIndex, int PrimitiveIndex), int>();
+            if (string.IsNullOrWhiteSpace(assetPath) || !File.Exists(assetPath))
             {
+                return false;
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            if (_materialIndexMapCache.TryGetValue(assetPath, out var cachedEntry) && cachedEntry.ExpiresAtUtc > now)
+            {
+                _materialIndexMapCache[assetPath] = cachedEntry.WithAccess(now);
+                map = cachedEntry.Map;
                 return true;
             }
 
@@ -396,15 +443,90 @@ namespace Avalonia3D.Loaders
             {
                 var root = ReadGltfRootFromFile(assetPath);
                 var parsed = ParseMaterialIndexMap(root);
-                _materialIndexMapCache[assetPath] = parsed;
+                _materialIndexMapCache[assetPath] = new MaterialIndexMapCacheEntry
+                {
+                    Map = parsed,
+                    ExpiresAtUtc = now.Add(MaterialIndexMapCacheTtl),
+                    LastAccessUtc = now
+                };
+
+                TrimMaterialIndexMapCacheIfNeeded(now);
                 map = parsed;
                 return true;
             }
             catch
             {
-                map = new Dictionary<(int MeshIndex, int PrimitiveIndex), int>();
                 return false;
             }
+        }
+
+        private static void TrimMaterialIndexMapCacheIfNeeded(DateTimeOffset now)
+        {
+            foreach (var pair in _materialIndexMapCache)
+            {
+                if (pair.Value.ExpiresAtUtc <= now)
+                {
+                    _materialIndexMapCache.TryRemove(pair.Key, out _);
+                }
+            }
+
+            while (_materialIndexMapCache.Count > MaterialIndexMapCacheSizeLimit)
+            {
+                var oldest = _materialIndexMapCache.OrderBy(pair => pair.Value.LastAccessUtc).FirstOrDefault();
+                if (string.IsNullOrEmpty(oldest.Key))
+                {
+                    break;
+                }
+
+                _materialIndexMapCache.TryRemove(oldest.Key, out _);
+            }
+        }
+
+        private static IReadOnlyDictionary<(int MeshIndex, int PrimitiveIndex), int> BuildPrecomputedMaterialIndexMap(ModelRoot? gltf, string? assetPath)
+        {
+            if (!string.IsNullOrWhiteSpace(assetPath) && TryGetMaterialIndexMap(assetPath, out var sourceDocumentMap))
+            {
+                return sourceDocumentMap;
+            }
+
+            var map = new Dictionary<(int MeshIndex, int PrimitiveIndex), int>();
+            if (gltf == null)
+            {
+                return map;
+            }
+
+            foreach (var mesh in gltf.LogicalMeshes)
+            {
+                foreach (var primitive in mesh.Primitives)
+                {
+                    var materialIndex = primitive.Material?.LogicalIndex;
+                    if (!materialIndex.HasValue)
+                    {
+                        continue;
+                    }
+
+                    map[(mesh.LogicalIndex, primitive.LogicalIndex)] = materialIndex.Value;
+                }
+            }
+
+            return map;
+        }
+
+        private static MaterialImportPolicyContext CreatePolicyContextWithMaterialMap(MaterialImportPolicyContext baseContext, IReadOnlyDictionary<(int MeshIndex, int PrimitiveIndex), int> precomputedMaterialIndexMap)
+        {
+            return new MaterialImportPolicyContext
+            {
+                AssetPath = baseContext.AssetPath,
+                AlphaProfile = baseContext.AlphaProfile,
+                SceneOverride = baseContext.SceneOverride,
+                SourceAlphaMode = baseContext.SourceAlphaMode,
+                MaterialName = baseContext.MaterialName,
+                MeshName = baseContext.MeshName,
+                NodeName = baseContext.NodeName,
+                NodeStableId = baseContext.NodeStableId,
+                IsAnimatedMaterial = baseContext.IsAnimatedMaterial,
+                PrecomputedMaterialIndexMap = precomputedMaterialIndexMap
+            };
         }
 
         private static JsonElement ReadGltfRootFromFile(string assetPath)
@@ -668,7 +790,8 @@ namespace Avalonia3D.Loaders
                 NodeStableId = node != null ? $"node:{node.LogicalIndex}" : null,
                 IsAnimatedMaterial = model.HasMorphTargets ||
                     (node?.MorphWeights?.Count ?? 0) > 0 ||
-                    (!string.IsNullOrWhiteSpace(policyContext.AssetPath) && policyContext.AssetPath.Contains("anim", StringComparison.OrdinalIgnoreCase))
+                    (!string.IsNullOrWhiteSpace(policyContext.AssetPath) && policyContext.AssetPath.Contains("anim", StringComparison.OrdinalIgnoreCase)),
+                PrecomputedMaterialIndexMap = policyContext.PrecomputedMaterialIndexMap
             };
 
             _ = _materialImportPolicy.ResolveColorSpaceHandling(result, TextureSemantic.BaseColor, effectivePolicyContext);

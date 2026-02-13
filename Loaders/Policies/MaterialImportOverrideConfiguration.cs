@@ -19,6 +19,7 @@ public sealed class MaterialImportPolicyContext
     public string? NodeName { get; init; }
     public string? NodeStableId { get; init; }
     public bool IsAnimatedMaterial { get; init; }
+    public IReadOnlyDictionary<(int MeshIndex, int PrimitiveIndex), int>? PrecomputedMaterialIndexMap { get; init; }
 }
 
 public sealed class MaterialSceneImportOverride
