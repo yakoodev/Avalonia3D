@@ -329,17 +329,24 @@ namespace Avalonia3D.Model
 
         private void BuildRenderResourcesRecursive(SceneObject obj)
         {
-            if (obj is MeshObject meshObject)
-            {
-                _pendingResourceBuildQueue.Enqueue(meshObject);
-            }
-
             if (obj is MeshGroup meshGroup)
             {
                 foreach (var child in meshGroup)
                 {
                     BuildRenderResourcesRecursive(child);
                 }
+
+                // Группы без собственной геометрии не должны съедать стартовый бюджет,
+                // иначе сцены с большим количеством узлов долго остаются "пустыми".
+                if (!meshGroup.HasAssignedModel)
+                {
+                    return;
+                }
+            }
+
+            if (obj is MeshObject meshObject)
+            {
+                _pendingResourceBuildQueue.Enqueue(meshObject);
             }
         }
 
@@ -358,6 +365,12 @@ namespace Avalonia3D.Model
             while (budget > 0 && _pendingResourceBuildQueue.Count > 0)
             {
                 var meshObject = _pendingResourceBuildQueue.Dequeue();
+                // Не тратим бюджет на контейнеры без модели.
+                if (!meshObject.HasAssignedModel)
+                {
+                    continue;
+                }
+
                 meshObject.BuildRenderResources(_resourceManager);
                 budget--;
             }
