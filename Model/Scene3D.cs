@@ -50,6 +50,7 @@ namespace Avalonia3D.Model
         private const int ResourceBuildsPerFrameBudget = 12;
         private const int InitialResourceBuildWarmupBudget = 64;
         private bool _isResourceBuildWarmupPending;
+        private bool _buildResourcesAfterInitPending;
 
         public SceneGraph SceneGraph { get; private set; } = new();
         public GltfSceneImporter Importer { get; } = new();
@@ -99,6 +100,12 @@ namespace Avalonia3D.Model
         {
             _resourceManager = new RenderResourceManager(gl);
             MemoryManager.Initialize(_resourceManager);
+
+            if (_buildResourcesAfterInitPending)
+            {
+                _buildResourcesAfterInitPending = false;
+                BuildRenderResources();
+            }
         }
 
 
@@ -261,6 +268,7 @@ namespace Avalonia3D.Model
             SceneGraph.Clear();
             _pendingResourceBuildQueue.Clear();
             _isResourceBuildWarmupPending = false;
+            _buildResourcesAfterInitPending = false;
 
             if (!clearGlobalCaches)
             {
@@ -316,9 +324,13 @@ namespace Avalonia3D.Model
         {
             if (_resourceManager == null)
             {
+                // Сцена может быть загружена до инициализации GL-контекста.
+                // Запоминаем, что нужно достроить ресурсы при первом Init.
+                _buildResourcesAfterInitPending = true;
                 return;
             }
 
+            _pendingResourceBuildQueue.Clear();
             _isResourceBuildWarmupPending = true;
 
             foreach (var obj in SceneGraph.RootObjects)
