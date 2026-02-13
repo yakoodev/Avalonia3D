@@ -36,6 +36,12 @@ public sealed class SceneLoader : ISceneLoadService
             renderThreadScheduler);
     }
 
+    public bool UnloadBeforePrepare
+    {
+        get => _sceneLoadService.UnloadBeforePrepare;
+        set => _sceneLoadService.UnloadBeforePrepare = value;
+    }
+
     public event Action<ISandboxScene>? SceneChanged
     {
         add => _sceneLoadService.SceneChanged += value;

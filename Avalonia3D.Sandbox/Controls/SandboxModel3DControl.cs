@@ -49,6 +49,9 @@ public class SandboxModel3DControl : OpenGlControlBase
     public static readonly DirectProperty<SandboxModel3DControl, ICommand> ResetCameraCommandProperty =
         AvaloniaProperty.RegisterDirect<SandboxModel3DControl, ICommand>(nameof(ResetCameraCommand), c => c.ResetCameraCommand);
 
+    public static readonly StyledProperty<bool> UnloadBeforeLoadProperty =
+        AvaloniaProperty.Register<SandboxModel3DControl, bool>(nameof(UnloadBeforeLoad), true);
+
     private GL? _gl;
     private readonly SandboxRenderer3D _renderer = new();
     private readonly RenderThreadScheduler _renderThreadScheduler = new();
@@ -69,6 +72,7 @@ public class SandboxModel3DControl : OpenGlControlBase
         CameraController = new CameraController(_renderer.Scene.Camera, () => _renderer.Scene.SceneGraph);
         _inputHandler = new MouseKeyboardInputHandler(CameraController);
         _sceneLoader = new SceneLoader(_renderer.Scene, DefaultSceneSource, _renderThreadScheduler);
+        _sceneLoader.UnloadBeforePrepare = UnloadBeforeLoad;
         _sceneLoader.SceneChanged += scene =>
         {
             Dispatcher.UIThread.Post(() =>
@@ -96,7 +100,14 @@ public class SandboxModel3DControl : OpenGlControlBase
     {
         base.OnPropertyChanged(change);
 
-        if (change.Property == SceneSourceProperty)
+        if (change.Property == UnloadBeforeLoadProperty)
+        {
+            if (change.NewValue is bool enabled)
+            {
+                _sceneLoader.UnloadBeforePrepare = enabled;
+            }
+        }
+        else if (change.Property == SceneSourceProperty)
         {
             var source = change.NewValue as string;
             if (!string.IsNullOrWhiteSpace(source))
@@ -135,6 +146,12 @@ public class SandboxModel3DControl : OpenGlControlBase
     public ICommand FrameSceneCommand { get; }
 
     public ICommand ResetCameraCommand { get; }
+
+    public bool UnloadBeforeLoad
+    {
+        get => GetValue(UnloadBeforeLoadProperty);
+        set => SetValue(UnloadBeforeLoadProperty, value);
+    }
 
     public IRenderThreadScheduler RenderThreadScheduler => _renderThreadScheduler;
 

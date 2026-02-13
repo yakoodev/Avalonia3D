@@ -63,6 +63,26 @@ public sealed class SceneLoaderTests
     }
 
 
+
+    [Fact]
+    public void Load_WhenRendererReady_WithoutPreUnload_UsesSingleRenderThreadApplyStep()
+    {
+        var coreLoader = CreateCoreLoader();
+        var scheduler = new ImmediateScheduler();
+        var orchestrator = new RenderThreadSceneLoadOrchestrator(coreLoader, scheduler)
+        {
+            UnloadBeforePrepare = false
+        };
+
+        var sample = new RecordingSandboxScene("vehicle");
+        orchestrator.MarkRendererReady();
+        orchestrator.Load(sample);
+
+        var loaded = SpinWait.SpinUntil(() => sample.LoadCallCount == 1, TimeSpan.FromSeconds(2));
+        Assert.True(loaded);
+        Assert.Equal(1, scheduler.EnqueueCalls);
+    }
+
     [Fact]
     public void Scene3D_LoadPrepared_ResetsAnimatorComponentClips()
     {
