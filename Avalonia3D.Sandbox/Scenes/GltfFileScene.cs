@@ -47,22 +47,23 @@ public sealed class GltfFileScene : ISandboxScene, ISceneAssetCacheKeyProvider, 
 
     public string BuildCacheKey(string assetsRoot)
     {
-        var fullPath = Path.GetFullPath(Path.Combine(assetsRoot, _relativePath));
-        var relative = _relativePath.Replace(Path.DirectorySeparatorChar, '/').Replace(Path.AltDirectorySeparatorChar, '/').ToLowerInvariant();
-
-        if (!File.Exists(fullPath))
-        {
-            return $"gltf:{relative}:missing";
-        }
-
-        var fileInfo = new FileInfo(fullPath);
-        return $"gltf:{relative}:ticks={fileInfo.LastWriteTimeUtc.Ticks}:len={fileInfo.Length}";
+        var path = Path.Combine(assetsRoot, _relativePath);
+        return ImportCacheKeyBuilder.Build(path);
     }
 
 
     public object Prepare(string assetsRoot)
     {
         var path = Path.Combine(assetsRoot, _relativePath);
+        var cacheKey = ImportCacheKeyBuilder.Build(path);
+        var importCache = CacheCoordinator.Current.SceneImportResultCache;
+
+        if (importCache.TryGet(cacheKey, out var cachedResult))
+        {
+            Log.Information("Scene import result cache hit: {Path}", path);
+            return new PreparedGltfPayload(path, cachedResult);
+        }
+
         var modelRoot = ModelRoot.Load(path);
         var importer = new GltfSceneImporter
         {
@@ -70,6 +71,9 @@ public sealed class GltfFileScene : ISandboxScene, ISceneAssetCacheKeyProvider, 
         };
 
         var importResult = importer.ImportWithAnimations(modelRoot);
+        var intermediatePayload = modelRoot.WriteGLB();
+        importCache.Set(cacheKey, importResult, intermediatePayload);
+        Log.Information("Scene import result cache miss: {Path}", path);
         return new PreparedGltfPayload(path, importResult);
     }
 

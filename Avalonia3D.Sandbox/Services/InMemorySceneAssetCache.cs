@@ -42,6 +42,11 @@ public sealed class InMemorySceneAssetCache : ISceneAssetCache
         _entries.Remove(key);
     }
 
+    public void InvalidateAll()
+    {
+        _entries.Clear();
+    }
+
     private static DateTime? ToExpiresAt(TimeSpan? ttl)
     {
         if (ttl is null)
