@@ -29,6 +29,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly SandboxModel3DControl _viewport;
     private readonly string _assetsRoot;
     private readonly Dictionary<string, ISandboxScene> _scenesById;
+    private readonly List<SceneItemViewModel> _allSceneItems = new();
     private string _currentSceneTitle = "Сцена не выбрана";
     private ShaderRenderMode _selectedRenderMode;
     private string? _selectedClipName;
@@ -53,6 +54,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private bool _isRendererReady;
     private string? _lastLoadError;
     private string? _selectedSceneId;
+    private string _selectedSceneGroup = "Все группы";
+    private string _selectedSceneTag = "Все теги";
     private readonly HashSet<string> _loadedSceneIds = new(StringComparer.OrdinalIgnoreCase);
     private string _cameraPreviewText = "camera: n/a";
 
@@ -85,16 +88,27 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
         var scenes = SceneCatalog.CreateDefault(assetsRoot);
         _scenesById = scenes.ToDictionary(scene => scene.Id, scene => scene, StringComparer.OrdinalIgnoreCase);
-        Scenes = new ObservableCollection<SceneItemViewModel>(
+
+        _allSceneItems.AddRange(
             scenes.Select(sceneInfo =>
-                new SceneItemViewModel(
+            {
+                var metadata = sceneInfo as ISceneCatalogMetadata;
+                return new SceneItemViewModel(
                     sceneInfo.Id,
                     sceneInfo.Title,
                     sceneInfo.Description,
-                    sceneInfo is GltfFileScene gltfScene ? gltfScene.FileName : sceneInfo.Title,
-                    sceneInfo is GltfFileScene gltfSceneDir ? gltfSceneDir.Directory : "n/a",
-                    sceneInfo is GltfFileScene gltfSceneExt ? gltfSceneExt.Extension : "internal",
-                    new RelayCommand(_ => LoadScene(sceneInfo.Id)))));
+                    metadata?.FileName ?? sceneInfo.Title,
+                    metadata?.Directory ?? "n/a",
+                    metadata?.Extension ?? "internal",
+                    metadata?.Group ?? "other",
+                    metadata?.Tags ?? Array.Empty<string>(),
+                    new RelayCommand(_ => LoadScene(sceneInfo.Id)));
+            }));
+
+        SceneGroups = new ObservableCollection<string>(new[] { "Все группы" }.Concat(_allSceneItems.Select(item => item.Group).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(static x => x, StringComparer.OrdinalIgnoreCase)));
+        SceneTags = new ObservableCollection<string>(new[] { "Все теги" }.Concat(_allSceneItems.SelectMany(item => item.Tags).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(static x => x, StringComparer.OrdinalIgnoreCase)));
+        GroupedScenes = new ObservableCollection<SceneGroupViewModel>();
+        RefreshSceneFilters();
 
         ShaderModes = new ObservableCollection<ShaderRenderMode>(new[]
         {
@@ -187,7 +201,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    public ObservableCollection<SceneItemViewModel> Scenes { get; }
+    public ObservableCollection<SceneGroupViewModel> GroupedScenes { get; }
+    public ObservableCollection<string> SceneGroups { get; }
+    public ObservableCollection<string> SceneTags { get; }
     public ObservableCollection<ShaderRenderMode> ShaderModes { get; }
     public ObservableCollection<string> AvailableClips { get; }
     public ObservableCollection<RenderQualityPreset> QualityPresets { get; }
@@ -272,6 +288,38 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
             _selectedSceneId = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedSceneId)));
+        }
+    }
+
+    public string SelectedSceneGroup
+    {
+        get => _selectedSceneGroup;
+        set
+        {
+            if (_selectedSceneGroup == value)
+            {
+                return;
+            }
+
+            _selectedSceneGroup = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedSceneGroup)));
+            RefreshSceneFilters();
+        }
+    }
+
+    public string SelectedSceneTag
+    {
+        get => _selectedSceneTag;
+        set
+        {
+            if (_selectedSceneTag == value)
+            {
+                return;
+            }
+
+            _selectedSceneTag = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedSceneTag)));
+            RefreshSceneFilters();
         }
     }
 
@@ -566,6 +614,26 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
 
     public event PropertyChangedEventHandler? PropertyChanged;
+
+
+    private void RefreshSceneFilters()
+    {
+        var filtered = _allSceneItems
+            .Where(item => SelectedSceneGroup == "Все группы" || string.Equals(item.Group, SelectedSceneGroup, StringComparison.OrdinalIgnoreCase))
+            .Where(item => SelectedSceneTag == "Все теги" || item.Tags.Any(tag => string.Equals(tag, SelectedSceneTag, StringComparison.OrdinalIgnoreCase)))
+            .ToArray();
+
+        var grouped = filtered
+            .GroupBy(item => item.Group, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new SceneGroupViewModel(group.Key, group.OrderBy(x => x.Title, StringComparer.OrdinalIgnoreCase).ThenBy(x => x.Id, StringComparer.OrdinalIgnoreCase).ToArray()));
+
+        GroupedScenes.Clear();
+        foreach (var group in grouped)
+        {
+            GroupedScenes.Add(group);
+        }
+    }
 
     private void LoadScene(string? sceneId)
     {

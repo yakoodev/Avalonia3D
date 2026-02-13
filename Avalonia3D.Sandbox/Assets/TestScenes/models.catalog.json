@@ -1,0 +1,60 @@
+{
+  "models": [
+    {
+      "id": "gltf:car2/scene",
+      "title": "Car 2",
+      "description": "Спортивный автомобиль (manifest).",
+      "relativePath": "car2/scene.gltf",
+      "group": "vehicles",
+      "tags": ["vehicle", "car", "pbr"],
+      "preload": {
+        "metadata": true,
+        "binary": false,
+        "cache": true,
+        "cacheMinutes": 45
+      }
+    },
+    {
+      "id": "gltf:doge/scene",
+      "title": "Doge",
+      "description": "Ретро-авто, сцена с текстурами.",
+      "relativePath": "doge/scene.gltf",
+      "group": "vehicles",
+      "tags": ["vehicle", "retro"],
+      "preload": {
+        "metadata": true,
+        "binary": false,
+        "cache": true,
+        "cacheMinutes": 30
+      }
+    },
+    {
+      "id": "gltf:box",
+      "title": "Box",
+      "description": "Простой базовый ассет для проверки загрузки.",
+      "relativePath": "Box.gltf",
+      "group": "reference",
+      "tags": ["pbr", "reference"],
+      "preload": {
+        "metadata": true,
+        "binary": false,
+        "cache": true,
+        "cacheMinutes": 60
+      }
+    },
+    {
+      "id": "gltf:droid/scene",
+      "title": "Droid",
+      "description": "Робот для smoke/regression прогонов.",
+      "relativePath": "droid/scene.gltf",
+      "group": "characters",
+      "tags": ["character", "robot"],
+      "preload": {
+        "metadata": true,
+        "binary": false,
+        "cache": true,
+        "cacheMinutes": 30
+      }
+    }
+  ]
+}
