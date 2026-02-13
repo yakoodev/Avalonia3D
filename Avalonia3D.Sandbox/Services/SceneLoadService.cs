@@ -13,20 +13,20 @@ public sealed class SceneLoadService
     private readonly string _assetsRoot;
     private readonly ISceneCameraPolicy _cameraPolicy;
     private readonly ISceneDiagnosticsReporter _diagnosticsReporter;
-    private readonly ISceneAssetCache _sceneAssetCache;
+    private readonly CacheCoordinator _cacheCoordinator;
 
     public SceneLoadService(
         Scene3D scene,
         string assetsRoot,
         ISceneCameraPolicy cameraPolicy,
         ISceneDiagnosticsReporter diagnosticsReporter,
-        ISceneAssetCache sceneAssetCache)
+        CacheCoordinator cacheCoordinator)
     {
         _scene = scene ?? throw new ArgumentNullException(nameof(scene));
         _assetsRoot = assetsRoot ?? throw new ArgumentNullException(nameof(assetsRoot));
         _cameraPolicy = cameraPolicy ?? throw new ArgumentNullException(nameof(cameraPolicy));
         _diagnosticsReporter = diagnosticsReporter ?? throw new ArgumentNullException(nameof(diagnosticsReporter));
-        _sceneAssetCache = sceneAssetCache ?? throw new ArgumentNullException(nameof(sceneAssetCache));
+        _cacheCoordinator = cacheCoordinator ?? throw new ArgumentNullException(nameof(cacheCoordinator));
     }
 
     public event Action<ISandboxScene>? SceneChanged;
@@ -77,14 +77,14 @@ public sealed class SceneLoadService
         }
 
         var key = cacheKeyProvider.BuildCacheKey(_assetsRoot);
-        if (_sceneAssetCache.TryGet(key, out _))
+        if (_cacheCoordinator.SceneAssetCache.TryGet(key, out _))
         {
             Log.Information("Scene asset cache hit: {SceneId}, Key={CacheKey}", sceneInfo.Id, key);
             return;
         }
 
         Log.Information("Scene asset cache miss: {SceneId}, Key={CacheKey}", sceneInfo.Id, key);
-        _sceneAssetCache.Set(
+        _cacheCoordinator.SceneAssetCache.Set(
             key,
             new SceneAssetCacheEntry(sceneInfo.Id, sceneInfo.GetType().Name, DateTime.UtcNow),
             cacheKeyProvider.CacheTtl ?? DefaultCacheTtl);

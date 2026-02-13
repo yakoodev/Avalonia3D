@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using Avalonia3D.Model;
 using Avalonia3D.Sandbox.Scenes;
 using Avalonia3D.Sandbox.Services;
@@ -30,6 +31,8 @@ public sealed class SceneLoaderTests
 
         orchestrator.MarkRendererReady();
 
+        var loaded = SpinWait.SpinUntil(() => second.LoadCallCount == 1, TimeSpan.FromSeconds(2));
+        Assert.True(loaded);
         Assert.Equal(0, first.LoadCallCount);
         Assert.Equal(1, second.LoadCallCount);
         Assert.Equal(1, scheduler.EnqueueCalls);
@@ -48,6 +51,8 @@ public sealed class SceneLoaderTests
         orchestrator.MarkRendererReady();
         orchestrator.Load(sample);
 
+        var loaded = SpinWait.SpinUntil(() => sample.LoadCallCount == 1, TimeSpan.FromSeconds(2));
+        Assert.True(loaded);
         Assert.Equal(1, scheduler.EnqueueCalls);
         Assert.Equal(1, sample.LoadCallCount);
         Assert.Same(sample, changedTo);
@@ -58,7 +63,7 @@ public sealed class SceneLoaderTests
     {
         var trackingCache = new TrackingSceneAssetCache();
         var scene = new Scene3D();
-        var loader = new SceneLoadService(scene, "/tmp/assets", new NoopCameraPolicy(), new NoopDiagnosticsReporter(), trackingCache);
+        var loader = new SceneLoadService(scene, "/tmp/assets", new NoopCameraPolicy(), new NoopDiagnosticsReporter(), new CacheCoordinator(trackingCache, new NullSceneImportResultCache()));
         var cacheable = new CacheableScene("cache-scene", "stable-key-1");
 
         loader.LoadNow(cacheable);
@@ -75,7 +80,7 @@ public sealed class SceneLoaderTests
     public void SceneLoadService_CallsCameraPolicy_WithExpectedAutoFrameFlag(bool autoFrame)
     {
         var policy = new TrackingCameraPolicy();
-        var loader = new SceneLoadService(new Scene3D(), "/tmp/assets", policy, new NoopDiagnosticsReporter(), new InMemorySceneAssetCache());
+        var loader = new SceneLoadService(new Scene3D(), "/tmp/assets", policy, new NoopDiagnosticsReporter(), new CacheCoordinator(new InMemorySceneAssetCache(), new NullSceneImportResultCache()));
         var scene = new SceneWithOptions("opts", autoFrame);
 
         loader.LoadNow(scene);
@@ -146,7 +151,7 @@ public sealed class SceneLoaderTests
 
     private static SceneLoadService CreateCoreLoader()
     {
-        return new SceneLoadService(new Scene3D(), "/tmp/assets", new DefaultSceneCameraPolicy(), new DefaultSceneDiagnosticsReporter(), new InMemorySceneAssetCache());
+        return new SceneLoadService(new Scene3D(), "/tmp/assets", new DefaultSceneCameraPolicy(), new DefaultSceneDiagnosticsReporter(), new CacheCoordinator(new InMemorySceneAssetCache(), new NullSceneImportResultCache()));
     }
 
     private sealed class ImmediateScheduler : IRenderThreadScheduler
@@ -282,6 +287,11 @@ public sealed class SceneLoaderTests
         public void Invalidate(string key)
         {
             _entries.Remove(key);
+        }
+
+        public void InvalidateAll()
+        {
+            _entries.Clear();
         }
     }
 }
