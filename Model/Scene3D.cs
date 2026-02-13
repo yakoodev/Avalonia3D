@@ -262,6 +262,7 @@ namespace Avalonia3D.Model
 
             SceneGraph.Clear();
             AnimatorComponent.ResetForScene(SceneGraph);
+            _resourceManager?.CleanupUnusedCacheEntries();
             _buildResourcesAfterInitPending = false;
 
             if (!clearGlobalCaches)
