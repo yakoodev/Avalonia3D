@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using Avalonia3D.Animation;
+using Avalonia3D.Loaders;
 using Avalonia3D.Model;
 using Avalonia3D.Sandbox.Scenes;
 using Avalonia3D.Sandbox.Services;
@@ -30,9 +33,11 @@ public sealed class SceneLoaderTests
 
         orchestrator.MarkRendererReady();
 
+        var loaded = SpinWait.SpinUntil(() => second.LoadCallCount == 1, TimeSpan.FromSeconds(2));
+        Assert.True(loaded);
         Assert.Equal(0, first.LoadCallCount);
         Assert.Equal(1, second.LoadCallCount);
-        Assert.Equal(1, scheduler.EnqueueCalls);
+        Assert.Equal(2, scheduler.EnqueueCalls);
     }
 
     [Fact]
@@ -48,9 +53,47 @@ public sealed class SceneLoaderTests
         orchestrator.MarkRendererReady();
         orchestrator.Load(sample);
 
-        Assert.Equal(1, scheduler.EnqueueCalls);
+        var loaded = SpinWait.SpinUntil(() => sample.LoadCallCount == 1, TimeSpan.FromSeconds(2));
+        var changed = SpinWait.SpinUntil(() => changedTo == sample, TimeSpan.FromSeconds(2));
+        Assert.True(loaded);
+        Assert.True(changed);
+        Assert.Equal(2, scheduler.EnqueueCalls);
         Assert.Equal(1, sample.LoadCallCount);
         Assert.Same(sample, changedTo);
+    }
+
+
+
+    [Fact]
+    public void Load_WhenRendererReady_WithoutPreUnload_UsesSingleRenderThreadApplyStep()
+    {
+        var coreLoader = CreateCoreLoader();
+        var scheduler = new ImmediateScheduler();
+        var orchestrator = new RenderThreadSceneLoadOrchestrator(coreLoader, scheduler)
+        {
+            UnloadBeforePrepare = false
+        };
+
+        var sample = new RecordingSandboxScene("vehicle");
+        orchestrator.MarkRendererReady();
+        orchestrator.Load(sample);
+
+        var loaded = SpinWait.SpinUntil(() => sample.LoadCallCount == 1, TimeSpan.FromSeconds(2));
+        Assert.True(loaded);
+        Assert.Equal(1, scheduler.EnqueueCalls);
+    }
+
+    [Fact]
+    public void Scene3D_LoadPrepared_ResetsAnimatorComponentClips()
+    {
+        var scene = new Scene3D();
+        scene.AnimatorComponent.RegisterClip(new AnimationClip("legacy"));
+        Assert.Contains("legacy", scene.AnimatorComponent.GetClipNames());
+
+        var result = new SceneImportResult(new SceneGraph(), [], SceneImportStatus.Success);
+        scene.LoadPrepared(result);
+
+        Assert.Empty(scene.AnimatorComponent.GetClipNames());
     }
 
     [Fact]

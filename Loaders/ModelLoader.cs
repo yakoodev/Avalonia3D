@@ -1058,12 +1058,15 @@ namespace Avalonia3D.Loaders
 
         private static string GeneratePrimitiveKey(MeshPrimitive prim, int vertexCount, int indexCount)
         {
-            // Более точный ключ для кеширования
+            // Ключ обязан быть детерминированным между повторными импортами одной и той же модели.
+            // Нельзя использовать GetHashCode(), иначе RenderResourceManager geometry cache будет расти бесконечно.
             var material = prim.Material;
-            var materialKey = material != null ?
-                $"{material.Name}_{material.GetHashCode()}" : "default";
+            var materialLogicalIndex = material?.LogicalIndex ?? -1;
+            var materialName = material?.Name ?? "default";
+            var meshLogicalIndex = prim.LogicalParent?.LogicalIndex ?? -1;
+            var primitiveLogicalIndex = prim.LogicalIndex;
 
-            return $"prim_{vertexCount}_{indexCount}_{materialKey}";
+            return $"prim_{meshLogicalIndex}_{primitiveLogicalIndex}_{vertexCount}_{indexCount}_{materialLogicalIndex}_{materialName}";
         }
 
         private static void CleanupTextureCache()

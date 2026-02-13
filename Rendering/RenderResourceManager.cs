@@ -247,6 +247,36 @@ namespace Avalonia3D.Rendering
             DeleteResources(resources);
         }
 
+        public void CleanupUnusedCacheEntries()
+        {
+            var keysToRemove = new List<string>();
+
+            lock (_cacheLock)
+            {
+                foreach (var (key, info) in _geometryCache)
+                {
+                    if (info.RefCount == 0)
+                    {
+                        keysToRemove.Add(key);
+                    }
+                }
+
+                foreach (var key in keysToRemove)
+                {
+                    if (_geometryCache.TryGetValue(key, out var info))
+                    {
+                        DeleteResources(info.Resources);
+                        _geometryCache.Remove(key);
+                    }
+                }
+            }
+
+            if (keysToRemove.Count > 0)
+            {
+                Log.Information("Cleaned up {Count} unused geometry cache entries", keysToRemove.Count);
+            }
+        }
+
         public void CleanupOldCacheEntries(TimeSpan maxAge)
         {
             var cutoff = DateTime.UtcNow - maxAge;

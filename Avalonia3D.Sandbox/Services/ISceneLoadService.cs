@@ -7,6 +7,8 @@ public interface ISceneLoadService
 {
     event Action<ISandboxScene>? SceneChanged;
 
+    bool UnloadBeforePrepare { get; set; }
+
     void MarkRendererReady();
 
     void Load(ISandboxScene scene);

@@ -1,3 +1,4 @@
+using Avalonia3D.Memory;
 using Avalonia3D.Model;
 using Avalonia3D.Sandbox.Scenes;
 using Serilog;
@@ -32,6 +33,12 @@ public sealed class SceneLoadService
     public event Action<ISandboxScene>? SceneChanged;
 
     public string AssetsRoot => _assetsRoot;
+
+    public void UnloadCurrentSceneForTransition()
+    {
+        _scene.ClearCaches(CacheScope.SceneOnly);
+        MemoryManager.PerformSoftCleanup("scene-switch", allowGen2: false);
+    }
 
     public void LoadNow(ISandboxScene sceneInfo)
     {

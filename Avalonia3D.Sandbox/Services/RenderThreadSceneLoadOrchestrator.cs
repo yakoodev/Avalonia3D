@@ -26,6 +26,8 @@ public sealed class RenderThreadSceneLoadOrchestrator : ISceneLoadService
 
     public event Action<ISandboxScene>? SceneChanged;
 
+    public bool UnloadBeforePrepare { get; set; } = true;
+
     public void MarkRendererReady()
     {
         lock (_sync)
@@ -90,6 +92,29 @@ public sealed class RenderThreadSceneLoadOrchestrator : ISceneLoadService
 
                 var requestedVersion = Volatile.Read(ref _lastRequestedVersion);
                 object? preparedPayload = null;
+
+                if (UnloadBeforePrepare)
+                {
+                    var unloaded = new ManualResetEventSlim(false);
+                    _renderThreadScheduler.Enqueue(() =>
+                    {
+                        try
+                        {
+                            if (requestedVersion != Volatile.Read(ref _lastRequestedVersion))
+                            {
+                                return;
+                            }
+
+                            _inner.UnloadCurrentSceneForTransition();
+                        }
+                        finally
+                        {
+                            unloaded.Set();
+                        }
+                    });
+
+                    await Task.Run(() => unloaded.Wait()).ConfigureAwait(false);
+                }
 
                 if (scene is ISceneBackgroundPreparation preparable)
                 {
