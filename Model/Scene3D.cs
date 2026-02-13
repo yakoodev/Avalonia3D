@@ -8,6 +8,7 @@ using Avalonia3D.Model.StandObjects;
 using Avalonia3D.Model.Workflow;
 using Avalonia3D.Rendering;
 using Silk.NET.OpenGL;
+using SharpGLTF.Schema2;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -267,6 +268,29 @@ namespace Avalonia3D.Model
         {
             ResetSceneGraph(clearGlobalCaches: false);
             var importResult = Importer.ImportWithAnimations(gltfPath);
+            LastImportReport = new SceneImportReport(
+                importResult.Status,
+                importResult.Issues,
+                importResult.UnsupportedAnimationChannels,
+                importResult.AnimationChannelKinds);
+            SceneGraph = importResult.Graph;
+            AnimatorComponent.SetSceneGraph(SceneGraph);
+            foreach (var clip in importResult.Clips)
+            {
+                AnimatorComponent.RegisterClip(clip);
+            }
+
+            ReattachBehaviors();
+            BuildRenderResources();
+            LookChanged?.Invoke(this, _lookState);
+            return SceneGraph;
+        }
+
+        public SceneGraph LoadScene(ModelRoot modelRoot, string sourcePath)
+        {
+            _ = sourcePath;
+            ResetSceneGraph(clearGlobalCaches: false);
+            var importResult = Importer.ImportWithAnimations(modelRoot);
             LastImportReport = new SceneImportReport(
                 importResult.Status,
                 importResult.Issues,

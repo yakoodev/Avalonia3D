@@ -31,13 +31,27 @@ public sealed class SceneLoadService
 
     public event Action<ISandboxScene>? SceneChanged;
 
+    public string AssetsRoot => _assetsRoot;
+
     public void LoadNow(ISandboxScene sceneInfo)
+    {
+        LoadNow(sceneInfo, null, null);
+    }
+
+    public void LoadNow(ISandboxScene sceneInfo, object? preparedPayload, ISceneBackgroundPreparation? preparedScene)
     {
         _cameraPolicy.ApplyDefaults(_scene, sceneInfo);
 
         RegisterCacheAccess(sceneInfo);
 
-        sceneInfo.Load(_scene, _assetsRoot);
+        if (preparedPayload != null && preparedScene != null)
+        {
+            preparedScene.LoadPrepared(_scene, _assetsRoot, preparedPayload);
+        }
+        else
+        {
+            sceneInfo.Load(_scene, _assetsRoot);
+        }
 
         var loadOptions = sceneInfo is ISceneLoadOptionsProvider provider
             ? provider.LoadOptions
