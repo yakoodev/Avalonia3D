@@ -18,33 +18,28 @@ public sealed class HybridSceneImportResultCache : ISceneImportResultCache
     private readonly object _sync = new();
     private long _memoryUsedBytes;
 
-    public HybridSceneImportResultCache(long memoryBudgetBytes = 64 * 1024 * 1024, string? diskCachePath = null)
+    public HybridSceneImportResultCache(long memoryBudgetBytes = 16 * 1024 * 1024, string? diskCachePath = null)
     {
-        _memoryBudgetBytes = Math.Max(memoryBudgetBytes, 8 * 1024 * 1024);
+        _memoryBudgetBytes = Math.Max(memoryBudgetBytes, 4 * 1024 * 1024);
         _diskCachePath = diskCachePath ?? Path.Combine(Path.GetTempPath(), "Avalonia3D", "scene-import-cache");
         Directory.CreateDirectory(_diskCachePath);
     }
 
     public bool TryGet(string key, out SceneImportResult importResult)
     {
-        byte[]? payload = null;
-
         lock (_sync)
         {
             if (_memoryEntries.TryGetValue(key, out var inMemory))
             {
                 Touch(inMemory);
-
                 if (inMemory.ImportResult.TryGetTarget(out importResult!))
                 {
                     return true;
                 }
-
-                payload = inMemory.Payload;
             }
         }
 
-        payload ??= ReadDiskPayload(key);
+        var payload = ReadDiskPayload(key);
         if (payload == null)
         {
             importResult = default!;
@@ -54,7 +49,7 @@ public sealed class HybridSceneImportResultCache : ISceneImportResultCache
         try
         {
             importResult = BuildImportResult(payload);
-            UpsertMemoryEntry(key, payload, importResult);
+            UpsertMemoryEntry(key, importResult, payload.Length);
             return true;
         }
         catch (Exception ex)
@@ -67,9 +62,8 @@ public sealed class HybridSceneImportResultCache : ISceneImportResultCache
 
     public void Set(string key, SceneImportResult importResult, ReadOnlyMemory<byte> intermediatePayload)
     {
-        var payload = intermediatePayload.ToArray();
-        UpsertMemoryEntry(key, payload, importResult);
-        WriteDiskPayload(key, payload);
+        WriteDiskPayload(key, intermediatePayload.Span);
+        UpsertMemoryEntry(key, importResult, intermediatePayload.Length);
     }
 
     public void Invalidate(string key)
@@ -79,7 +73,7 @@ public sealed class HybridSceneImportResultCache : ISceneImportResultCache
             if (_memoryEntries.Remove(key, out var removed))
             {
                 _lru.Remove(removed.LruNode);
-                _memoryUsedBytes -= removed.Payload.Length;
+                _memoryUsedBytes -= removed.ApproximateSize;
             }
         }
 
@@ -110,16 +104,16 @@ public sealed class HybridSceneImportResultCache : ISceneImportResultCache
         }
     }
 
-    private void UpsertMemoryEntry(string key, byte[] payload, SceneImportResult importResult)
+    private void UpsertMemoryEntry(string key, SceneImportResult importResult, int approximateSize)
     {
-        if (payload.Length > _memoryBudgetBytes)
+        if (approximateSize <= 0 || approximateSize > _memoryBudgetBytes)
         {
             lock (_sync)
             {
-                if (_memoryEntries.Remove(key, out var oversized))
+                if (_memoryEntries.Remove(key, out var removed))
                 {
-                    _lru.Remove(oversized.LruNode);
-                    _memoryUsedBytes -= oversized.Payload.Length;
+                    _lru.Remove(removed.LruNode);
+                    _memoryUsedBytes -= removed.ApproximateSize;
                 }
             }
 
@@ -131,13 +125,13 @@ public sealed class HybridSceneImportResultCache : ISceneImportResultCache
             if (_memoryEntries.Remove(key, out var previous))
             {
                 _lru.Remove(previous.LruNode);
-                _memoryUsedBytes -= previous.Payload.Length;
+                _memoryUsedBytes -= previous.ApproximateSize;
             }
 
             var node = new LinkedListNode<string>(key);
             _lru.AddFirst(node);
-            _memoryEntries[key] = new MemoryEntry(payload, new WeakReference<SceneImportResult>(importResult), node);
-            _memoryUsedBytes += payload.Length;
+            _memoryEntries[key] = new MemoryEntry(new WeakReference<SceneImportResult>(importResult), node, approximateSize);
+            _memoryUsedBytes += approximateSize;
             TrimToBudget();
         }
     }
@@ -154,7 +148,7 @@ public sealed class HybridSceneImportResultCache : ISceneImportResultCache
                 continue;
             }
 
-            _memoryUsedBytes -= removed.Payload.Length;
+            _memoryUsedBytes -= removed.ApproximateSize;
         }
     }
 
@@ -189,13 +183,14 @@ public sealed class HybridSceneImportResultCache : ISceneImportResultCache
         }
     }
 
-    private void WriteDiskPayload(string key, byte[] payload)
+    private void WriteDiskPayload(string key, ReadOnlySpan<byte> payload)
     {
         var diskPath = GetDiskPath(key);
 
         try
         {
-            File.WriteAllBytes(diskPath, payload);
+            using var stream = new FileStream(diskPath, FileMode.Create, FileAccess.Write, FileShare.None);
+            stream.Write(payload);
         }
         catch (Exception ex)
         {
@@ -215,5 +210,5 @@ public sealed class HybridSceneImportResultCache : ISceneImportResultCache
         return Path.Combine(_diskCachePath, $"{hash}.glb");
     }
 
-    private sealed record MemoryEntry(byte[] Payload, WeakReference<SceneImportResult> ImportResult, LinkedListNode<string> LruNode);
+    private sealed record MemoryEntry(WeakReference<SceneImportResult> ImportResult, LinkedListNode<string> LruNode, int ApproximateSize);
 }
