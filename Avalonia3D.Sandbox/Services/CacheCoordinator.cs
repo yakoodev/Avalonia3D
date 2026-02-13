@@ -2,6 +2,10 @@ using System;
 
 namespace Avalonia3D.Sandbox.Services;
 
+/// <summary>
+/// Single entry point for cache invalidation across cache levels.
+/// Keep future cache orchestration changes centralized here.
+/// </summary>
 public sealed class CacheCoordinator
 {
     private static readonly object Sync = new();
