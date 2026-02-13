@@ -48,6 +48,8 @@ namespace Avalonia3D.Model
         private readonly Dictionary<ShaderRenderMode, string> _renderModeBindings = new();
         private readonly Queue<MeshObject> _pendingResourceBuildQueue = new();
         private const int ResourceBuildsPerFrameBudget = 2;
+        private const int InitialResourceBuildWarmupBudget = 48;
+        private bool _isResourceBuildWarmupPending;
 
         public SceneGraph SceneGraph { get; private set; } = new();
         public GltfSceneImporter Importer { get; } = new();
@@ -258,6 +260,7 @@ namespace Avalonia3D.Model
 
             SceneGraph.Clear();
             _pendingResourceBuildQueue.Clear();
+            _isResourceBuildWarmupPending = false;
 
             if (!clearGlobalCaches)
             {
@@ -316,6 +319,8 @@ namespace Avalonia3D.Model
                 return;
             }
 
+            _isResourceBuildWarmupPending = true;
+
             foreach (var obj in SceneGraph.RootObjects)
             {
                 BuildRenderResourcesRecursive(obj);
@@ -346,12 +351,20 @@ namespace Avalonia3D.Model
                 return;
             }
 
-            var remainingBudget = ResourceBuildsPerFrameBudget;
+            var remainingBudget = _isResourceBuildWarmupPending
+                ? InitialResourceBuildWarmupBudget
+                : ResourceBuildsPerFrameBudget;
+
             while (remainingBudget > 0 && _pendingResourceBuildQueue.Count > 0)
             {
                 var meshObject = _pendingResourceBuildQueue.Dequeue();
                 meshObject.BuildRenderResources(_resourceManager);
                 remainingBudget--;
+            }
+
+            if (_isResourceBuildWarmupPending)
+            {
+                _isResourceBuildWarmupPending = false;
             }
         }
 
