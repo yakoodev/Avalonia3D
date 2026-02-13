@@ -329,7 +329,7 @@ namespace Avalonia3D.Model
 
         private void BuildRenderResourcesRecursive(SceneObject obj)
         {
-            if (obj is MeshObject meshObject)
+            if (obj is MeshObject meshObject && meshObject.HasAssignedModel)
             {
                 _pendingResourceBuildQueue.Enqueue(meshObject);
             }
