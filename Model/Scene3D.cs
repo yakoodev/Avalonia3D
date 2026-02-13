@@ -48,7 +48,7 @@ namespace Avalonia3D.Model
         private readonly Dictionary<ShaderRenderMode, string> _renderModeBindings = new();
         private readonly Queue<MeshObject> _pendingResourceBuildQueue = new();
         private const int ResourceBuildsPerFrameBudget = 2;
-        private const int InitialResourceBuildWarmupBudget = 48;
+        private const int InitialResourceBuildWarmupBudget = 256;
         private bool _isResourceBuildWarmupPending;
 
         public SceneGraph SceneGraph { get; private set; } = new();
@@ -329,7 +329,7 @@ namespace Avalonia3D.Model
 
         private void BuildRenderResourcesRecursive(SceneObject obj)
         {
-            if (obj is MeshObject meshObject && meshObject.HasAssignedModel)
+            if (obj is MeshObject meshObject)
             {
                 _pendingResourceBuildQueue.Enqueue(meshObject);
             }
