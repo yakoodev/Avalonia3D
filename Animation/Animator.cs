@@ -23,6 +23,11 @@ namespace Avalonia3D.Animation
             return true;
         }       
 
+        public void Clear()
+        {
+            _animations.Clear();
+        }
+
         public void Update(float deltaTime)
         {
             for (int i = _animations.Count - 1; i >= 0; i--)

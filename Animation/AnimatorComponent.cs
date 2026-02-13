@@ -42,6 +42,14 @@ namespace Avalonia3D.Animation
             }
         }
 
+        public void ResetForScene(SceneGraph sceneGraph)
+        {
+            _sceneGraph = sceneGraph ?? throw new ArgumentNullException(nameof(sceneGraph));
+            _activePlayers.Clear();
+            _clips.Clear();
+            _animator.Clear();
+        }
+
         public void RegisterClip(AnimationClip clip)
         {
             if (clip == null || string.IsNullOrWhiteSpace(clip.Name))

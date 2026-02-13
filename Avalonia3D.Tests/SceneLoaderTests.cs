@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using Avalonia3D.Animation;
+using Avalonia3D.Loaders;
 using Avalonia3D.Model;
 using Avalonia3D.Sandbox.Scenes;
 using Avalonia3D.Sandbox.Services;
@@ -56,6 +58,20 @@ public sealed class SceneLoaderTests
         Assert.Equal(1, scheduler.EnqueueCalls);
         Assert.Equal(1, sample.LoadCallCount);
         Assert.Same(sample, changedTo);
+    }
+
+
+    [Fact]
+    public void Scene3D_LoadPrepared_ResetsAnimatorComponentClips()
+    {
+        var scene = new Scene3D();
+        scene.AnimatorComponent.RegisterClip(new AnimationClip("legacy"));
+        Assert.Contains("legacy", scene.AnimatorComponent.GetClipNames());
+
+        var result = new SceneImportResult(new SceneGraph(), [], SceneImportStatus.Success);
+        scene.LoadPrepared(result);
+
+        Assert.Empty(scene.AnimatorComponent.GetClipNames());
     }
 
     [Fact]
