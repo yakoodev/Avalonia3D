@@ -91,6 +91,26 @@ public sealed class RenderThreadSceneLoadOrchestrator : ISceneLoadService
                 var requestedVersion = Volatile.Read(ref _lastRequestedVersion);
                 object? preparedPayload = null;
 
+                var unloaded = new ManualResetEventSlim(false);
+                _renderThreadScheduler.Enqueue(() =>
+                {
+                    try
+                    {
+                        if (requestedVersion != Volatile.Read(ref _lastRequestedVersion))
+                        {
+                            return;
+                        }
+
+                        _inner.UnloadCurrentSceneForTransition();
+                    }
+                    finally
+                    {
+                        unloaded.Set();
+                    }
+                });
+
+                await Task.Run(() => unloaded.Wait()).ConfigureAwait(false);
+
                 if (scene is ISceneBackgroundPreparation preparable)
                 {
                     try

@@ -37,7 +37,7 @@ public sealed class SceneLoaderTests
         Assert.True(loaded);
         Assert.Equal(0, first.LoadCallCount);
         Assert.Equal(1, second.LoadCallCount);
-        Assert.Equal(1, scheduler.EnqueueCalls);
+        Assert.Equal(2, scheduler.EnqueueCalls);
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public sealed class SceneLoaderTests
         var changed = SpinWait.SpinUntil(() => changedTo == sample, TimeSpan.FromSeconds(2));
         Assert.True(loaded);
         Assert.True(changed);
-        Assert.Equal(1, scheduler.EnqueueCalls);
+        Assert.Equal(2, scheduler.EnqueueCalls);
         Assert.Equal(1, sample.LoadCallCount);
         Assert.Same(sample, changedTo);
     }
