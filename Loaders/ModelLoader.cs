@@ -1,6 +1,7 @@
 ﻿// File: ModelLoader.cs - Optimized Version
 using Avalonia3D.Model;
 using Avalonia3D.Loaders.Policies;
+using Avalonia3D.Memory;
 using Avalonia3D.Rendering;
 using Serilog;
 using SharpGLTF.Schema2;
@@ -23,6 +24,7 @@ namespace Avalonia3D.Loaders
     {
         private static readonly GltfMaterialExtensionsReader _materialExtensionsReader = new();
         private static readonly IMaterialImportPolicy _materialImportPolicy = new DefaultMaterialImportPolicy();
+        private static IMemoryPressurePolicy _memoryPressurePolicy = DefaultMemoryPressurePolicy.Instance;
 
         private static readonly Dictionary<string, Dictionary<(int MeshIndex, int PrimitiveIndex), int>> _materialIndexMapCache = new(StringComparer.OrdinalIgnoreCase);
         private const uint GlbMagic = 0x46546C67;
@@ -88,10 +90,18 @@ namespace Avalonia3D.Loaders
             }
         }
 
-        public static List<Model.Model> LoadModels(ModelRoot gltf, MaterialImportPolicyContext? policyContext = null)
+        public static void ConfigureMemoryPressurePolicy(IMemoryPressurePolicy? policy)
+        {
+            _memoryPressurePolicy = policy ?? DefaultMemoryPressurePolicy.Instance;
+        }
+
+        public static List<Model.Model> LoadModels(ModelRoot gltf, MaterialImportPolicyContext? policyContext = null, IMemoryPressurePolicy? memoryPressurePolicy = null)
         {
             var models = new List<Model.Model>();
             if (gltf == null) return models;
+
+            var pressurePolicy = memoryPressurePolicy ?? _memoryPressurePolicy;
+            pressurePolicy.NotifyActivity("ModelLoader.LoadModels:start");
 
             policyContext ??= new MaterialImportPolicyContext
             {
@@ -105,10 +115,7 @@ namespace Avalonia3D.Loaders
                     models.AddRange(LoadModelsForNode(node, policyContext));
                 }
 
-                // Принудительная сборка мусора после загрузки
-                GC.Collect(2, GCCollectionMode.Aggressive);
-                GC.WaitForPendingFinalizers();
-
+                pressurePolicy.OnImportCompleted("ModelLoader.LoadModels");
                 return models;
             }
             finally
@@ -976,9 +983,7 @@ namespace Avalonia3D.Loaders
                 _materialIndexMapCache.Clear();
             }
 
-            GC.Collect(2, GCCollectionMode.Aggressive);
-            GC.WaitForPendingFinalizers();
-            GC.Collect(2, GCCollectionMode.Aggressive);
+            _memoryPressurePolicy.OnMemoryPressure("ModelLoader.ClearAllCaches");
 
             Log.Information("All ModelLoader caches cleared");
         }

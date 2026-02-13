@@ -9,6 +9,7 @@ using SharpGLTF.Schema2;
 using SharpGLTF.Validation;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Numerics;
 using System.Text.Json.Nodes;
@@ -23,7 +24,8 @@ namespace Avalonia3D.Loaders
             SceneImportStatus status,
             IReadOnlyList<string>? issues = null,
             IReadOnlyList<UnsupportedAnimationChannelReport>? unsupportedAnimationChannels = null,
-            IReadOnlyList<AnimationChannelKindSummary>? animationChannelKinds = null)
+            IReadOnlyList<AnimationChannelKindSummary>? animationChannelKinds = null,
+            ImportPhaseTimings? phaseTimings = null)
         {
             Graph = graph;
             Clips = clips;
@@ -31,6 +33,7 @@ namespace Avalonia3D.Loaders
             Issues = issues ?? [];
             UnsupportedAnimationChannels = unsupportedAnimationChannels ?? [];
             AnimationChannelKinds = animationChannelKinds ?? [];
+            PhaseTimings = phaseTimings ?? new ImportPhaseTimings();
         }
 
         public SceneGraph Graph { get; }
@@ -39,7 +42,18 @@ namespace Avalonia3D.Loaders
         public IReadOnlyList<string> Issues { get; }
         public IReadOnlyList<UnsupportedAnimationChannelReport> UnsupportedAnimationChannels { get; }
         public IReadOnlyList<AnimationChannelKindSummary> AnimationChannelKinds { get; }
+        public ImportPhaseTimings PhaseTimings { get; }
         public bool IsDegraded => Status == SceneImportStatus.Degraded;
+    }
+
+
+    public sealed class ImportPhaseTimings
+    {
+        public TimeSpan Parse { get; init; }
+        public TimeSpan Decode { get; init; }
+        public TimeSpan BuildGpu { get; init; }
+
+        public TimeSpan Total => Parse + Decode + BuildGpu;
     }
 
     public enum UnsupportedAnimationChannelReason
@@ -77,7 +91,18 @@ namespace Avalonia3D.Loaders
     public class GltfSceneImporter
     {
         private readonly Dictionary<string, List<Model.Model>> _modelCache = new(StringComparer.OrdinalIgnoreCase);
+        private readonly IMemoryPressurePolicy _memoryPressurePolicy;
         public ImportValidationPolicy ValidationPolicy { get; set; } = ImportValidationPolicy.RelaxedWithWarnings;
+
+        public GltfSceneImporter() : this(DefaultMemoryPressurePolicy.Instance)
+        {
+        }
+
+        public GltfSceneImporter(IMemoryPressurePolicy memoryPressurePolicy)
+        {
+            _memoryPressurePolicy = memoryPressurePolicy ?? DefaultMemoryPressurePolicy.Instance;
+            ModelLoader.ConfigureMemoryPressurePolicy(_memoryPressurePolicy);
+        }
 
         public SceneGraph Import(string gltfPath)
         {
@@ -96,6 +121,7 @@ namespace Avalonia3D.Loaders
                 throw new FileNotFoundException($"Model file not found: {gltfPath}");
             }
 
+            _memoryPressurePolicy.NotifyActivity("GltfSceneImporter.ImportWithAnimations(path):start");
             Log.Information($"Loading GLTF scene: {gltfPath}");
             MemoryManager.LogMemoryState("Before GLTF load");
 
@@ -107,10 +133,13 @@ namespace Avalonia3D.Loaders
 
             try
             {
+                var parseWatch = Stopwatch.StartNew();
                 var loaded = LoadModelRoot(gltfPath, ValidationPolicy);
+                parseWatch.Stop();
+
                 var importResult = loaded.Model != null
-                    ? ImportWithAnimations(loaded.Model)
-                    : new SceneImportResult(new SceneGraph(), [], SceneImportStatus.Success);
+                    ? ImportWithAnimations(loaded.Model, parseWatch.Elapsed)
+                    : new SceneImportResult(new SceneGraph(), [], SceneImportStatus.Success, phaseTimings: new ImportPhaseTimings { Parse = parseWatch.Elapsed });
 
                 return new SceneImportResult(
                     importResult.Graph,
@@ -118,7 +147,8 @@ namespace Avalonia3D.Loaders
                     loaded.Status,
                     loaded.Issues,
                     importResult.UnsupportedAnimationChannels,
-                    importResult.AnimationChannelKinds);
+                    importResult.AnimationChannelKinds,
+                    importResult.PhaseTimings);
             }
             finally
             {
@@ -235,9 +265,11 @@ namespace Avalonia3D.Loaders
             return ImportWithAnimations(gltf).Graph;
         }
 
-        public SceneImportResult ImportWithAnimations(ModelRoot gltf)
+        public SceneImportResult ImportWithAnimations(ModelRoot gltf, TimeSpan? parseDuration = null)
         {
+            _memoryPressurePolicy.NotifyActivity("GltfSceneImporter.ImportWithAnimations(model):start");
             var graph = new SceneGraph();
+            var decodeWatch = Stopwatch.StartNew();
             var policyContext = new MaterialImportPolicyContext
             {
                 AlphaProfile = MaterialAlphaImportConfiguration.CurrentProfile
@@ -245,10 +277,11 @@ namespace Avalonia3D.Loaders
 
             if (gltf == null)
             {
-                return new SceneImportResult(graph, [], SceneImportStatus.Success);
+                return new SceneImportResult(graph, [], SceneImportStatus.Success, phaseTimings: new ImportPhaseTimings { Parse = parseDuration ?? TimeSpan.Zero });
             }
 
             var nodeKeys = new Dictionary<Node, string>();
+            var buildGpu = TimeSpan.Zero;
             var scenes = gltf.LogicalScenes;
             if (scenes.Count > 0)
             {
@@ -256,7 +289,10 @@ namespace Avalonia3D.Loaders
                 {
                     foreach (var root in scene.VisualChildren)
                     {
+                        var buildWatch = Stopwatch.StartNew();
                         BuildNode(graph, null, root, nodeKeys, policyContext);
+                        buildWatch.Stop();
+                        buildGpu += buildWatch.Elapsed;
                     }
                 }
             }
@@ -264,21 +300,37 @@ namespace Avalonia3D.Loaders
             {
                 foreach (var node in gltf.LogicalNodes)
                 {
+                    var buildWatch = Stopwatch.StartNew();
                     BuildNode(graph, null, node, nodeKeys, policyContext);
+                    buildWatch.Stop();
+                    buildGpu += buildWatch.Elapsed;
                 }
             }
 
             var materialTargetMap = BuildMaterialTargetMap(gltf, nodeKeys);
             var (clips, unsupportedChannels, channelKindSummary) = ExtractAnimationClips(gltf, nodeKeys, materialTargetMap);
 
-            MemoryManager.PerformAggressiveCleanup();
+            decodeWatch.Stop();
+            _memoryPressurePolicy.OnImportCompleted("GltfSceneImporter.ImportWithAnimations(ModelRoot)");
             MemoryManager.LogMemoryState("After GLTF load");
+
+            var timings = new ImportPhaseTimings
+            {
+                Parse = parseDuration ?? TimeSpan.Zero,
+                Decode = decodeWatch.Elapsed - buildGpu,
+                BuildGpu = buildGpu
+            };
+
+            Log.Information("Import timings: parse={ParseMs:F1}ms decode={DecodeMs:F1}ms buildGPU={BuildGpuMs:F1}ms total={TotalMs:F1}ms",
+                timings.Parse.TotalMilliseconds, timings.Decode.TotalMilliseconds, timings.BuildGpu.TotalMilliseconds, timings.Total.TotalMilliseconds);
+
             return new SceneImportResult(
                 graph,
                 clips,
                 SceneImportStatus.Success,
                 unsupportedAnimationChannels: unsupportedChannels,
-                animationChannelKinds: channelKindSummary);
+                animationChannelKinds: channelKindSummary,
+                phaseTimings: timings);
         }
 
         private sealed record ModelLoadOutcome(ModelRoot? Model, SceneImportStatus Status, IReadOnlyList<string> Issues);
@@ -300,6 +352,7 @@ namespace Avalonia3D.Loaders
                 throw new FileNotFoundException($"Model file not found: {gltfPath}");
             }
 
+            _memoryPressurePolicy.NotifyActivity("GltfSceneImporter.ImportInto:start");
             var models = LoadModelsForPath(gltfPath);
             foreach (var model in models)
             {
@@ -307,7 +360,7 @@ namespace Avalonia3D.Loaders
                 target.Add(meshObject);
             }
 
-            MemoryManager.PerformAggressiveCleanup();
+            _memoryPressurePolicy.OnImportCompleted("GltfSceneImporter.ImportInto");
         }
 
         private MeshGroup BuildNode(SceneGraph graph, MeshGroup? parent, Node node, Dictionary<Node, string> nodeKeys, MaterialImportPolicyContext policyContext)
@@ -834,7 +887,7 @@ namespace Avalonia3D.Loaders
                     SceneOverride = sceneOverride
                 };
 
-                models = ModelLoader.LoadModels(gltf, policyContext);
+                models = ModelLoader.LoadModels(gltf, policyContext, _memoryPressurePolicy);
                 _modelCache[gltfPath] = models;
             }
 

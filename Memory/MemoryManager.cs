@@ -2,7 +2,6 @@
 using Avalonia3D.Rendering;
 using Serilog;
 using System;
-using System.Buffers;
 using System.Runtime;
 using System.Threading;
 
@@ -22,8 +21,16 @@ namespace Avalonia3D.Memory
             public static TimeSpan MaxCacheEntryAge { get; set; } = TimeSpan.FromMinutes(10);
             public static int MaxTextureDimension { get; set; } = 512;
             public static long MaxTotalMemoryMB { get; set; } = 500; // 500 MB лимит
-            public static bool AggressiveGC { get; set; } = true;
+            public static bool AggressiveGC { get; set; } = false;
+            public static TimeSpan CleanupCooldown { get; set; } = TimeSpan.FromSeconds(30);
+            public static TimeSpan IdleThreshold { get; set; } = TimeSpan.FromSeconds(15);
+            public static double HighPressureFactor { get; set; } = 1.15;
         }
+
+        private static DateTime _lastCleanupUtc = DateTime.MinValue;
+        private static DateTime _lastActivityUtc = DateTime.MinValue;
+        private static Timer? _deferredCleanupTimer;
+        private static string? _deferredCleanupSource;
 
         public static void Initialize(RenderResourceManager resourceManager)
         {
@@ -41,6 +48,7 @@ namespace Avalonia3D.Memory
                     Settings.CacheCleanupInterval,
                     Settings.CacheCleanupInterval);
 
+                _lastActivityUtc = DateTime.UtcNow;
                 _isInitialized = true;
                 LogMemoryState("MemoryManager Initialized");
             }
@@ -53,10 +61,13 @@ namespace Avalonia3D.Memory
                 _cleanupTimer?.Dispose();
                 _cleanupTimer = null;
 
+                _deferredCleanupTimer?.Dispose();
+                _deferredCleanupTimer = null;
+                _deferredCleanupSource = null;
+
                 _resourceManager?.ClearAll();
 
-                // Финальная очистка
-                PerformAggressiveCleanup();
+                PerformSoftCleanup("shutdown");
                 _resourceManager = null;
                 _isInitialized = false;
             }
@@ -74,8 +85,7 @@ namespace Avalonia3D.Memory
 
                 if (currentMemoryMB > Settings.MaxTotalMemoryMB)
                 {
-                     Log.Information($"Memory usage too high: {currentMemoryMB:F2} MB, performing cleanup...");
-                    PerformAggressiveCleanup();
+                    RequestMemoryPressureCleanup("timer-threshold", requireIdle: true, allowGen2: true);
                 }
 
                 // Регулярная сборка мусора для поколения 0
@@ -90,31 +100,80 @@ namespace Avalonia3D.Memory
             }
         }
 
-        public static void PerformAggressiveCleanup()
+        public static bool RequestMemoryPressureCleanup(string source, bool requireIdle = true, bool allowGen2 = false, DateTime? nowUtc = null)
         {
-             Log.Information("Performing aggressive memory cleanup...");
+            var now = nowUtc ?? DateTime.UtcNow;
+
+            var sinceCleanup = now - _lastCleanupUtc;
+            if (sinceCleanup < Settings.CleanupCooldown)
+            {
+                Log.Debug("Skipping cleanup from {Source}: cooldown {CooldownMs}ms not elapsed.", source, Settings.CleanupCooldown.TotalMilliseconds);
+                return false;
+            }
+
+            if (requireIdle && Settings.IdleThreshold > TimeSpan.Zero)
+            {
+                var idleTime = now - _lastActivityUtc;
+                if (idleTime < Settings.IdleThreshold)
+                {
+                    ScheduleDeferredCleanup(source, Settings.IdleThreshold - idleTime, allowGen2);
+                    Log.Debug("Deferred cleanup from {Source}: idle threshold not reached yet.", source);
+                    return false;
+                }
+            }
+
+            PerformSoftCleanup(source, allowGen2);
+            return true;
+        }
+
+        public static void MarkActivity(DateTime? activityUtc = null)
+        {
+            _lastActivityUtc = activityUtc ?? DateTime.UtcNow;
+        }
+
+        public static void PerformSoftCleanup(string source, bool allowGen2 = false)
+        {
+            Log.Information("Performing soft memory cleanup ({Source})...", source);
 
             var beforeMB = GC.GetTotalMemory(false) / 1024.0 / 1024.0;
 
-            // Принудительная очистка ArrayPool'ов
-            ArrayPool<byte>.Shared.Return(ArrayPool<byte>.Shared.Rent(1), true);
-            ArrayPool<ushort>.Shared.Return(ArrayPool<ushort>.Shared.Rent(1), true);
+            GC.Collect(0, GCCollectionMode.Optimized);
+            GC.Collect(1, GCCollectionMode.Optimized);
 
-            // Агрессивная сборка мусора
-            for (int i = 0; i < 3; i++)
+            var highPressureThreshold = Settings.MaxTotalMemoryMB * Settings.HighPressureFactor;
+            if (allowGen2 || beforeMB > highPressureThreshold)
             {
-                GC.Collect(2, GCCollectionMode.Aggressive);
-                GC.WaitForPendingFinalizers();
+                if (beforeMB > highPressureThreshold)
+                {
+                    GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+                }
+
+                GC.Collect(2, GCCollectionMode.Optimized, blocking: false, compacting: beforeMB > highPressureThreshold);
             }
 
-            // Компактификация Large Object Heap если доступна
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect(2, GCCollectionMode.Aggressive);
-
-            var afterMB = GC.GetTotalMemory(true) / 1024.0 / 1024.0;
+            var afterMB = GC.GetTotalMemory(false) / 1024.0 / 1024.0;
             var freedMB = beforeMB - afterMB;
+            _lastCleanupUtc = DateTime.UtcNow;
 
-             Log.Information($"Memory cleanup complete: {freedMB:F2} MB freed ({beforeMB:F2} -> {afterMB:F2} MB)");
+            Log.Information("Soft memory cleanup complete: {FreedMb:F2} MB freed ({BeforeMb:F2} -> {AfterMb:F2} MB)", freedMB, beforeMB, afterMB);
+        }
+
+        private static void ScheduleDeferredCleanup(string source, TimeSpan delay, bool allowGen2)
+        {
+            var due = delay < TimeSpan.Zero ? TimeSpan.Zero : delay;
+            lock (_lock)
+            {
+                _deferredCleanupSource = source;
+                _deferredCleanupTimer ??= new Timer(DeferredCleanupCallback, allowGen2, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+                _deferredCleanupTimer.Change(due, Timeout.InfiniteTimeSpan);
+            }
+        }
+
+        private static void DeferredCleanupCallback(object? state)
+        {
+            var allowGen2 = state is bool b && b;
+            var source = _deferredCleanupSource ?? "deferred";
+            RequestMemoryPressureCleanup($"{source}:deferred", requireIdle: true, allowGen2: allowGen2);
         }
 
         public static void LogMemoryState(string context = "")
@@ -183,15 +242,13 @@ namespace Avalonia3D.Memory
         // Методы для оптимизации конкретных операций
         public static void OptimizeForLargeModel()
         {
-            // Подготовка к загрузке большой модели
-            GC.Collect(2, GCCollectionMode.Aggressive);
-            GC.WaitForPendingFinalizers();
+            MarkActivity();
 
             // Устанавливаем более консервативные настройки
             var oldMaxDim = Settings.MaxTextureDimension;
             Settings.MaxTextureDimension = Math.Min(oldMaxDim, 256);
 
-             Log.Information("Optimized settings for large model loading");
+            Log.Information("Optimized settings for large model loading");
         }
 
         public static void RestoreNormalSettings()
