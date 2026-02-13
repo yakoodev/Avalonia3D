@@ -54,7 +54,9 @@ public sealed class SceneLoaderTests
         orchestrator.Load(sample);
 
         var loaded = SpinWait.SpinUntil(() => sample.LoadCallCount == 1, TimeSpan.FromSeconds(2));
+        var changed = SpinWait.SpinUntil(() => changedTo == sample, TimeSpan.FromSeconds(2));
         Assert.True(loaded);
+        Assert.True(changed);
         Assert.Equal(1, scheduler.EnqueueCalls);
         Assert.Equal(1, sample.LoadCallCount);
         Assert.Same(sample, changedTo);
