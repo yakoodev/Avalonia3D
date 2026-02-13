@@ -9,6 +9,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
+using SixLabors.ImageSharp.Processing.Processors.Transforms;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -17,6 +18,7 @@ using System.Text;
 using System.Text.Json;
 using System.Numerics;
 using System.Runtime;
+using System.Security.Cryptography;
 
 namespace Avalonia3D.Loaders
 {
@@ -27,6 +29,8 @@ namespace Avalonia3D.Loaders
         private static IMemoryPressurePolicy _memoryPressurePolicy = DefaultMemoryPressurePolicy.Instance;
 
         private static readonly Dictionary<string, Dictionary<(int MeshIndex, int PrimitiveIndex), int>> _materialIndexMapCache = new(StringComparer.OrdinalIgnoreCase);
+        private static readonly LruTextureDecodeCache _textureDecodeCache = new();
+        private static ITextureDecodePolicy _textureDecodePolicy = TextureDecodePolicies.Balanced;
         private const uint GlbMagic = 0x46546C67;
         private const uint JsonChunkType = 0x4E4F534A;
 
@@ -38,14 +42,13 @@ namespace Avalonia3D.Loaders
             return v + i + t;
         }
 
-        private static TextureData LoadTextureFromImage(byte[] imageData, int maxDimension = 1024) // Уменьшен размер по умолчанию
+        private static TextureData? LoadTextureFromImage(ReadOnlyMemory<byte> imageData, int maxDimension, TextureDecodeMode samplerMode)
         {
-            if (imageData == null || imageData.Length == 0) return null;
+            if (imageData.IsEmpty) return null;
 
             try
             {
-                using var ms = new MemoryStream(imageData);
-                using var image = SixLabors.ImageSharp.Image.Load<Rgba32>(ms);
+                using var image = SixLabors.ImageSharp.Image.Load<Rgba32>(imageData.Span);
 
                 // Более агрессивный ресайз
                 int w = image.Width;
@@ -58,12 +61,11 @@ namespace Avalonia3D.Loaders
                     int newW = Math.Max(4, (int)(w * ratio)); // Минимум 4x4
                     int newH = Math.Max(4, (int)(h * ratio));
 
-                    // Используем более качественный алгоритм ресайза
                     image.Mutate(x => x.Resize(new ResizeOptions
                     {
                         Size = new Size(newW, newH),
                         Mode = ResizeMode.Max,
-                        Sampler = KnownResamplers.Lanczos3 // Лучшее качество
+                        Sampler = _textureDecodePolicy.GetResamplerFor(samplerMode)
                     }));
                     w = newW;
                     h = newH;
@@ -93,6 +95,11 @@ namespace Avalonia3D.Loaders
         public static void ConfigureMemoryPressurePolicy(IMemoryPressurePolicy? policy)
         {
             _memoryPressurePolicy = policy ?? DefaultMemoryPressurePolicy.Instance;
+        }
+
+        public static void ConfigureTextureDecodePolicy(ITextureDecodePolicy? policy)
+        {
+            _textureDecodePolicy = policy ?? TextureDecodePolicies.Balanced;
         }
 
         public static List<Model.Model> LoadModels(ModelRoot gltf, MaterialImportPolicyContext? policyContext = null, IMemoryPressurePolicy? memoryPressurePolicy = null)
@@ -194,9 +201,20 @@ namespace Avalonia3D.Loaders
             }
 
             // Индексы
-            uint[] indices = indicesAccessor?.AsIndicesArray()
-                .Select(idx => (uint)idx)
-                .ToArray() ?? Array.Empty<uint>();
+            uint[] indices;
+            if (indicesAccessor == null)
+            {
+                indices = Array.Empty<uint>();
+            }
+            else
+            {
+                var sourceIndices = indicesAccessor.AsIndicesArray();
+                indices = new uint[sourceIndices.Count];
+                for (var i = 0; i < sourceIndices.Count; i++)
+                {
+                    indices[i] = (uint)sourceIndices[i];
+                }
+            }
 
             var resolvedMaterial = ResolvePrimitiveMaterial(prim, policyContext?.AssetPath);
 
@@ -792,8 +810,96 @@ namespace Avalonia3D.Loaders
 
         private static TextureData? LoadTextureFromImage(SharpGLTF.Schema2.Image image)
         {
-            var texBytes = image.Content.Content.ToArray();
-            return LoadTextureFromImage(texBytes);
+            var maxDimension = Math.Max(4, MemoryManager.Settings.MaxTextureDimension);
+            var samplerMode = _textureDecodePolicy.Mode;
+            var cacheKey = BuildTextureCacheKey(image, maxDimension, samplerMode);
+
+            if (_textureDecodeCache.TryGet(cacheKey, out var cached))
+            {
+                return CloneTextureData(cached);
+            }
+
+            var content = image.Content.Content;
+            if (content.IsEmpty)
+            {
+                return null;
+            }
+
+            PersistOriginalTextureBytes(cacheKey.SourceIdentity, content);
+
+            var decoded = LoadTextureFromImage(content, maxDimension, samplerMode);
+            if (decoded == null)
+            {
+                return null;
+            }
+
+            _textureDecodeCache.Set(cacheKey, decoded, MemoryManager.Settings.MaxDecodedTextureCacheMemoryMB * 1024L * 1024L);
+            return CloneTextureData(decoded);
+        }
+
+        private static TextureData CloneTextureData(TextureData source)
+        {
+            var dataCopy = new byte[source.Data.Length];
+            source.Data.AsSpan().CopyTo(dataCopy);
+
+            return new TextureData
+            {
+                Width = source.Width,
+                Height = source.Height,
+                Data = dataCopy,
+                DataIsPooled = false
+            };
+        }
+
+        private static DecodedTextureCacheKey BuildTextureCacheKey(SharpGLTF.Schema2.Image image, int targetDimension, TextureDecodeMode samplerMode)
+        {
+            var uri = TryGetImageIdentity(image);
+            if (!string.IsNullOrWhiteSpace(uri))
+            {
+                return new DecodedTextureCacheKey(uri, targetDimension, samplerMode);
+            }
+
+            var hash = Convert.ToHexString(SHA256.HashData(image.Content.Content.Span));
+            return new DecodedTextureCacheKey(hash, targetDimension, samplerMode);
+        }
+
+
+        private static string? TryGetImageIdentity(SharpGLTF.Schema2.Image image)
+        {
+            var uriProperty = image.GetType().GetProperty("Uri")
+                ?? image.GetType().GetProperty("Name")
+                ?? image.GetType().GetProperty("LogicalIndex");
+
+            return uriProperty?.GetValue(image)?.ToString();
+        }
+
+        private static void PersistOriginalTextureBytes(string sourceIdentity, ReadOnlyMemory<byte> sourceData)
+        {
+            var cacheRoot = Path.Combine(Path.GetTempPath(), "Avalonia3D", "asset-cache", "textures");
+            Directory.CreateDirectory(cacheRoot);
+
+            var fileName = $"{SanitizeFileName(sourceIdentity)}.bin";
+            var fullPath = Path.Combine(cacheRoot, fileName);
+            if (File.Exists(fullPath))
+            {
+                return;
+            }
+
+            using var stream = File.Create(fullPath);
+            stream.Write(sourceData.Span);
+        }
+
+        private static string SanitizeFileName(string value)
+        {
+            var invalid = Path.GetInvalidFileNameChars();
+            var sb = new StringBuilder(value.Length);
+            foreach (var c in value)
+            {
+                sb.Append(Array.IndexOf(invalid, c) >= 0 ? '_' : c);
+            }
+
+            var candidate = sb.ToString();
+            return candidate.Length <= 80 ? candidate : candidate.Substring(0, 80);
         }
 
         private static Vector4 GetChannelColor(MaterialChannel? channel, Vector4 fallback)
@@ -962,7 +1068,7 @@ namespace Avalonia3D.Loaders
 
         private static void CleanupTextureCache()
         {
-            // no-op: CPU texture cache removed to avoid excessive RAM usage
+            _textureDecodeCache.TrimToSize(MemoryManager.Settings.MaxDecodedTextureCacheMemoryMB * 1024L * 1024L);
         }
 
         internal static int MaterialIndexMapCacheCount
@@ -983,9 +1089,95 @@ namespace Avalonia3D.Loaders
                 _materialIndexMapCache.Clear();
             }
 
+            _textureDecodeCache.Clear();
+
             _memoryPressurePolicy.OnMemoryPressure("ModelLoader.ClearAllCaches");
 
             Log.Information("All ModelLoader caches cleared");
+        }
+
+        private readonly record struct DecodedTextureCacheKey(string SourceIdentity, int TargetDimension, TextureDecodeMode SamplerMode);
+
+        private sealed class LruTextureDecodeCache
+        {
+            private sealed class Entry
+            {
+                public required DecodedTextureCacheKey Key;
+                public required TextureData Texture;
+                public required long SizeBytes;
+            }
+
+            private readonly Dictionary<DecodedTextureCacheKey, LinkedListNode<Entry>> _map = new();
+            private readonly LinkedList<Entry> _lru = new();
+            private readonly object _sync = new();
+            private long _currentSizeBytes;
+
+            public bool TryGet(DecodedTextureCacheKey key, out TextureData texture)
+            {
+                lock (_sync)
+                {
+                    if (!_map.TryGetValue(key, out var node))
+                    {
+                        texture = null!;
+                        return false;
+                    }
+
+                    _lru.Remove(node);
+                    _lru.AddFirst(node);
+                    texture = node.Value.Texture;
+                    return true;
+                }
+            }
+
+            public void Set(DecodedTextureCacheKey key, TextureData texture, long maxSizeBytes)
+            {
+                lock (_sync)
+                {
+                    if (_map.TryGetValue(key, out var existing))
+                    {
+                        _currentSizeBytes -= existing.Value.SizeBytes;
+                        _lru.Remove(existing);
+                        _map.Remove(key);
+                    }
+
+                    var size = texture.Data?.LongLength ?? 0;
+                    var entry = new Entry { Key = key, Texture = texture, SizeBytes = size };
+                    var node = new LinkedListNode<Entry>(entry);
+                    _lru.AddFirst(node);
+                    _map[key] = node;
+                    _currentSizeBytes += size;
+
+                    TrimInternal(maxSizeBytes);
+                }
+            }
+
+            public void TrimToSize(long maxSizeBytes)
+            {
+                lock (_sync)
+                {
+                    TrimInternal(maxSizeBytes);
+                }
+            }
+
+            public void Clear()
+            {
+                lock (_sync)
+                {
+                    _map.Clear();
+                    _lru.Clear();
+                    _currentSizeBytes = 0;
+                }
+            }
+
+            private void TrimInternal(long maxSizeBytes)
+            {
+                while (_currentSizeBytes > maxSizeBytes && _lru.Last is { } tail)
+                {
+                    _lru.RemoveLast();
+                    _map.Remove(tail.Value.Key);
+                    _currentSizeBytes -= tail.Value.SizeBytes;
+                }
+            }
         }
     }
 }
