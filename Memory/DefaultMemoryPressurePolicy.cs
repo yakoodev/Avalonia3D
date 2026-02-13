@@ -17,12 +17,12 @@ namespace Avalonia3D.Memory
 
         public void OnMemoryPressure(string source)
         {
-            MemoryManager.RequestMemoryPressureCleanup(source);
+            MemoryManager.RequestMemoryPressureCleanup(source, requireIdle: true, allowGen2: true);
         }
 
         public void OnImportCompleted(string source)
         {
-            MemoryManager.RequestMemoryPressureCleanup($"{source}:import-complete");
+            MemoryManager.RequestMemoryPressureCleanup($"{source}:import-complete", requireIdle: false, allowGen2: false);
         }
     }
 }
