@@ -46,10 +46,6 @@ namespace Avalonia3D.Model
 
         private RenderResourceManager? _resourceManager;
         private readonly Dictionary<ShaderRenderMode, string> _renderModeBindings = new();
-        private readonly Queue<MeshObject> _pendingResourceBuildQueue = new();
-        private const int ResourceBuildsPerFrameBudget = 12;
-        private const int InitialResourceBuildWarmupBudget = 64;
-        private bool _isResourceBuildWarmupPending;
         private bool _buildResourcesAfterInitPending;
 
         public SceneGraph SceneGraph { get; private set; } = new();
@@ -231,7 +227,6 @@ namespace Avalonia3D.Model
         public void Render(IRenderContext context)
         {
             UpdateFrame();
-            ProcessPendingResourceBuilds();
             foreach (var obj in SceneGraph.RootObjects)
             {
                 if (obj.IsVisible)
@@ -266,8 +261,6 @@ namespace Avalonia3D.Model
             }
 
             SceneGraph.Clear();
-            _pendingResourceBuildQueue.Clear();
-            _isResourceBuildWarmupPending = false;
             _buildResourcesAfterInitPending = false;
 
             if (!clearGlobalCaches)
@@ -330,9 +323,6 @@ namespace Avalonia3D.Model
                 return;
             }
 
-            _pendingResourceBuildQueue.Clear();
-            _isResourceBuildWarmupPending = true;
-
             foreach (var obj in SceneGraph.RootObjects)
             {
                 BuildRenderResourcesRecursive(obj);
@@ -347,47 +337,12 @@ namespace Avalonia3D.Model
                 {
                     BuildRenderResourcesRecursive(child);
                 }
-
-                // Группы без собственной геометрии не должны съедать стартовый бюджет,
-                // иначе сцены с большим количеством узлов долго остаются "пустыми".
-                if (!meshGroup.HasAssignedModel)
-                {
-                    return;
-                }
             }
 
-            if (obj is MeshObject meshObject)
+            if (obj is MeshObject meshObject && meshObject.HasAssignedModel && _resourceManager != null)
             {
-                _pendingResourceBuildQueue.Enqueue(meshObject);
-            }
-        }
-
-
-        private void ProcessPendingResourceBuilds()
-        {
-            if (_resourceManager == null || _pendingResourceBuildQueue.Count == 0)
-            {
-                return;
-            }
-
-            var budget = _isResourceBuildWarmupPending
-                ? InitialResourceBuildWarmupBudget
-                : ResourceBuildsPerFrameBudget;
-
-            while (budget > 0 && _pendingResourceBuildQueue.Count > 0)
-            {
-                var meshObject = _pendingResourceBuildQueue.Dequeue();
-                // Не тратим бюджет на контейнеры без модели.
-                if (!meshObject.HasAssignedModel)
-                {
-                    continue;
-                }
-
                 meshObject.BuildRenderResources(_resourceManager);
-                budget--;
             }
-
-            _isResourceBuildWarmupPending = false;
         }
 
         private void ReattachBehaviors()
