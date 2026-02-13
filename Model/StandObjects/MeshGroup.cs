@@ -49,11 +49,13 @@ namespace Avalonia3D.Model.StandObjects
         /// </summary>
         public override void Render(IRenderContext context)
         {
+            // Если у группы есть собственная геометрия/ресурсы — рендерим её тоже.
+            base.Render(context);
+
             foreach (var child in _children)
             {
                 if (child.IsVisible)
                 {
-                  
                     child.BaseColor = BaseColor;
                     child.EmissionColor = EmissionColor;
                     child.Render(context);

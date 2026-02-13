@@ -1,14 +1,17 @@
 using Avalonia3D.Lights;
+using Avalonia3D.Loaders;
+using Avalonia3D.Loaders.Policies;
 using Avalonia3D.Model;
 using Avalonia3D.Sandbox.Services;
 using Serilog;
 using System;
 using System.IO;
 using System.Numerics;
+using SharpGLTF.Schema2;
 
 namespace Avalonia3D.Sandbox.Scenes;
 
-public sealed class GltfFileScene : ISandboxScene, ISceneAssetCacheKeyProvider
+public sealed class GltfFileScene : ISandboxScene, ISceneAssetCacheKeyProvider, ISceneBackgroundPreparation
 {
     private readonly string _relativePath;
 
@@ -56,6 +59,51 @@ public sealed class GltfFileScene : ISandboxScene, ISceneAssetCacheKeyProvider
         return $"gltf:{relative}:ticks={fileInfo.LastWriteTimeUtc.Ticks}:len={fileInfo.Length}";
     }
 
+
+    public object Prepare(string assetsRoot)
+    {
+        var path = Path.Combine(assetsRoot, _relativePath);
+        var modelRoot = ModelRoot.Load(path);
+        var importer = new GltfSceneImporter
+        {
+            ValidationPolicy = ImportValidationConfiguration.CurrentPolicy
+        };
+
+        var importResult = importer.ImportWithAnimations(modelRoot);
+        return new PreparedGltfPayload(path, importResult);
+    }
+
+    public void LoadPrepared(Scene3D scene, string assetsRoot, object preparedPayload)
+    {
+        if (preparedPayload is not PreparedGltfPayload payload)
+        {
+            Load(scene, assetsRoot);
+            return;
+        }
+
+        Log.Information("Loading prepared GLTF scene from: {Path}", payload.Path);
+        GltfAssetDiagnostics.LogAssetStatus(payload.Path);
+        scene.LoadPrepared(payload.ImportResult);
+        GltfAssetDiagnostics.LogNodeIdConflicts(scene.SceneGraph, Path.GetFileName(payload.Path));
+        GltfAssetDiagnostics.LogAnimationChannelKinds(scene.LastImportReport, Path.GetFileName(payload.Path));
+
+        if (scene.Lights.Count == 0)
+        {
+            scene.Lights.Add(new Light
+            {
+                Position = new Vector3(0f, 8f, 10f),
+                Color = new Vector3(1f, 1f, 1f),
+                Intensity = 1.0f
+            });
+
+            scene.Lights.Add(new Light
+            {
+                Position = new Vector3(-8f, 5f, -6f),
+                Color = new Vector3(0.8f, 0.9f, 1f),
+                Intensity = 0.65f
+            });
+        }
+    }
     private static string NormalizeDirectory(string? directory)
     {
         if (string.IsNullOrWhiteSpace(directory))
@@ -93,4 +141,6 @@ public sealed class GltfFileScene : ISandboxScene, ISceneAssetCacheKeyProvider
             });
         }
     }
+
+    private sealed record PreparedGltfPayload(string Path, SceneImportResult ImportResult);
 }

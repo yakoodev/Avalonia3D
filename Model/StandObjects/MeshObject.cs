@@ -94,6 +94,7 @@ namespace Avalonia3D.Model.StandObjects
             _resources = resourceManager.Acquire(_model);
         }
 
+        public bool HasAssignedModel => _model != null;
         public Material? Material => _model?.Material;
         public RenderResources? Resources => _resources;
         public string MaterialKey => _model?.MaterialKey ?? string.Empty;

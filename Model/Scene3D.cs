@@ -8,6 +8,7 @@ using Avalonia3D.Model.StandObjects;
 using Avalonia3D.Model.Workflow;
 using Avalonia3D.Rendering;
 using Silk.NET.OpenGL;
+using SharpGLTF.Schema2;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -45,6 +46,7 @@ namespace Avalonia3D.Model
 
         private RenderResourceManager? _resourceManager;
         private readonly Dictionary<ShaderRenderMode, string> _renderModeBindings = new();
+        private bool _buildResourcesAfterInitPending;
 
         public SceneGraph SceneGraph { get; private set; } = new();
         public GltfSceneImporter Importer { get; } = new();
@@ -94,6 +96,12 @@ namespace Avalonia3D.Model
         {
             _resourceManager = new RenderResourceManager(gl);
             MemoryManager.Initialize(_resourceManager);
+
+            if (_buildResourcesAfterInitPending)
+            {
+                _buildResourcesAfterInitPending = false;
+                BuildRenderResources();
+            }
         }
 
 
@@ -253,6 +261,7 @@ namespace Avalonia3D.Model
             }
 
             SceneGraph.Clear();
+            _buildResourcesAfterInitPending = false;
 
             if (!clearGlobalCaches)
             {
@@ -263,10 +272,8 @@ namespace Avalonia3D.Model
             ModelLoader.ClearAllCaches();
         }
 
-        public SceneGraph LoadScene(string gltfPath)
+        private SceneGraph ApplyImportResult(SceneImportResult importResult)
         {
-            ResetSceneGraph(clearGlobalCaches: false);
-            var importResult = Importer.ImportWithAnimations(gltfPath);
             LastImportReport = new SceneImportReport(
                 importResult.Status,
                 importResult.Issues,
@@ -285,10 +292,34 @@ namespace Avalonia3D.Model
             return SceneGraph;
         }
 
+        public SceneGraph LoadScene(string gltfPath)
+        {
+            ResetSceneGraph(clearGlobalCaches: false);
+            var importResult = Importer.ImportWithAnimations(gltfPath);
+            return ApplyImportResult(importResult);
+        }
+
+        public SceneGraph LoadScene(ModelRoot modelRoot, string sourcePath)
+        {
+            _ = sourcePath;
+            ResetSceneGraph(clearGlobalCaches: false);
+            var importResult = Importer.ImportWithAnimations(modelRoot);
+            return ApplyImportResult(importResult);
+        }
+
+        public SceneGraph LoadPrepared(SceneImportResult importResult)
+        {
+            ResetSceneGraph(clearGlobalCaches: false);
+            return ApplyImportResult(importResult);
+        }
+
         internal void BuildRenderResources()
         {
             if (_resourceManager == null)
             {
+                // Сцена может быть загружена до инициализации GL-контекста.
+                // Запоминаем, что нужно достроить ресурсы при первом Init.
+                _buildResourcesAfterInitPending = true;
                 return;
             }
 
@@ -300,17 +331,17 @@ namespace Avalonia3D.Model
 
         private void BuildRenderResourcesRecursive(SceneObject obj)
         {
-            if (obj is MeshObject meshObject)
-            {
-                meshObject.BuildRenderResources(_resourceManager);
-            }
-
             if (obj is MeshGroup meshGroup)
             {
                 foreach (var child in meshGroup)
                 {
                     BuildRenderResourcesRecursive(child);
                 }
+            }
+
+            if (obj is MeshObject meshObject && meshObject.HasAssignedModel && _resourceManager != null)
+            {
+                meshObject.BuildRenderResources(_resourceManager);
             }
         }
 

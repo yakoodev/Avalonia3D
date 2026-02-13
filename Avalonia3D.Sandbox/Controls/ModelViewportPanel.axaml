@@ -1,0 +1,73 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:viewModels="clr-namespace:Avalonia3D.Sandbox.ViewModels"
+             mc:Ignorable="d"
+             x:Class="Avalonia3D.Sandbox.Controls.ModelViewportPanel"
+             x:DataType="viewModels:MainWindowViewModel">
+  <TabControl>
+    <TabItem Header="Сцены">
+      <ScrollViewer>
+        <StackPanel Spacing="10" Margin="0,8,0,0">
+          <TextBlock Text="Выберите тестовую сцену" Foreground="White" FontWeight="SemiBold" />
+          <ItemsControl ItemsSource="{Binding Scenes}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="viewModels:SceneItemViewModel">
+                <Border Background="#2D2D33" Padding="10" CornerRadius="8" Margin="0,0,0,8">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="{Binding Title}" FontWeight="Bold" Foreground="White" />
+                    <TextBlock Text="{Binding Description}" Foreground="#CFCFCF" TextWrapping="Wrap" />
+                    <WrapPanel Orientation="Horizontal" Margin="0,2,0,0">
+                      <Border Background="#3E4454" CornerRadius="12" Padding="8,2" Margin="0,0,6,4">
+                        <TextBlock Text="{Binding FileNameBadge}" Foreground="#EAF1FF" FontSize="11" />
+                      </Border>
+                      <Border Background="#2F4A3A" CornerRadius="12" Padding="8,2" Margin="0,0,6,4">
+                        <TextBlock Text="{Binding DirectoryBadge}" Foreground="#D5F7E1" FontSize="11" />
+                      </Border>
+                      <Border Background="#4D344D" CornerRadius="12" Padding="8,2" Margin="0,0,6,4">
+                        <TextBlock Text="{Binding ExtensionBadge}" Foreground="#F8D7FF" FontSize="11" />
+                      </Border>
+                    </WrapPanel>
+                    <Button Content="Открыть сцену" Command="{Binding LoadCommand}" HorizontalAlignment="Left" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <Separator />
+          <TextBlock Text="Статус загрузки" Foreground="White" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding LoadStatusText}" Foreground="#FFD36B" TextWrapping="Wrap" />
+          <ProgressBar IsIndeterminate="True" Height="6" IsVisible="{Binding IsLoading}" />
+          <TextBlock Text="{Binding CacheStatusText}" Foreground="#D0D0D0" TextWrapping="Wrap" />
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
+
+    <TabItem Header="Камера">
+      <ScrollViewer>
+        <StackPanel Spacing="10" Margin="0,8,0,0">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="Frame All" Command="{Binding FrameAllCommand}" />
+            <Button Content="Reset" Command="{Binding ResetViewCommand}" />
+            <Button Content="Toggle Mode" Command="{Binding ToggleCameraModeCommand}" />
+          </StackPanel>
+
+          <TextBlock Text="Текущий режим камеры:" Foreground="#D6D6D6" />
+          <TextBlock Text="{Binding CurrentCameraMode}" Foreground="White" FontWeight="SemiBold" />
+
+          <TextBlock Text="Preview камеры" Foreground="#D6D6D6" />
+          <TextBlock Text="{Binding CameraPreviewText}" Foreground="#D0D0D0" TextWrapping="Wrap" />
+
+          <TextBlock Text="Orbit sensitivity" Foreground="#D6D6D6" />
+          <Slider Minimum="0.001" Maximum="0.1" Value="{Binding OrbitSensitivity}" />
+          <TextBlock Text="Pan sensitivity" Foreground="#D6D6D6" />
+          <Slider Minimum="0.001" Maximum="0.1" Value="{Binding PanSensitivity}" />
+          <TextBlock Text="Dolly sensitivity" Foreground="#D6D6D6" />
+          <Slider Minimum="0.1" Maximum="10" Value="{Binding DollySensitivity}" />
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
+  </TabControl>
+</UserControl>
