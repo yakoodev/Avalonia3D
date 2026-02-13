@@ -46,6 +46,8 @@ namespace Avalonia3D.Model
 
         private RenderResourceManager? _resourceManager;
         private readonly Dictionary<ShaderRenderMode, string> _renderModeBindings = new();
+        private readonly Queue<MeshObject> _pendingResourceBuildQueue = new();
+        private const int ResourceBuildsPerFrameBudget = 2;
 
         public SceneGraph SceneGraph { get; private set; } = new();
         public GltfSceneImporter Importer { get; } = new();
@@ -220,6 +222,7 @@ namespace Avalonia3D.Model
         public void Render(IRenderContext context)
         {
             UpdateFrame();
+            ProcessPendingResourceBuilds();
             foreach (var obj in SceneGraph.RootObjects)
             {
                 if (obj.IsVisible)
@@ -254,6 +257,7 @@ namespace Avalonia3D.Model
             }
 
             SceneGraph.Clear();
+            _pendingResourceBuildQueue.Clear();
 
             if (!clearGlobalCaches)
             {
@@ -322,7 +326,7 @@ namespace Avalonia3D.Model
         {
             if (obj is MeshObject meshObject)
             {
-                meshObject.BuildRenderResources(_resourceManager);
+                _pendingResourceBuildQueue.Enqueue(meshObject);
             }
 
             if (obj is MeshGroup meshGroup)
@@ -331,6 +335,23 @@ namespace Avalonia3D.Model
                 {
                     BuildRenderResourcesRecursive(child);
                 }
+            }
+        }
+
+
+        private void ProcessPendingResourceBuilds()
+        {
+            if (_resourceManager == null || _pendingResourceBuildQueue.Count == 0)
+            {
+                return;
+            }
+
+            var remainingBudget = ResourceBuildsPerFrameBudget;
+            while (remainingBudget > 0 && _pendingResourceBuildQueue.Count > 0)
+            {
+                var meshObject = _pendingResourceBuildQueue.Dequeue();
+                meshObject.BuildRenderResources(_resourceManager);
+                remainingBudget--;
             }
         }
 
