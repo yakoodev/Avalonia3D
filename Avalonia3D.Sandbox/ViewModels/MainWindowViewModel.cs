@@ -829,12 +829,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             Name = "Custom"
         };
 
-        var validatedCurrent = _graphicsProfile.Validate();
         var validatedCandidate = candidate.Validate();
-        if (validatedCandidate.Equals(validatedCurrent))
-        {
-            return;
-        }
 
         _selectedQualityPreset = RenderQualityPreset.Custom;
         ApplyProfile(validatedCandidate, statusMessage);

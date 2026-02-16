@@ -163,7 +163,8 @@ public class PbrShaderSourceBuilderTests
         Assert.Contains("iblSpecular = reflection * max(specularColor, vec3(0.04))", fragmentSource);
         Assert.Contains("studioBase", fragmentSource);
         Assert.Contains("studioSpec", fragmentSource);
-        Assert.Contains("iblSpecular *= mix(1.0,1.4,metallic)", fragmentSource);
+        Assert.Contains("metallicMask = smoothstep(0.55,0.9,metallic)", fragmentSource);
+        Assert.Contains("iblSpecular *= metallicMask*mix(1.0,1.4,metallic)", fragmentSource);
         Assert.Contains("min((iblSpecular*mix(1.0,ao,0.2) + iblDiffuse*ao)", fragmentSource);
     }
     [Fact]
@@ -193,7 +194,8 @@ public class PbrShaderSourceBuilderTests
         Assert.Contains("metallicReflectionBoost", fragmentSource);
         Assert.Contains("reflection *= metallicReflectionBoost*(1.0-0.35*clamp(roughness,0.0,1.0))", fragmentSource);
         Assert.Contains("iblSpecular = reflection * max(specularColor, vec3(0.04))", fragmentSource);
-        Assert.Contains("iblSpecular *= mix(1.0,1.4,metallic)", fragmentSource);
+        Assert.Contains("metallicMask = smoothstep(0.55,0.9,metallic)", fragmentSource);
+        Assert.Contains("iblSpecular *= metallicMask*mix(1.0,1.4,metallic)", fragmentSource);
         Assert.Contains("iblComponent = min((iblSpecular*mix(1.0,ao,0.2) + iblDiffuse*ao)", fragmentSource);
     }
 
