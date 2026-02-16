@@ -210,6 +210,13 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
         public const float StrictDenseDeepMaskRatio = 0.15f;
         public const float BalancedDenseDeepMaskRatio = 0.20f;
         public const float PermissiveDenseDeepMaskRatio = 0.35f;
+        public const float NegligibleTransparencyRatio = 0.002f;
+        public const float NegligibleDeepTransparencyRatio = 0.0005f;
+        public const float NegligibleRegularTransparencyRatio = 0.001f;
+        public const float PredominantlyOpaqueRatio = 0.985f;
+        public const float PredominantlyOpaqueSoftTransparentCeiling = 0.03f;
+        public const float PredominantlyOpaqueRegularTransparentCeiling = 0.02f;
+        public const float PredominantlyOpaqueDeepTransparentCeiling = 0.01f;
 
         public static float GetDenseDeepMaskRatioThreshold(TextureAlphaHeuristicProfile profile)
         {
@@ -333,6 +340,7 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
         var denseDeepMaskThreshold = TextureAlphaHeuristics.GetDenseDeepMaskRatioThreshold(heuristicProfile);
 
         var regularTransparentRatio = regularTransparent / (float)sampled;
+        var totalTransparentRatio = anyTransparent / (float)sampled;
 
         var shouldTreatAsCutout =
             deepTransparentRatio > denseDeepMaskThreshold &&
@@ -343,6 +351,25 @@ public sealed class DefaultMaterialImportPolicy : IMaterialImportPolicy
         if (shouldTreatAsCutout)
         {
             return TextureAlphaSignal.MaskCutout;
+        }
+
+        // Avoid treating nearly opaque textures as blend-only transparent:
+        // tiny alpha noise in packed/baseColor maps creates self-see-through artifacts.
+        if (totalTransparentRatio <= TextureAlphaHeuristics.NegligibleTransparencyRatio &&
+            deepTransparentRatio <= TextureAlphaHeuristics.NegligibleDeepTransparencyRatio &&
+            regularTransparentRatio <= TextureAlphaHeuristics.NegligibleRegularTransparencyRatio)
+        {
+            return TextureAlphaSignal.None;
+        }
+
+        // GLTF assets frequently export BLEND even for effectively opaque materials.
+        // Keeping those as BLEND causes self-overdraw artifacts (back geometry leaking through).
+        if (opaqueRatio >= TextureAlphaHeuristics.PredominantlyOpaqueRatio &&
+            softTransparentRatio <= TextureAlphaHeuristics.PredominantlyOpaqueSoftTransparentCeiling &&
+            regularTransparentRatio <= TextureAlphaHeuristics.PredominantlyOpaqueRegularTransparentCeiling &&
+            deepTransparentRatio <= TextureAlphaHeuristics.PredominantlyOpaqueDeepTransparentCeiling)
+        {
+            return TextureAlphaSignal.None;
         }
 
         return deepTransparentRatio >= TextureAlphaHeuristics.MinDeepTransparentRatio ||

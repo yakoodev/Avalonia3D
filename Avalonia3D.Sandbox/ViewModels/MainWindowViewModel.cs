@@ -22,6 +22,7 @@ namespace Avalonia3D.Sandbox.ViewModels;
 
 public sealed class MainWindowViewModel : INotifyPropertyChanged
 {
+    private const string PreferredStartupSceneId = "gltf:car2/scene";
     private readonly Scene3D _scene;
     private readonly CameraController _cameraController;
     private readonly IRenderThreadScheduler _renderThreadScheduler;
@@ -182,8 +183,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
         if (scenes.Count > 0)
         {
-            SelectedSceneId = scenes[0].Id;
-            LoadScene(scenes[0].Id);
+            var startupSceneId = _scenesById.ContainsKey(PreferredStartupSceneId)
+                ? PreferredStartupSceneId
+                : scenes[0].Id;
+
+            SelectedSceneId = startupSceneId;
+            LoadScene(startupSceneId);
         }
     }
 

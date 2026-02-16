@@ -2,6 +2,7 @@ using Avalonia3D.Lights;
 using Avalonia3D.Loaders;
 using Avalonia3D.Loaders.Policies;
 using Avalonia3D.Model;
+using Avalonia3D.Model.StandObjects;
 using Avalonia3D.Sandbox.Services;
 using Serilog;
 using System;
@@ -88,6 +89,7 @@ public sealed class GltfFileScene : ISandboxScene, ISceneAssetCacheKeyProvider, 
         Log.Information("Loading prepared GLTF scene from: {Path}", payload.Path);
         GltfAssetDiagnostics.LogAssetStatus(payload.Path);
         scene.LoadPrepared(payload.ImportResult);
+        ApplySceneVisibilityFixes(scene, payload.Path);
         GltfAssetDiagnostics.LogNodeIdConflicts(scene.SceneGraph, Path.GetFileName(payload.Path));
         GltfAssetDiagnostics.LogAnimationChannelKinds(scene.LastImportReport, Path.GetFileName(payload.Path));
 
@@ -124,6 +126,7 @@ public sealed class GltfFileScene : ISandboxScene, ISceneAssetCacheKeyProvider, 
         Log.Information("Loading auto-discovered GLTF scene from: {Path}", path);
         GltfAssetDiagnostics.LogAssetStatus(path);
         scene.LoadScene(path);
+        ApplySceneVisibilityFixes(scene, path);
         GltfAssetDiagnostics.LogNodeIdConflicts(scene.SceneGraph, Path.GetFileName(path));
         GltfAssetDiagnostics.LogAnimationChannelKinds(scene.LastImportReport, Path.GetFileName(path));
 
@@ -147,4 +150,67 @@ public sealed class GltfFileScene : ISandboxScene, ISceneAssetCacheKeyProvider, 
     }
 
     private sealed record PreparedGltfPayload(string Path, SceneImportResult ImportResult);
+
+    private static void ApplySceneVisibilityFixes(Scene3D scene, string scenePath)
+    {
+        if (scene == null || string.IsNullOrWhiteSpace(scenePath))
+        {
+            return;
+        }
+
+        var normalizedPath = scenePath.Replace('\\', '/');
+        if (!normalizedPath.EndsWith("/droid/scene.gltf", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var hiddenCount = 0;
+        foreach (var root in scene.SceneGraph.RootObjects)
+        {
+            hiddenCount += HideByNameRecursive(root);
+        }
+
+        if (hiddenCount > 0)
+        {
+            Log.Information("Applied droid visibility fix. Hidden scene objects: {HiddenCount}", hiddenCount);
+        }
+    }
+
+    private static int HideByNameRecursive(SceneObject? sceneObject)
+    {
+        if (sceneObject == null)
+        {
+            return 0;
+        }
+
+        var hidden = 0;
+        if (ShouldHideNode(sceneObject.Name))
+        {
+            sceneObject.IsVisible = false;
+            hidden++;
+        }
+
+        if (sceneObject is MeshGroup group)
+        {
+            foreach (var child in group)
+            {
+                hidden += HideByNameRecursive(child);
+            }
+        }
+
+        return hidden;
+    }
+
+    private static bool ShouldHideNode(string? nodeName)
+    {
+        if (string.IsNullOrWhiteSpace(nodeName))
+        {
+            return false;
+        }
+
+        return string.Equals(nodeName, "Env", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(nodeName, "Scheibe", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(nodeName, "Scheibe_Boden_0", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(nodeName, "Himmel", StringComparison.OrdinalIgnoreCase);
+    }
 }
