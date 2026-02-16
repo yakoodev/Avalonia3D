@@ -1,4 +1,4 @@
-# Avalonia3D Architecture (EN)
+﻿# Avalonia3D Architecture (EN)
 
 ## 1. High-level layout
 
@@ -18,19 +18,19 @@ Runtime data flow:
 
 ## 2. Entry points
 
-- `Program.cs` in `Avalonia3D` and `Avalonia3D.Sandbox`:
+- [Program.cs](../Program.cs) in `Avalonia3D` and [Avalonia3D.Sandbox/Program.cs](../Avalonia3D.Sandbox/Program.cs):
   - configures import/material policies;
   - selects desktop startup or Linux DRM startup;
   - builds Avalonia app.
 
-- `App.axaml.cs`:
+- [App.axaml.cs](../App.axaml.cs) and [Avalonia3D.Sandbox/App.axaml.cs](../Avalonia3D.Sandbox/App.axaml.cs):
   - creates the main window (`MainWindow`).
 
 ## 3. System layers
 
 ### 3.1 Domain scene layer
 
-Main class: `Model/Scene3D.cs`.
+Main class: [Model/Scene3D.cs](../Model/Scene3D.cs).
 
 Responsibilities:
 
@@ -44,10 +44,10 @@ Responsibilities:
 
 Key files:
 
-- `Loaders/GltfSceneImporter.cs`
-- `Loaders/ModelLoader.cs`
-- `Loaders/Policies/DefaultMaterialImportPolicy.cs`
-- `Loaders/MaterialAlphaImportPolicy.cs`
+- [Loaders/GltfSceneImporter.cs](../Loaders/GltfSceneImporter.cs)
+- [Loaders/ModelLoader.cs](../Loaders/ModelLoader.cs)
+- [Loaders/Policies/DefaultMaterialImportPolicy.cs](../Loaders/Policies/DefaultMaterialImportPolicy.cs)
+- [Loaders/MaterialAlphaImportPolicy.cs](../Loaders/MaterialAlphaImportPolicy.cs)
 
 Capabilities:
 
@@ -61,14 +61,14 @@ Capabilities:
 
 Key files:
 
-- `Rendering/RenderPipeline.cs`
-- `Rendering/RenderPipelineFactory.cs`
-- `Rendering/RenderResourceManager.cs`
-- `Rendering/ForwardPass.cs`
-- `Rendering/ShadowPass.cs`
-- `Rendering/EnvironmentLightingPass.cs`
-- `Rendering/BloomPass.cs`
-- `Rendering/PostEffectsPass.cs`
+- [Rendering/RenderPipeline.cs](../Rendering/RenderPipeline.cs)
+- [Rendering/RenderPipelineFactory.cs](../Rendering/RenderPipelineFactory.cs)
+- [Rendering/RenderResourceManager.cs](../Rendering/RenderResourceManager.cs)
+- [Rendering/ForwardPass.cs](../Rendering/ForwardPass.cs)
+- [Rendering/ShadowPass.cs](../Rendering/ShadowPass.cs)
+- [Rendering/EnvironmentLightingPass.cs](../Rendering/EnvironmentLightingPass.cs)
+- [Rendering/BloomPass.cs](../Rendering/BloomPass.cs)
+- [Rendering/PostEffectsPass.cs](../Rendering/PostEffectsPass.cs)
 
 Pipeline steps:
 
@@ -82,10 +82,10 @@ Pipeline steps:
 
 Key files:
 
-- `Rendering/ShaderSelectionPolicy.cs`
-- `Rendering/RuntimePbrShaderFactory.cs`
-- `Shaders/PbrShaderSourceBuilder.cs`
-- `Shaders/ShaderIds.cs`
+- [Rendering/ShaderSelectionPolicy.cs](../Rendering/ShaderSelectionPolicy.cs)
+- [Rendering/RuntimePbrShaderFactory.cs](../Rendering/RuntimePbrShaderFactory.cs)
+- [Shaders/PbrShaderSourceBuilder.cs](../Shaders/PbrShaderSourceBuilder.cs)
+- [Shaders/ShaderIds.cs](../Shaders/ShaderIds.cs)
 
 Selection logic:
 
@@ -97,9 +97,9 @@ Selection logic:
 
 Key files:
 
-- `Interaction/CameraController/*`
-- `Interaction/Behaviors/DoorBehavior.cs`
-- `Interaction/Behaviors/WheelRotationBehavior.cs`
+- [Interaction/CameraController/*](../Interaction/CameraController/)
+- [Interaction/Behaviors/DoorBehavior.cs](../Interaction/Behaviors/DoorBehavior.cs)
+- [Interaction/Behaviors/WheelRotationBehavior.cs](../Interaction/Behaviors/WheelRotationBehavior.cs)
 
 Behavior:
 
@@ -111,10 +111,10 @@ Behavior:
 
 Key files:
 
-- `Avalonia3D.Sandbox/Controls/SandboxModel3DControl.cs`
-- `Avalonia3D.Sandbox/Services/RenderThreadSceneLoadOrchestrator.cs`
-- `Avalonia3D.Sandbox/Services/SceneLoadService.cs`
-- `Avalonia3D.Sandbox/ViewModels/MainWindowViewModel.cs`
+- [Avalonia3D.Sandbox/Controls/SandboxModel3DControl.cs](../Avalonia3D.Sandbox/Controls/SandboxModel3DControl.cs)
+- [Avalonia3D.Sandbox/Services/RenderThreadSceneLoadOrchestrator.cs](../Avalonia3D.Sandbox/Services/RenderThreadSceneLoadOrchestrator.cs)
+- [Avalonia3D.Sandbox/Services/SceneLoadService.cs](../Avalonia3D.Sandbox/Services/SceneLoadService.cs)
+- [Avalonia3D.Sandbox/ViewModels/MainWindowViewModel.cs](../Avalonia3D.Sandbox/ViewModels/MainWindowViewModel.cs)
 
 Role:
 
@@ -139,7 +139,7 @@ Role:
 
 ## 5. Graphics profiles
 
-`Rendering/GraphicsProfile.cs` defines:
+[Rendering/GraphicsProfile.cs](../Rendering/GraphicsProfile.cs) defines:
 
 - `Low`, `Medium`, `High`, `Ultra`, `PbrDebugNeutral`;
 - shadow map size, post effects, bloom, reflections, exposure/IBL, background;
@@ -149,7 +149,7 @@ Role:
 
 Core mechanisms:
 
-- `Memory/MemoryManager.cs` for soft cleanup and large-model tuning.
+- [Memory/MemoryManager.cs](../Memory/MemoryManager.cs) for soft cleanup and large-model tuning.
 - `ModelLoader`:
   - LRU texture decode cache;
   - material index map cache;
@@ -161,10 +161,10 @@ Core mechanisms:
 ## 7. Diagnostics and quality gates
 
 - `Scene3D.LastImportReport` captures Success/Degraded status and issues.
-- `Rendering/Diagnostics/MaterialRenderDiagnostics.cs` provides material render snapshots.
+- [Rendering/Diagnostics/MaterialRenderDiagnostics.cs](../Rendering/Diagnostics/MaterialRenderDiagnostics.cs) provides material render snapshots.
 - Python quality/preflight scripts:
-  - `tools/validate_gltf_assets.py`
-  - `tools/validate_pbr_snapshot.py`
+  - [tools/validate_gltf_assets.py](../tools/validate_gltf_assets.py)
+  - [tools/validate_pbr_snapshot.py](../tools/validate_pbr_snapshot.py)
 
 ## 8. Test strategy
 
@@ -176,3 +176,6 @@ Core mechanisms:
 - import and texture policy behavior;
 - behavior integration (door/wheel/command bus);
 - camera controller and render frame-state contracts.
+
+
+

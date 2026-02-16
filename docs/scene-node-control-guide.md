@@ -1,4 +1,4 @@
-# Scene Node Control Guide (Car Model)
+﻿# Scene Node Control Guide (Car Model)
 
 ## What is already implemented in Avalonia3D
 
@@ -15,11 +15,11 @@
 
 ## Important for your prepared `car` model
 
-- `car/scene.gltf` has wheel/door nodes in hierarchy (good for per-part motion).
+- [car/scene.gltf](../Avalonia3D.Sandbox/Assets/TestScenes/car/scene.gltf) has wheel/door nodes in hierarchy (good for per-part motion).
 - It does not contain node `semanticId` extras and does not contain animation clips for doors.
 - Because of this:
   - Direct node transform control works now.
-  - `WheelRotationBehavior`/`DoorBehavior` are not plug-and-play without extra setup.
+  - ``WheelRotationBehavior`/`DoorBehavior`` are not plug-and-play without extra setup.
 
 ## 1) Rotate wheels
 
@@ -61,7 +61,7 @@ For right door you usually use opposite sign.
 
 ### Behavior-based way (requires clips)
 
-`DoorBehavior` only plays clips like `door.main.open` / `door.main.close`.
+`DoorBehavior` only plays clips like ``door.main.open` / `door.main.close``.
 If your model has no such clips, this behavior will not open doors.
 
 ## 3) Move whole car
@@ -85,3 +85,6 @@ If the exact root name differs, inspect top-level children of `scene.SceneGraph.
 - Use direct node transforms for wheels/doors/chassis now.
 - If you need stable API bindings, add `semanticId` in glTF node `extras`.
 - If you need command-style open/close for doors, add corresponding animation clips or implement runtime rotation fallback behavior.
+
+
+

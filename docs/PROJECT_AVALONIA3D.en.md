@@ -1,4 +1,4 @@
-# Project `Avalonia3D` (EN)
+﻿# Project `Avalonia3D` (EN)
 
 ## 1. Purpose
 
@@ -12,7 +12,7 @@
 
 ## 2. Startup entry point
 
-File: `Program.cs`.
+File: [Program.cs](../Program.cs).
 
 Before UI startup it applies:
 
@@ -27,7 +27,7 @@ Then:
 
 ## 3. Main dependencies
 
-`Avalonia3D.csproj` includes:
+[Avalonia3D.csproj](../Avalonia3D.csproj) includes:
 
 - Avalonia UI stack (`Avalonia`, `Avalonia.Desktop`, `Avalonia.Skia`, etc.);
 - OpenGL APIs (`Silk.NET.OpenGL`, `Silk.NET.OpenGLES`);
@@ -39,18 +39,18 @@ Then:
 
 ### 4.1 Scene and domain model
 
-Folder: `Model/`.
+Folder: [Model/](../Model/).
 
 Important types:
 
 - `Scene3D` - central runtime container.
-- `SceneGraph` / `SceneNode` - hierarchical scene structure.
+- ``SceneGraph` / `SceneNode`` - hierarchical scene structure.
 - `MeshObject`, `MeshGroup`, `Material`, `TextureData`.
 - `EnvironmentLightingSettings` - runtime IBL/environment settings.
 
 ### 4.2 glTF import
 
-Folder: `Loaders/`.
+Folder: [Loaders/](../Loaders/).
 
 Important types:
 
@@ -71,7 +71,7 @@ Policies:
 
 ### 4.3 Rendering
 
-Folder: `Rendering/`.
+Folder: [Rendering/](../Rendering/).
 
 Important components:
 
@@ -87,7 +87,7 @@ Important components:
 
 ### 4.4 Shader system
 
-Folders: `Shaders/`, plus `Rendering/ShaderSelectionPolicy.cs`.
+Folders: [Shaders/](../Shaders/), plus [Rendering/ShaderSelectionPolicy.cs](../Rendering/ShaderSelectionPolicy.cs).
 
 Highlights:
 
@@ -98,7 +98,7 @@ Highlights:
 
 ### 4.5 Animation
 
-Folder: `Animation/`.
+Folder: [Animation/](../Animation/).
 
 Key elements:
 
@@ -109,7 +109,7 @@ Key elements:
 
 ### 4.6 Behaviors and command bus
 
-Folder: `Interaction/Behaviors/`.
+Folder: [Interaction/Behaviors/](../Interaction/Behaviors/).
 
 Key elements:
 
@@ -119,7 +119,7 @@ Key elements:
 
 ## 5. GraphicsProfile and quality levels
 
-File: `Rendering/GraphicsProfile.cs`.
+File: [Rendering/GraphicsProfile.cs](../Rendering/GraphicsProfile.cs).
 
 Profiles:
 
@@ -136,7 +136,7 @@ They configure:
 
 ## 6. Memory and caching
 
-- `Memory/MemoryManager.cs` - soft cleanup and large-asset tuning.
+- [Memory/MemoryManager.cs](../Memory/MemoryManager.cs) - soft cleanup and large-asset tuning.
 - `ModelLoader`:
   - texture decode LRU cache;
   - material index map cache;
@@ -149,7 +149,10 @@ They configure:
 Common extension points:
 
 - new `ISceneModule` implementations;
-- new `ISceneBehavior`/`IUpdatableBehavior` implementations;
+- new ``ISceneBehavior`/`IUpdatableBehavior`` implementations;
 - new render passes via `RenderPipelineFactory` extension;
 - new shader variants via `ShaderRegistry` and runtime factory;
 - custom material import policy implementations.
+
+
+

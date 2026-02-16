@@ -1,4 +1,4 @@
-# Project `Avalonia3D.Sandbox` (EN)
+﻿# Project `Avalonia3D.Sandbox` (EN)
 
 ## 1. Purpose
 
@@ -12,7 +12,7 @@
 
 ## 2. Application startup
 
-File: `Avalonia3D.Sandbox/Program.cs`.
+File: [Avalonia3D.Sandbox/Program.cs](../Avalonia3D.Sandbox/Program.cs).
 
 It applies import policies and then:
 
@@ -21,19 +21,19 @@ It applies import policies and then:
 
 ## 3. UI structure
 
-- `MainWindow.axaml`:
+- [MainWindow.axaml](../Avalonia3D.Sandbox/MainWindow.axaml):
   - left control panel (`ModelViewportPanel`);
   - right OpenGL viewport (`SandboxModel3DControl`);
   - top-left overlay with import/profile status.
 
-- `Controls/ModelViewportPanel.axaml`:
+- [Controls/ModelViewportPanel.axaml](../Avalonia3D.Sandbox/Controls/ModelViewportPanel.axaml):
   - tabs: `Scenes`, `Camera`, `Graphics`, `Animation`.
 
 ## 4. Core runtime classes
 
 ### 4.1 `SandboxModel3DControl`
 
-File: `Avalonia3D.Sandbox/Controls/SandboxModel3DControl.cs`.
+File: [Avalonia3D.Sandbox/Controls/SandboxModel3DControl.cs](../Avalonia3D.Sandbox/Controls/SandboxModel3DControl.cs).
 
 Role:
 
@@ -51,7 +51,7 @@ Main properties/commands:
 
 ### 4.2 `MainWindowViewModel`
 
-File: `Avalonia3D.Sandbox/ViewModels/MainWindowViewModel.cs`.
+File: [Avalonia3D.Sandbox/ViewModels/MainWindowViewModel.cs](../Avalonia3D.Sandbox/ViewModels/MainWindowViewModel.cs).
 
 Role:
 
@@ -62,17 +62,17 @@ Role:
 
 ### 4.3 `SceneCatalog`
 
-File: `Avalonia3D.Sandbox/Scenes/SceneCatalog.cs`.
+File: [Avalonia3D.Sandbox/Scenes/SceneCatalog.cs](../Avalonia3D.Sandbox/Scenes/SceneCatalog.cs).
 
-Discovers `*.gltf`/`*.glb` recursively under `Assets/TestScenes`.
+Discovers `*.gltf`/`*.glb` recursively under [Assets/TestScenes](../Avalonia3D.Sandbox/Assets/TestScenes).
 
 ### 4.4 `SceneLoader` and orchestration
 
 Files:
 
-- `Services/SceneLoader.cs`
-- `Services/RenderThreadSceneLoadOrchestrator.cs`
-- `Services/SceneLoadService.cs`
+- [Services/SceneLoader.cs](../Avalonia3D.Sandbox/Services/SceneLoader.cs)
+- [Services/RenderThreadSceneLoadOrchestrator.cs](../Avalonia3D.Sandbox/Services/RenderThreadSceneLoadOrchestrator.cs)
+- [Services/SceneLoadService.cs](../Avalonia3D.Sandbox/Services/SceneLoadService.cs)
 
 Behavior:
 
@@ -103,15 +103,15 @@ Exposed through ViewModel/UI:
 
 ## 7. Assets and QA
 
-Folder: `Avalonia3D.Sandbox/Assets/TestScenes`.
+Folder: [Avalonia3D.Sandbox/Assets/TestScenes](../Avalonia3D.Sandbox/Assets/TestScenes).
 
 Includes:
 
 - test glTF/glb assets;
 - QA checklists/registries (`PBR_QA_CHECKLIST`, `ANIMATION_QA_CHECKLIST`);
-- import override config (`material-import-overrides.json`).
+- import override config ([material-import-overrides.json](../Avalonia3D.Sandbox/Assets/TestScenes/material-import-overrides.json)).
 
-Scripts under `tools/` treat this folder as the source for preflight/regression checks.
+Scripts under [tools/](../tools/) treat this folder as the source for preflight/regression checks.
 
 ## 8. Practical debug workflow
 
@@ -121,3 +121,6 @@ Scripts under `tools/` treat this folder as the source for preflight/regression 
 4. Toggle `PBR <-> Unlit`.
 5. Adjust quality profile, exposure, and reflection intensity.
 6. Verify animation controls (play/pause/loop) and behavior commands.
+
+
+

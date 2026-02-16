@@ -1,4 +1,4 @@
-# Project `Avalonia3D.Tests` (EN)
+﻿# Project `Avalonia3D.Tests` (EN)
 
 ## 1. Purpose
 
@@ -17,7 +17,7 @@ Main packages:
 
 ### 2.1 Shader selection and PBR variants
 
-File: `Avalonia3D.Tests/ShaderSelectionTests.cs`.
+File: [Avalonia3D.Tests/ShaderSelectionTests.cs](../Avalonia3D.Tests/ShaderSelectionTests.cs).
 
 Validates:
 
@@ -28,7 +28,7 @@ Validates:
 
 ### 2.2 Render pipeline composition
 
-File: `Avalonia3D.Tests/RenderPipelineFactoryTests.cs`.
+File: [Avalonia3D.Tests/RenderPipelineFactoryTests.cs](../Avalonia3D.Tests/RenderPipelineFactoryTests.cs).
 
 Validates:
 
@@ -38,7 +38,7 @@ Validates:
 
 ### 2.3 Scene loading orchestration
 
-File: `Avalonia3D.Tests/SceneLoaderTests.cs`.
+File: [Avalonia3D.Tests/SceneLoaderTests.cs](../Avalonia3D.Tests/SceneLoaderTests.cs).
 
 Validates:
 
@@ -49,7 +49,7 @@ Validates:
 
 ### 2.4 Behavior integration
 
-File: `Avalonia3D.Tests/BehaviorIntegrationTests.cs`.
+File: [Avalonia3D.Tests/BehaviorIntegrationTests.cs](../Avalonia3D.Tests/BehaviorIntegrationTests.cs).
 
 Validates:
 
@@ -91,4 +91,6 @@ dotnet test Avalonia3D.sln -c Debug
 ## 5. Limits
 
 - tests do not replace manual visual QA for PBR/animation quality;
-- asset-specific regression checks are complemented by Python scripts under `tools/`.
+- asset-specific regression checks are complemented by Python scripts under [tools/](../tools/).
+
+

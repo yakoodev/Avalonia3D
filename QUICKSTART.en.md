@@ -1,4 +1,4 @@
-# Quick Start (EN)
+﻿# Quick Start (EN)
 
 ## 1. Requirements
 
@@ -66,8 +66,9 @@ Supported args:
 
 ## 9. Read more
 
-- `docs/README.md`
-- `docs/ARCHITECTURE.en.md`
-- `docs/PROJECT_AVALONIA3D.en.md`
-- `docs/PROJECT_SANDBOX.en.md`
-- `docs/PROJECT_TESTS.en.md`
+- [docs/README.md](docs/README.md)
+- [docs/ARCHITECTURE.en.md](docs/ARCHITECTURE.en.md)
+- [docs/PROJECT_AVALONIA3D.en.md](docs/PROJECT_AVALONIA3D.en.md)
+- [docs/PROJECT_SANDBOX.en.md](docs/PROJECT_SANDBOX.en.md)
+- [docs/PROJECT_TESTS.en.md](docs/PROJECT_TESTS.en.md)
+
