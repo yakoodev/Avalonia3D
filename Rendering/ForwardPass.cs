@@ -25,6 +25,7 @@ namespace Avalonia3D.Rendering
             if (!_settings.Reflections.Enabled || _settings.Reflections.Mode == ReflectionMode.Off)
             {
                 frameState.EnvironmentReflectionTextureId = null;
+                frameState.EnvironmentReflectionMaxLod = 0f;
                 frameState.ReflectionIntensity = 0f;
                 frameState.IblDiffuseIntensity = 0f;
                 frameState.IblSpecularIntensity = 0f;

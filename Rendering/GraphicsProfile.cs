@@ -155,7 +155,7 @@ namespace Avalonia3D.Rendering
             {
                 Enabled = true,
                 Mode = ReflectionMode.IBL,
-                Intensity = 0.35f,
+                Intensity = 0.62f,
                 EnvironmentMapPath = DefaultEnvironmentMapPath
             },
             PbrTuning = new PbrTuningProfile
@@ -163,8 +163,8 @@ namespace Avalonia3D.Rendering
                 Exposure = 1.0f,
                 PbrWhitePoint = 1.2f,
                 IblDiffuseIntensity = 0.2f,
-                IblSpecularIntensity = 0.75f,
-                ReflectionContributionClamp = 1.05f,
+                IblSpecularIntensity = 1.2f,
+                ReflectionContributionClamp = 1.6f,
                 AmbientStrengthClamp = 0.30f,
                 AmbientOcclusionStrength = 1.0f,
                 SeparateEmissiveSurfaceScale = 0.2f
@@ -202,7 +202,7 @@ namespace Avalonia3D.Rendering
             {
                 Enabled = true,
                 Mode = ReflectionMode.IBL,
-                Intensity = 0.5f,
+                Intensity = 0.76f,
                 EnvironmentMapPath = DefaultEnvironmentMapPath
             },
             PbrTuning = new PbrTuningProfile
@@ -210,8 +210,8 @@ namespace Avalonia3D.Rendering
                 Exposure = 1.08f,
                 PbrWhitePoint = 1.28f,
                 IblDiffuseIntensity = 0.25f,
-                IblSpecularIntensity = 1.0f,
-                ReflectionContributionClamp = 1.2f,
+                IblSpecularIntensity = 1.35f,
+                ReflectionContributionClamp = 1.9f,
                 AmbientStrengthClamp = 0.35f,
                 AmbientOcclusionStrength = 1.05f,
                 SeparateEmissiveSurfaceScale = 0.2f
@@ -251,7 +251,7 @@ namespace Avalonia3D.Rendering
             {
                 Enabled = true,
                 Mode = ReflectionMode.IBL,
-                Intensity = 0.75f,
+                Intensity = 0.95f,
                 EnvironmentMapPath = DefaultEnvironmentMapPath
             },
             PbrTuning = new PbrTuningProfile
@@ -259,8 +259,8 @@ namespace Avalonia3D.Rendering
                 Exposure = 1.0f,
                 PbrWhitePoint = 1.35f,
                 IblDiffuseIntensity = 0.15f,
-                IblSpecularIntensity = 0.95f,
-                ReflectionContributionClamp = 1.0f,
+                IblSpecularIntensity = 1.55f,
+                ReflectionContributionClamp = 2.2f,
                 AmbientStrengthClamp = 0.22f,
                 AmbientOcclusionStrength = 1.0f
             },

@@ -13,6 +13,7 @@ namespace Avalonia3D.Rendering
         public uint? ShadowMapId { get; set; }
         public Matrix4x4 LightSpaceMatrix { get; set; } = Matrix4x4.Identity;
         public uint? EnvironmentReflectionTextureId { get; set; }
+        public float EnvironmentReflectionMaxLod { get; set; }
         public float ReflectionIntensity { get; set; }
         public float IblDiffuseIntensity { get; set; } = 0.2f;
         public float IblSpecularIntensity { get; set; } = 1.0f;
