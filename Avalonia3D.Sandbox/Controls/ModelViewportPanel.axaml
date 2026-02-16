@@ -122,11 +122,11 @@
             <StackPanel Spacing="8">
               <TextBlock Text="Play imported glTF clips from the active model (for example droid)." Foreground="#D6D6D6" TextWrapping="Wrap" />
               <ComboBox ItemsSource="{Binding AvailableClips}" SelectedItem="{Binding SelectedClipName, Mode=TwoWay}" />
-              <WrapPanel Orientation="Horizontal" ItemHeight="32" ItemWidth="120">
-                <Button Content="Play" Command="{Binding PlayClipCommand}" Margin="0,0,8,8" />
-                <Button Content="Pause" Command="{Binding PauseClipCommand}" Margin="0,0,8,8" />
-                <Button Content="Stop" Command="{Binding StopClipCommand}" Margin="0,0,8,8" />
-                <Button Content="Play/Pause" Command="{Binding TogglePlayPauseCommand}" Margin="0,0,8,8" />
+              <WrapPanel Orientation="Horizontal" ItemWidth="120">
+                <Button Content="Play" Command="{Binding PlayClipCommand}" Margin="0,0,8,8" MinHeight="36" Padding="12,6" />
+                <Button Content="Pause" Command="{Binding PauseClipCommand}" Margin="0,0,8,8" MinHeight="36" Padding="12,6" />
+                <Button Content="Stop" Command="{Binding StopClipCommand}" Margin="0,0,8,8" MinHeight="36" Padding="12,6" />
+                <Button Content="Play/Pause" Command="{Binding TogglePlayPauseCommand}" Margin="0,0,8,8" MinHeight="36" Padding="12,6" />
               </WrapPanel>
               <CheckBox Content="Loop clip" IsChecked="{Binding IsLoopEnabled, Mode=TwoWay}" Foreground="#D6D6D6" />
               <TextBlock Text="Playback speed" Foreground="#D6D6D6" />
@@ -141,21 +141,21 @@
           <Border Background="#2D2D33" Padding="10" CornerRadius="8">
             <StackPanel Spacing="8">
               <TextBlock Text="Custom model animator control (implemented only for gltf:car2/scene)." Foreground="#D6D6D6" TextWrapping="Wrap" />
-              <WrapPanel Orientation="Horizontal" ItemHeight="32" ItemWidth="140">
-                <Button Content="Wheels +" Command="{Binding Car2RotateWheelsForwardCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
-                <Button Content="Wheels -" Command="{Binding Car2RotateWheelsBackwardCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
-                <Button Content="+90 deg" Command="{Binding Car2RotateWheelsQuarterForwardCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
-                <Button Content="-90 deg" Command="{Binding Car2RotateWheelsQuarterBackwardCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
-                <Button Content="+360 deg" Command="{Binding Car2RotateWheelsFullForwardCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
-                <Button Content="-360 deg" Command="{Binding Car2RotateWheelsFullBackwardCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
-                <Button Content="Auto >>" Command="{Binding Car2StartWheelAutoSpinForwardCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
-                <Button Content="Auto &lt;&lt;" Command="{Binding Car2StartWheelAutoSpinBackwardCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
-                <Button Content="Auto Stop" Command="{Binding Car2StopWheelAutoSpinCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
-                <Button Content="Move +" Command="{Binding Car2MoveForwardCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
-                <Button Content="Move -" Command="{Binding Car2MoveBackwardCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
-                <Button Content="Turn Left" Command="{Binding Car2TurnLeftCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
-                <Button Content="Turn Right" Command="{Binding Car2TurnRightCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
-                <Button Content="Reset Pose" Command="{Binding Car2ResetPoseCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+              <WrapPanel Orientation="Horizontal" ItemWidth="140">
+                <Button Content="Wheels +" Command="{Binding Car2RotateWheelsForwardCommand}" Margin="0,0,8,8" MinHeight="36" Padding="12,6" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="Wheels -" Command="{Binding Car2RotateWheelsBackwardCommand}" Margin="0,0,8,8" MinHeight="36" Padding="12,6" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="+90 deg" Command="{Binding Car2RotateWheelsQuarterForwardCommand}" Margin="0,0,8,8" MinHeight="36" Padding="12,6" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="-90 deg" Command="{Binding Car2RotateWheelsQuarterBackwardCommand}" Margin="0,0,8,8" MinHeight="36" Padding="12,6" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="+360 deg" Command="{Binding Car2RotateWheelsFullForwardCommand}" Margin="0,0,8,8" MinHeight="36" Padding="12,6" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="-360 deg" Command="{Binding Car2RotateWheelsFullBackwardCommand}" Margin="0,0,8,8" MinHeight="36" Padding="12,6" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="Auto >>" Command="{Binding Car2StartWheelAutoSpinForwardCommand}" Margin="0,0,8,8" MinHeight="36" Padding="12,6" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="Auto &lt;&lt;" Command="{Binding Car2StartWheelAutoSpinBackwardCommand}" Margin="0,0,8,8" MinHeight="36" Padding="12,6" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="Auto Stop" Command="{Binding Car2StopWheelAutoSpinCommand}" Margin="0,0,8,8" MinHeight="36" Padding="12,6" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="Move +" Command="{Binding Car2MoveForwardCommand}" Margin="0,0,8,8" MinHeight="36" Padding="12,6" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="Move -" Command="{Binding Car2MoveBackwardCommand}" Margin="0,0,8,8" MinHeight="36" Padding="12,6" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="Turn Left" Command="{Binding Car2TurnLeftCommand}" Margin="0,0,8,8" MinHeight="36" Padding="12,6" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="Turn Right" Command="{Binding Car2TurnRightCommand}" Margin="0,0,8,8" MinHeight="36" Padding="12,6" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="Reset Pose" Command="{Binding Car2ResetPoseCommand}" Margin="0,0,8,8" MinHeight="36" Padding="12,6" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
               </WrapPanel>
               <TextBlock Text="{Binding Car2WheelAutoSpinState}" Foreground="#FFD36B" TextWrapping="Wrap" />
               <TextBlock Text="{Binding Car2AnimatorStatus}" Foreground="#9ED7FF" TextWrapping="Wrap" />
