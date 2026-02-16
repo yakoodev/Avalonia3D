@@ -1,96 +1,96 @@
-﻿# РџСЂРѕРµРєС‚ `Avalonia3D.Tests` (RU)
+# Проект `Avalonia3D.Tests` (RU)
 
-## 1. РќР°Р·РЅР°С‡РµРЅРёРµ
+## 1. Назначение
 
-`Avalonia3D.Tests` - xUnit-РїСЂРѕРµРєС‚ РґР»СЏ РїСЂРѕРІРµСЂРєРё РґРѕРјРµРЅРЅРѕР№ Р»РѕРіРёРєРё Рё РєРѕРЅС‚СЂР°РєС‚РѕРІ РїРѕРґСЃРёСЃС‚РµРј Р±РµР· Р·Р°РїСѓСЃРєР° РїРѕР»РЅРѕРіРѕ UI.
+`Avalonia3D.Tests` - xUnit-проект для проверки доменной логики и контрактов подсистем без запуска полного UI.
 
-РџР»Р°С‚С„РѕСЂРјР°: `net8.0`.
+Платформа: `net8.0`.
 
-РћСЃРЅРѕРІРЅС‹Рµ РїР°РєРµС‚С‹:
+Основные пакеты:
 
 - `Microsoft.NET.Test.Sdk`
 - `xunit`
 - `xunit.runner.visualstudio`
 - `coverlet.collector`
 
-## 2. РћР±Р»Р°СЃС‚Рё РїРѕРєСЂС‹С‚РёСЏ
+## 2. Области покрытия
 
-### 2.1 Shader selection Рё PBR-РІР°СЂРёР°РЅС‚С‹
+### 2.1 Shader selection и PBR-варианты
 
-Р¤Р°Р№Р»: [Avalonia3D.Tests/ShaderSelectionTests.cs](../Avalonia3D.Tests/ShaderSelectionTests.cs).
+Файл: [Avalonia3D.Tests/ShaderSelectionTests.cs](../Avalonia3D.Tests/ShaderSelectionTests.cs).
 
-РџСЂРѕРІРµСЂСЏРµС‚:
+Проверяет:
 
-- РїСЂРёРѕСЂРёС‚РµС‚С‹ РІС‹Р±РѕСЂР° С€РµР№РґРµСЂР°;
-- РіРµРЅРµСЂР°С†РёСЋ PBR feature id;
-- fallback РїСЂРё РїСЂРѕРІР°Р»Рµ runtime-РєРѕРјРїРёР»СЏС†РёРё;
-- РїРѕРІРµРґРµРЅРёРµ РґР»СЏ transmission/extension-С„РёС‡.
+- приоритеты выбора шейдера;
+- генерацию PBR feature id;
+- fallback при провале runtime-компиляции;
+- поведение для transmission/extension-фич.
 
 ### 2.2 Render pipeline composition
 
-Р¤Р°Р№Р»: [Avalonia3D.Tests/RenderPipelineFactoryTests.cs](../Avalonia3D.Tests/RenderPipelineFactoryTests.cs).
+Файл: [Avalonia3D.Tests/RenderPipelineFactoryTests.cs](../Avalonia3D.Tests/RenderPipelineFactoryTests.cs).
 
-РџСЂРѕРІРµСЂСЏРµС‚:
+Проверяет:
 
-- РїСЂР°РІРёР»СЊРЅС‹Р№ СЃРѕСЃС‚Р°РІ Рё РїРѕСЂСЏРґРѕРє pass-РѕРІ РїРѕ РїСЂРѕС„РёР»СЏРј;
-- РІРєР»СЋС‡РµРЅРёРµ/РІС‹РєР»СЋС‡РµРЅРёРµ environment pass;
-- СѓСЃР»РѕРІРёСЏ РїРѕСЏРІР»РµРЅРёСЏ `BloomPass` Рё `PostEffectsPass`.
+- правильный состав и порядок pass-ов по профилям;
+- включение/выключение environment pass;
+- условия появления `BloomPass` и `PostEffectsPass`.
 
 ### 2.3 Scene loading orchestration
 
-Р¤Р°Р№Р»: [Avalonia3D.Tests/SceneLoaderTests.cs](../Avalonia3D.Tests/SceneLoaderTests.cs).
+Файл: [Avalonia3D.Tests/SceneLoaderTests.cs](../Avalonia3D.Tests/SceneLoaderTests.cs).
 
-РџСЂРѕРІРµСЂСЏРµС‚:
+Проверяет:
 
-- РѕС‚Р»РѕР¶РµРЅРЅСѓСЋ Р·Р°РіСЂСѓР·РєСѓ РґРѕ РіРѕС‚РѕРІРЅРѕСЃС‚Рё СЂРµРЅРґРµСЂР°;
-- РѕС‚РјРµРЅСѓ СЃС‚Р°СЂС‹С… Р·Р°РїСЂРѕСЃРѕРІ РїСЂРё СЃРµСЂРёРё Р·Р°РіСЂСѓР·РѕРє;
-- РїСЂР°РІРёР»СЊРЅРѕРµ С‡РёСЃР»Рѕ render-thread apply С€Р°РіРѕРІ;
-- cache hit/miss Рё camera policy РІС‹Р·РѕРІС‹.
+- отложенную загрузку до готовности рендера;
+- отмену старых запросов при серии загрузок;
+- правильное число render-thread apply шагов;
+- cache hit/miss и camera policy вызовы.
 
 ### 2.4 Behavior integration
 
-Р¤Р°Р№Р»: [Avalonia3D.Tests/BehaviorIntegrationTests.cs](../Avalonia3D.Tests/BehaviorIntegrationTests.cs).
+Файл: [Avalonia3D.Tests/BehaviorIntegrationTests.cs](../Avalonia3D.Tests/BehaviorIntegrationTests.cs).
 
-РџСЂРѕРІРµСЂСЏРµС‚:
+Проверяет:
 
-- dispatch РєРѕРјР°РЅРґ РІ `DoorBehavior`;
-- runtime fallback rotation РґР»СЏ РґРІРµСЂРµР№ РїСЂРё РѕС‚СЃСѓС‚СЃС‚РІРёРё РєР»РёРїРѕРІ;
-- wheel rotation behavior РїРѕ target key mode;
-- СЃРѕР±С‹С‚РёСЏ Р·Р°РІРµСЂС€РµРЅРёСЏ РєР»РёРїРѕРІ `AnimatorComponent`.
+- dispatch команд в `DoorBehavior`;
+- runtime fallback rotation для дверей при отсутствии клипов;
+- wheel rotation behavior по target key mode;
+- события завершения клипов `AnimatorComponent`.
 
-### 2.5 Р”РѕРїРѕР»РЅРёС‚РµР»СЊРЅС‹Рµ Р±Р»РѕРєРё
+### 2.5 Дополнительные блоки
 
-РџРѕ РёРјРµРЅР°Рј С„Р°Р№Р»РѕРІ С‚Р°РєР¶Рµ РїРѕРєСЂС‹РІР°СЋС‚СЃСЏ:
+По именам файлов также покрываются:
 
 - material alpha/import policy;
 - texture semantics/color management/decode policy;
 - import diagnostics;
-- camera controller, frame-state Рё resource manager.
+- camera controller, frame-state и resource manager.
 
-## 3. РљР°Рє Р·Р°РїСѓСЃРєР°С‚СЊ
+## 3. Как запускать
 
-РР· РєРѕСЂРЅСЏ СЂРµРїРѕР·РёС‚РѕСЂРёСЏ:
+Из корня репозитория:
 
 ```bash
 dotnet test Avalonia3D.Tests/Avalonia3D.Tests.csproj -c Debug
 ```
 
-РџРѕР»РЅС‹Р№ solution-СЂР°РЅ:
+Полный solution-ран:
 
 ```bash
 dotnet test Avalonia3D.sln -c Debug
 ```
 
-## 4. РџСЂР°РєС‚РёРєРё РЅР°РїРёСЃР°РЅРёСЏ С‚РµСЃС‚РѕРІ РІ СЌС‚РѕРј РїСЂРѕРµРєС‚Рµ
+## 4. Практики написания тестов в этом проекте
 
-- Р°РєС†РµРЅС‚ РЅР° deterministic domain behavior;
-- РјРёРЅРёРјСѓРј UI-Р·Р°РІРёСЃРёРјРѕСЃС‚РµР№;
-- РёР·РѕР»СЏС†РёСЏ С‡РµСЂРµР· test doubles (РЅР°РїСЂРёРјРµСЂ scheduler/factory stubs);
-- coverage РєР»СЋС‡РµРІС‹С… fallback-РїСѓС‚РµР№, Р° РЅРµ С‚РѕР»СЊРєРѕ happy path.
+- акцент на deterministic domain behavior;
+- минимум UI-зависимостей;
+- изоляция через test doubles (например scheduler/factory stubs);
+- coverage ключевых fallback-путей, а не только happy path.
 
-## 5. РћРіСЂР°РЅРёС‡РµРЅРёСЏ
+## 5. Ограничения
 
-- С‚РµСЃС‚С‹ РЅРµ Р·Р°РјРµРЅСЏСЋС‚ СЂСѓС‡РЅСѓСЋ РІРёР·СѓР°Р»СЊРЅСѓСЋ РїСЂРѕРІРµСЂРєСѓ РєР°С‡РµСЃС‚РІР° PBR/Р°РЅРёРјР°С†РёРё;
-- РґР»СЏ asset-СЃРїРµС†РёС„РёС‡РЅС‹С… РїСЂРѕРІРµСЂРѕРє РґРѕРїРѕР»РЅРёС‚РµР»СЊРЅРѕ Р·Р°РїСѓСЃРєР°СЋС‚СЃСЏ Python QA-СЃРєСЂРёРїС‚С‹ РёР· [tools/](../tools/).
+- тесты не заменяют ручную визуальную проверку качества PBR/анимации;
+- для asset-специфичных проверок дополнительно запускаются Python QA-скрипты из [tools/](../tools/).
 
 

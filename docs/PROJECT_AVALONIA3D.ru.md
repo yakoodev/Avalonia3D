@@ -1,158 +1,158 @@
-﻿# РџСЂРѕРµРєС‚ `Avalonia3D` (RU)
+# Проект `Avalonia3D` (RU)
 
-## 1. РќР°Р·РЅР°С‡РµРЅРёРµ
+## 1. Назначение
 
-`Avalonia3D` - СЌС‚Рѕ СЏРґСЂРѕ 3D-РґРІРёР¶РєР°:
+`Avalonia3D` - это ядро 3D-движка:
 
-- РјРѕРґРµР»СЊ СЃС†РµРЅС‹ (`Scene3D`, `SceneGraph`, `SceneNode`);
-- РёРјРїРѕСЂС‚ glTF/glb (`GltfSceneImporter`, `ModelLoader`);
-- СЂРµРЅРґРµСЂ-РїР°Р№РїР»Р°Р№РЅ Рё OpenGL-СЂРµСЃСѓСЂСЃС‹;
-- СЃРёСЃС‚РµРјС‹ Р°РЅРёРјР°С†РёРё Рё runtime-РїРѕРІРµРґРµРЅРёСЏ;
-- С€РµР№РґРµСЂРЅР°СЏ РїРѕРґСЃРёСЃС‚РµРјР° PBR/Unlit/Debug.
+- модель сцены (`Scene3D`, `SceneGraph`, `SceneNode`);
+- импорт glTF/glb (`GltfSceneImporter`, `ModelLoader`);
+- рендер-пайплайн и OpenGL-ресурсы;
+- системы анимации и runtime-поведения;
+- шейдерная подсистема PBR/Unlit/Debug.
 
-## 2. РўРѕС‡РєР° Р·Р°РїСѓСЃРєР°
+## 2. Точка запуска
 
-Р¤Р°Р№Р»: [Program.cs](../Program.cs).
+Файл: [Program.cs](../Program.cs).
 
-РџРµСЂРµРґ СЃС‚Р°СЂС‚РѕРј UI:
+Перед стартом UI:
 
 - `ImportValidationConfiguration.Configure(...)`
 - `MaterialAlphaImportConfiguration.Configure(...)`
 - `MaterialImportOverrideConfiguration.ConfigureFromPath(...)`
 
-Р”Р°Р»РµРµ:
+Далее:
 
-- desktop startup С‡РµСЂРµР· `StartWithClassicDesktopLifetime`;
-- РЅР° Linux РІРѕР·РјРѕР¶РµРЅ DRM startup СЃ `-card=` Рё `-resolution=`.
+- desktop startup через `StartWithClassicDesktopLifetime`;
+- на Linux возможен DRM startup с `-card=` и `-resolution=`.
 
-## 3. РљР»СЋС‡РµРІС‹Рµ РїР°РєРµС‚С‹
+## 3. Ключевые пакеты
 
-Р’ [Avalonia3D.csproj](../Avalonia3D.csproj) РїРѕРґРєР»СЋС‡РµРЅС‹:
+В [Avalonia3D.csproj](../Avalonia3D.csproj) подключены:
 
-- Avalonia UI (`Avalonia`, `Avalonia.Desktop`, `Avalonia.Skia`, Рё С‚.Рґ.);
+- Avalonia UI (`Avalonia`, `Avalonia.Desktop`, `Avalonia.Skia`, и т.д.);
 - OpenGL API (`Silk.NET.OpenGL`, `Silk.NET.OpenGLES`);
-- glTF СЃС‚РµРє (`SharpGLTF.Core`, `SharpGLTF.Runtime`, `SharpGLTF.Toolkit`);
+- glTF стек (`SharpGLTF.Core`, `SharpGLTF.Runtime`, `SharpGLTF.Toolkit`);
 - image decode (`SixLabors.ImageSharp`);
-- Р»РѕРіРёСЂРѕРІР°РЅРёРµ (`Serilog`).
+- логирование (`Serilog`).
 
-## 4. РћСЃРЅРѕРІРЅС‹Рµ РїРѕРґСЃРёСЃС‚РµРјС‹
+## 4. Основные подсистемы
 
-### 4.1 Scene Рё domain model
+### 4.1 Scene и domain model
 
-РџР°РїРєР°: [Model/](../Model/).
+Папка: [Model/](../Model/).
 
-РљР»СЋС‡РµРІС‹Рµ С‚РёРїС‹:
+Ключевые типы:
 
-- `Scene3D` - С†РµРЅС‚СЂР°Р»СЊРЅС‹Р№ runtime-РєРѕРЅС‚РµР№РЅРµСЂ.
-- ``SceneGraph` / `SceneNode`` - РёРµСЂР°СЂС…РёСЏ СѓР·Р»РѕРІ.
+- `Scene3D` - центральный runtime-контейнер.
+- ``SceneGraph` / `SceneNode`` - иерархия узлов.
 - `MeshObject`, `MeshGroup`, `Material`, `TextureData`.
-- `EnvironmentLightingSettings` - runtime-РїР°СЂР°РјРµС‚СЂС‹ IBL/РѕРєСЂСѓР¶РµРЅРёСЏ.
+- `EnvironmentLightingSettings` - runtime-параметры IBL/окружения.
 
-### 4.2 РРјРїРѕСЂС‚ glTF
+### 4.2 Импорт glTF
 
-РџР°РїРєР°: [Loaders/](../Loaders/).
+Папка: [Loaders/](../Loaders/).
 
-РљР»СЋС‡РµРІС‹Рµ С‚РёРїС‹:
+Ключевые типы:
 
 - `GltfSceneImporter`:
-  - С‡С‚РµРЅРёРµ `ModelRoot`;
-  - fallback РёР· strict РІ relaxed validation;
-  - РїРѕСЃС‚СЂРѕРµРЅРёРµ `SceneImportResult`.
+  - чтение `ModelRoot`;
+  - fallback из strict в relaxed validation;
+  - построение `SceneImportResult`.
 - `ModelLoader`:
-  - СЂР°Р·Р±РѕСЂ РіРµРѕРјРµС‚СЂРёРё/РјР°С‚РµСЂРёР°Р»РѕРІ/С‚РµРєСЃС‚СѓСЂ;
+  - разбор геометрии/материалов/текстур;
   - material policy;
   - texture decode + resize + cache.
 
-РџРѕР»РёС‚РёРєРё:
+Политики:
 
 - `ImportValidationConfiguration` - strict/relaxed.
 - `MaterialAlphaImportConfiguration` - `strict|balanced|legacy`.
-- `MaterialImportOverrideConfiguration` - asset/material overrides РёР· JSON.
+- `MaterialImportOverrideConfiguration` - asset/material overrides из JSON.
 
-### 4.3 Р РµРЅРґРµСЂ
+### 4.3 Рендер
 
-РџР°РїРєР°: [Rendering/](../Rendering/).
+Папка: [Rendering/](../Rendering/).
 
-РљР»СЋС‡РµРІС‹Рµ РєРѕРјРїРѕРЅРµРЅС‚С‹:
+Ключевые компоненты:
 
-- `RenderPipeline` - СЃР±РѕСЂ РІРёРґРёРјС‹С… РѕР±СЉРµРєС‚РѕРІ, culling, СЃРѕСЂС‚РёСЂРѕРІРєР° РїСЂРѕР·СЂР°С‡РЅС‹С….
-- `RenderPipelineFactory` - СЃРѕСЃС‚Р°РІ pass-РѕРІ РїРѕ `GraphicsProfile`.
-- `RenderResourceManager` - GPU-Р±СѓС„РµСЂС‹/С‚РµРєСЃС‚СѓСЂС‹ Рё РєРµС€ РіРµРѕРјРµС‚СЂРёРё.
-- Pass-С‹:
+- `RenderPipeline` - сбор видимых объектов, culling, сортировка прозрачных.
+- `RenderPipelineFactory` - состав pass-ов по `GraphicsProfile`.
+- `RenderResourceManager` - GPU-буферы/текстуры и кеш геометрии.
+- Pass-ы:
   - `ShadowPass`
   - `EnvironmentLightingPass`
   - `ForwardPass`
   - `BloomPass`
   - `PostEffectsPass`
 
-### 4.4 РЁРµР№РґРµСЂС‹
+### 4.4 Шейдеры
 
-РџР°РїРєРё: [Shaders/](../Shaders/), [Rendering/ShaderSelectionPolicy.cs](../Rendering/ShaderSelectionPolicy.cs).
+Папки: [Shaders/](../Shaders/), [Rendering/ShaderSelectionPolicy.cs](../Rendering/ShaderSelectionPolicy.cs).
 
-РћСЃРѕР±РµРЅРЅРѕСЃС‚Рё:
+Особенности:
 
-- СЃС‚Р°С‚РёС‡РµСЃРєРёР№ registry (`ShaderRegistry`);
+- статический registry (`ShaderRegistry`);
 - feature-based PBR shader ids (`ShaderIds.CreatePbrVariantId(...)`);
-- runtime РіРµРЅРµСЂР°С†РёСЏ PBR-РІР°СЂРёР°РЅС‚РѕРІ РїСЂРё РЅРµРґРѕСЃС‚Р°СЋС‰РµРј СЃС‚Р°С‚РёС‡РµСЃРєРѕРј С€РµР№РґРµСЂРµ;
-- fallback Рє Р±Р°Р·РѕРІРѕРјСѓ PBR/default.
+- runtime генерация PBR-вариантов при недостающем статическом шейдере;
+- fallback к базовому PBR/default.
 
-### 4.5 РђРЅРёРјР°С†РёСЏ
+### 4.5 Анимация
 
-РџР°РїРєР°: [Animation/](../Animation/).
+Папка: [Animation/](../Animation/).
 
-РљР»СЋС‡РµРІС‹Рµ СЌР»РµРјРµРЅС‚С‹:
+Ключевые элементы:
 
 - `Animator`, `AnimatorComponent`;
 - `AnimationClip`, `AnimationChannel`, keyframe/interpolation;
-- binding-РєР»Р°СЃСЃС‹ РґР»СЏ node/material/texture transform С†РµР»РµР№;
-- РїРѕРґРґРµСЂР¶РєР° morph-driven emission Р»РѕРіРёРєРё.
+- binding-классы для node/material/texture transform целей;
+- поддержка morph-driven emission логики.
 
-### 4.6 РџРѕРІРµРґРµРЅРёСЏ Рё РєРѕРјР°РЅРґС‹
+### 4.6 Поведения и команды
 
-РџР°РїРєР°: [Interaction/Behaviors/](../Interaction/Behaviors/).
+Папка: [Interaction/Behaviors/](../Interaction/Behaviors/).
 
-РљР»СЋС‡РµРІС‹Рµ СЌР»РµРјРµРЅС‚С‹:
+Ключевые элементы:
 
 - `SceneCommand`, `SceneCommandBus`;
-- `DoorBehavior` (РІРєР»СЋС‡Р°СЏ runtime rotation fallback);
+- `DoorBehavior` (включая runtime rotation fallback);
 - `WheelRotationBehavior`.
 
-## 5. GraphicsProfile Рё РєР°С‡РµСЃС‚РІРѕ
+## 5. GraphicsProfile и качество
 
-Р¤Р°Р№Р»: [Rendering/GraphicsProfile.cs](../Rendering/GraphicsProfile.cs).
+Файл: [Rendering/GraphicsProfile.cs](../Rendering/GraphicsProfile.cs).
 
-РџСЂРѕС„РёР»Рё:
+Профили:
 
 - `Low`, `Medium`, `High`, `Ultra`, `PbrDebugNeutral`.
 
-РџРѕРєСЂС‹РІР°СЋС‚:
+Покрывают:
 
 - MSAA;
 - shadow map size;
 - post effects flags;
-- bloom РЅР°СЃС‚СЂРѕР№РєРё;
+- bloom настройки;
 - reflections and environment map;
 - PBR tuning (exposure, IBL intensity, clamps).
 
-## 6. РџР°РјСЏС‚СЊ Рё РєРµС€РёСЂРѕРІР°РЅРёРµ
+## 6. Память и кеширование
 
-- [Memory/MemoryManager.cs](../Memory/MemoryManager.cs) - soft cleanup, СЂРµР¶РёРјС‹ РїРѕРґ РєСЂСѓРїРЅС‹Рµ Р°СЃСЃРµС‚С‹.
+- [Memory/MemoryManager.cs](../Memory/MemoryManager.cs) - soft cleanup, режимы под крупные ассеты.
 - `ModelLoader`:
   - texture decode LRU cache;
   - material index map cache;
   - persisted texture cache.
 - `GltfSceneImporter`:
-  - cache РёРјРїРѕСЂС‚РёСЂРѕРІР°РЅРЅС‹С… РјРѕРґРµР»РµР№ СЃ trim РїРѕ СЂР°Р·РјРµСЂСѓ/РІРѕР·СЂР°СЃС‚Сѓ.
+  - cache импортированных моделей с trim по размеру/возрасту.
 
-## 7. Р Р°СЃС€РёСЂРµРЅРёРµ Рё РёРЅС‚РµРіСЂР°С†РёСЏ
+## 7. Расширение и интеграция
 
-РўРёРїРёС‡РЅС‹Рµ extension points:
+Типичные extension points:
 
-- РЅРѕРІС‹Рµ `ISceneModule`;
-- РЅРѕРІС‹Рµ ``ISceneBehavior`/`IUpdatableBehavior``;
-- РЅРѕРІС‹Рµ render passes С‡РµСЂРµР· СЂР°СЃС€РёСЂРµРЅРёРµ `RenderPipelineFactory`;
-- РЅРѕРІС‹Рµ shader-РІР°СЂРёР°РЅС‚С‹ С‡РµСЂРµР· `ShaderRegistry` Рё runtime factory;
-- РєР°СЃС‚РѕРјРЅС‹Р№ material import policy.
+- новые `ISceneModule`;
+- новые ``ISceneBehavior`/`IUpdatableBehavior``;
+- новые render passes через расширение `RenderPipelineFactory`;
+- новые shader-варианты через `ShaderRegistry` и runtime factory;
+- кастомный material import policy.
 
 
 

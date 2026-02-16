@@ -1,22 +1,22 @@
-﻿# Avalonia3D Documentation
+# Avalonia3D Documentation
 
 ## RU
 
-### РќР°Р·РЅР°С‡РµРЅРёРµ
+### Назначение
 
-Р­С‚Р° РїР°РїРєР° СЃРѕРґРµСЂР¶РёС‚ СЃС‚СЂСѓРєС‚СѓСЂРёСЂРѕРІР°РЅРЅСѓСЋ РґРѕРєСѓРјРµРЅС‚Р°С†РёСЋ РїРѕ РІСЃРµРј РїСЂРѕРµРєС‚Р°Рј СЂРµС€РµРЅРёСЏ [Avalonia3D.sln](../Avalonia3D.sln).
+Эта папка содержит структурированную документацию по всем проектам решения [Avalonia3D.sln](../Avalonia3D.sln).
 
-### РЎРѕРґРµСЂР¶Р°РЅРёРµ
+### Содержание
 
-- [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md) - СЃРєРІРѕР·РЅР°СЏ Р°СЂС…РёС‚РµРєС‚СѓСЂР°: РєР°Рє РґР°РЅРЅС‹Рµ РїСЂРѕС…РѕРґСЏС‚ РѕС‚ Р·Р°РіСЂСѓР·РєРё Р°СЃСЃРµС‚Р° РґРѕ РєР°РґСЂР°.
-- [PROJECT_AVALONIA3D.ru.md](PROJECT_AVALONIA3D.ru.md) - РґРµС‚Р°Р»СЊРЅРѕ РїСЂРѕ СЏРґСЂРѕ (`Avalonia3D`).
-- [PROJECT_SANDBOX.ru.md](PROJECT_SANDBOX.ru.md) - РґРµС‚Р°Р»СЊРЅРѕ РїСЂРѕ sandbox (`Avalonia3D.Sandbox`).
-- [PROJECT_TESTS.ru.md](PROJECT_TESTS.ru.md) - РґРµС‚Р°Р»СЊРЅРѕ РїСЂРѕ С‚РµСЃС‚РѕРІС‹Р№ РїСЂРѕРµРєС‚ (`Avalonia3D.Tests`).
-- [ARCHITECTURE.en.md](ARCHITECTURE.en.md), `PROJECT_*.en.md` - Р°РЅРіР»РёР№СЃРєРёРµ РІРµСЂСЃРёРё С‚РµС… Р¶Рµ РґРѕРєСѓРјРµРЅС‚РѕРІ.
+- [ARCHITECTURE.ru.md](ARCHITECTURE.ru.md) - сквозная архитектура: как данные проходят от загрузки ассета до кадра.
+- [PROJECT_AVALONIA3D.ru.md](PROJECT_AVALONIA3D.ru.md) - детально про ядро (`Avalonia3D`).
+- [PROJECT_SANDBOX.ru.md](PROJECT_SANDBOX.ru.md) - детально про sandbox (`Avalonia3D.Sandbox`).
+- [PROJECT_TESTS.ru.md](PROJECT_TESTS.ru.md) - детально про тестовый проект (`Avalonia3D.Tests`).
+- [ARCHITECTURE.en.md](ARCHITECTURE.en.md), `PROJECT_*.en.md` - английские версии тех же документов.
 
-### Р‘С‹СЃС‚СЂС‹Р№ РІС…РѕРґ
+### Быстрый вход
 
-- РР· РєРѕСЂРЅСЏ СЂРµРїРѕР·РёС‚РѕСЂРёСЏ: [QUICKSTART.ru.md](../QUICKSTART.ru.md).
+- Из корня репозитория: [QUICKSTART.ru.md](../QUICKSTART.ru.md).
 
 ## EN
 
