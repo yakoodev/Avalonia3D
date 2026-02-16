@@ -18,7 +18,11 @@ public class BehaviorIntegrationTests
         graph.Root.AddChild(new SceneNode { SemanticId = "door.main", StableId = "door.main" });
         scene.AnimatorComponent.SetSceneGraph(graph);
 
-        var doorBehavior = new DoorBehavior("door.main", openClipName: "door.main.open", closeClipName: "door.main.close");
+        var doorBehavior = new DoorBehavior(
+            "door.main",
+            openClipName: "door.main.open",
+            closeClipName: "door.main.close",
+            runtimeFallback: new DoorRuntimeRotationFallback("door.main", DoorNodeTargetKeyMode.SemanticId, Vector3.UnitY, 90f));
         scene.RegisterBehavior(doorBehavior);
 
         scene.AnimatorComponent.RegisterClip(CreateClip("door.main.open"));
@@ -28,6 +32,38 @@ public class BehaviorIntegrationTests
 
         Assert.True(opened);
         Assert.True(scene.AnimatorComponent.GetClipState("door.main.open").IsPlaying);
+
+        var rotatedZ = Vector3.Transform(Vector3.UnitZ, graph.FindNodeBySemanticId("door.main")!.Rotation);
+        Assert.InRange(rotatedZ.Z, 0.99f, 1.01f);
+    }
+
+    [Fact]
+    public void DoorBehavior_RuntimeFallback_RotatesNode_WhenClipsMissing()
+    {
+        var scene = new Scene3D();
+        var graph = new SceneGraph();
+        var doorNode = new SceneNode { SemanticId = "door.main", StableId = "door.main" };
+        graph.Root.AddChild(doorNode);
+        scene.AnimatorComponent.SetSceneGraph(graph);
+
+        var doorBehavior = new DoorBehavior(
+            "door.main",
+            openClipName: "door.main.open",
+            closeClipName: "door.main.close",
+            runtimeFallback: new DoorRuntimeRotationFallback("door.main", DoorNodeTargetKeyMode.SemanticId, Vector3.UnitY, 90f));
+        scene.RegisterBehavior(doorBehavior);
+
+        Assert.True(scene.DispatchCommand(SceneCommand.Open("door.main")));
+
+        var rotatedOpen = Vector3.Transform(Vector3.UnitZ, doorNode.Rotation);
+        Assert.InRange(rotatedOpen.X, 0.99f, 1.01f);
+        Assert.InRange(rotatedOpen.Z, -0.01f, 0.01f);
+
+        Assert.True(scene.DispatchCommand(SceneCommand.Close("door.main")));
+
+        var rotatedClosed = Vector3.Transform(Vector3.UnitZ, doorNode.Rotation);
+        Assert.InRange(rotatedClosed.X, -0.01f, 0.01f);
+        Assert.InRange(rotatedClosed.Z, 0.99f, 1.01f);
     }
 
     [Fact]
