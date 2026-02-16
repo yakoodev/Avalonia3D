@@ -86,12 +86,26 @@ namespace Avalonia3D.Model.StandObjects
 
             if (_resources != null)
             {
-                return;
+                if (ReferenceEquals(_resourceManager, resourceManager))
+                {
+                    return;
+                }
+
+                // GL context can be recreated by host compositor.
+                // Old resource handles must be dropped and recreated for the new manager.
+                _resources = null;
             }
 
             _resourceManager = resourceManager;
             _gl = resourceManager.Gl;
             _resources = resourceManager.Acquire(_model);
+        }
+
+        public void InvalidateRenderResources()
+        {
+            _resources = null;
+            _resourceManager = null;
+            _gl = null;
         }
 
         public bool HasAssignedModel => _model != null;

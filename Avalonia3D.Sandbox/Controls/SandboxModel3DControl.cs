@@ -63,6 +63,9 @@ public class SandboxModel3DControl : OpenGlControlBase
     private bool _isLoading;
     private string? _lastLoadError;
     private bool _isRendererReady;
+    private bool _frameRequestScheduled;
+    private DateTime _interactionUntilUtc = DateTime.MinValue;
+    private bool _hasPendingRenderWork;
 
     public SandboxModel3DControl()
     {
@@ -73,6 +76,11 @@ public class SandboxModel3DControl : OpenGlControlBase
         _inputHandler = new MouseKeyboardInputHandler(CameraController);
         _sceneLoader = new SceneLoader(_renderer.Scene, DefaultSceneSource, _renderThreadScheduler);
         _sceneLoader.UnloadBeforePrepare = UnloadBeforeLoad;
+        _renderThreadScheduler.WorkEnqueued += () =>
+        {
+            _hasPendingRenderWork = true;
+            Dispatcher.UIThread.Post(() => ScheduleNextFrame(TimeSpan.Zero));
+        };
         _sceneLoader.SceneChanged += scene =>
         {
             Dispatcher.UIThread.Post(() =>
@@ -80,13 +88,22 @@ public class SandboxModel3DControl : OpenGlControlBase
                 SetAndRaise(IsLoadingProperty, ref _isLoading, false);
                 SelectedSceneId = scene.Id;
                 SetAndRaise(LastLoadErrorProperty, ref _lastLoadError, null);
+                MarkInteractionActive();
                 SceneLoaded?.Invoke(scene);
             });
         };
 
         LoadSceneCommand = new RelayCommand(parameter => RequestSceneLoad(parameter as string));
-        FrameSceneCommand = new RelayCommand(_ => _renderThreadScheduler.Enqueue(() => CameraController.FrameAll()));
-        ResetCameraCommand = new RelayCommand(_ => _renderThreadScheduler.Enqueue(() => CameraController.ResetView()));
+        FrameSceneCommand = new RelayCommand(_ =>
+        {
+            _renderThreadScheduler.Enqueue(() => CameraController.FrameAll());
+            MarkInteractionActive();
+        });
+        ResetCameraCommand = new RelayCommand(_ =>
+        {
+            _renderThreadScheduler.Enqueue(() => CameraController.ResetView());
+            MarkInteractionActive();
+        });
 
         _renderer.RendererInitialized += () => RendererInitialized?.Invoke(this, EventArgs.Empty);
 
@@ -121,6 +138,14 @@ public class SandboxModel3DControl : OpenGlControlBase
             if (!string.IsNullOrWhiteSpace(selectedId))
             {
                 RequestSceneLoad(selectedId);
+            }
+        }
+        else if (change.Property == BoundsProperty && _gl != null)
+        {
+            var newBounds = change.GetNewValue<Rect>();
+            if (newBounds.Width > 0 && newBounds.Height > 0)
+            {
+                MarkInteractionActive();
             }
         }
     }
@@ -170,6 +195,7 @@ public class SandboxModel3DControl : OpenGlControlBase
     public void ApplyGraphicsProfile(GraphicsProfile profile)
     {
         _renderThreadScheduler.Enqueue(() => _renderer.SetGraphicsProfile(profile));
+        MarkInteractionActive();
     }
 
     public GraphicsProfile GetGraphicsProfile() => _renderer.GraphicsProfile;
@@ -195,16 +221,24 @@ public class SandboxModel3DControl : OpenGlControlBase
         SetAndRaise(IsRendererReadyProperty, ref _isRendererReady, true);
         _sceneLoader.MarkRendererReady();
         ApplySensitivity();
+        MarkInteractionActive();
+        RequestNextFrameRendering();
         Log.Information("SandboxModel3DControl initialized. Bounds={Bounds}", Bounds);
     }
 
     protected override void OnOpenGlRender(GlInterface gl, int fb)
     {
         if (_gl == null) return;
+        _frameRequestScheduled = false;
 
         int width = (int)Bounds.Width;
         int height = (int)Bounds.Height;
         if (width <= 0 || height <= 0) return;
+        if (fb <= 0)
+        {
+            ScheduleNextFrame(TimeSpan.Zero);
+            return;
+        }
 
         if (_lastFramebuffer != fb)
         {
@@ -212,24 +246,44 @@ public class SandboxModel3DControl : OpenGlControlBase
             Log.Information("Sandbox OpenGL target framebuffer: {FramebufferId}", fb);
         }
 
-        _renderer.FrameState.OutputFramebufferId = (uint)Math.Max(0, fb);
-        _renderThreadScheduler.ExecutePending();
+        _renderer.FrameState.OutputFramebufferId = (uint)fb;
+        var executedActions = _renderThreadScheduler.ExecutePending();
+        _hasPendingRenderWork = false;
         _renderer.Resize((uint)width, (uint)height);
         _renderer.RenderFrame(width, height);
-        RequestNextFrameRendering();
+
+        if (executedActions > 0)
+        {
+            _interactionUntilUtc = DateTime.UtcNow.AddMilliseconds(InteractionKeepAliveMs);
+        }
+
+        if (_hasPendingRenderWork || ShouldRunActiveLoop())
+        {
+            var activeDelay = TimeSpan.FromSeconds(1.0 / ActiveFps);
+            ScheduleNextFrame(activeDelay);
+        }
+        else if (IdleFps > 0)
+        {
+            var idleDelay = TimeSpan.FromSeconds(1.0 / IdleFps);
+            ScheduleNextFrame(idleDelay);
+        }
     }
 
     protected override void OnOpenGlDeinit(GlInterface gl)
     {
-        _renderer.Clear();
+        _renderer.ReleaseContextResources();
         SetAndRaise(IsRendererReadyProperty, ref _isRendererReady, false);
         _gl = null;
+        _frameRequestScheduled = false;
         base.OnOpenGlDeinit(gl);
     }
 
     private float _rotationSensitivity = 0.01f;
     private float _panSensitivity = 0.01f;
     private float _zoomSensitivity = 2f;
+    private int _activeFps = 60;
+    private int _idleFps = 0;
+    private int _interactionKeepAliveMs = 500;
 
     [Category("Interaction")]
     public float RotationSensitivity { get => _rotationSensitivity; set { _rotationSensitivity = value; ApplySensitivity(); } }
@@ -240,10 +294,32 @@ public class SandboxModel3DControl : OpenGlControlBase
     [Category("Interaction")]
     public float ZoomSensitivity { get => _zoomSensitivity; set { _zoomSensitivity = value; ApplySensitivity(); } }
 
+    [Category("Rendering")]
+    public int ActiveFps
+    {
+        get => _activeFps;
+        set => _activeFps = Math.Clamp(value, 1, 240);
+    }
+
+    [Category("Rendering")]
+    public int IdleFps
+    {
+        get => _idleFps;
+        set => _idleFps = Math.Clamp(value, 0, 60);
+    }
+
+    [Category("Rendering")]
+    public int InteractionKeepAliveMs
+    {
+        get => _interactionKeepAliveMs;
+        set => _interactionKeepAliveMs = Math.Clamp(value, 0, 5000);
+    }
+
     private int _lastFramebuffer = -1;
 
     public void HandlePointerPressed(PointerPressedEventArgs e)
     {
+        MarkInteractionActive();
         var point = e.GetPosition(this);
         _activeMouseButton = ResolveMouseButton(e);
 
@@ -261,6 +337,7 @@ public class SandboxModel3DControl : OpenGlControlBase
 
     public void HandlePointerReleased(PointerReleasedEventArgs e)
     {
+        MarkInteractionActive();
         var point = e.GetPosition(this);
         var releasedButton = e.InitialPressMouseButton == MouseButton.None ? _activeMouseButton : e.InitialPressMouseButton;
 
@@ -282,6 +359,7 @@ public class SandboxModel3DControl : OpenGlControlBase
 
         if (_isPointerDragActive)
         {
+            MarkInteractionActive();
             _inputHandler.OnMouseMove(new Vector2((float)point.X, (float)point.Y));
             e.Handled = true;
         }
@@ -289,6 +367,7 @@ public class SandboxModel3DControl : OpenGlControlBase
 
     public void HandlePointerWheelChanged(PointerWheelEventArgs e)
     {
+        MarkInteractionActive();
         _inputHandler.OnMouseWheel((float)e.Delta.Y);
         e.Handled = true;
     }
@@ -327,6 +406,7 @@ public class SandboxModel3DControl : OpenGlControlBase
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
+        MarkInteractionActive();
         _inputHandler.OnKeyDown(e.Key);
     }
 
@@ -348,6 +428,49 @@ public class SandboxModel3DControl : OpenGlControlBase
         CameraController.OrbitSensitivity = RotationSensitivity;
         CameraController.PanSensitivity = PanSensitivity;
         CameraController.DollySensitivity = ZoomSensitivity;
+    }
+
+    private bool ShouldRunActiveLoop()
+    {
+        if (Scene.HasActiveAnimations)
+        {
+            return true;
+        }
+
+        return DateTime.UtcNow < _interactionUntilUtc;
+    }
+
+    private void MarkInteractionActive()
+    {
+        _interactionUntilUtc = DateTime.UtcNow.AddMilliseconds(InteractionKeepAliveMs);
+        ScheduleNextFrame(TimeSpan.Zero);
+    }
+
+    private void ScheduleNextFrame(TimeSpan delay)
+    {
+        if (_gl == null || _frameRequestScheduled)
+        {
+            return;
+        }
+
+        _frameRequestScheduled = true;
+
+        if (delay <= TimeSpan.Zero)
+        {
+            RequestNextFrameRendering();
+            return;
+        }
+
+        DispatcherTimer.RunOnce(() =>
+        {
+            if (_gl == null)
+            {
+                _frameRequestScheduled = false;
+                return;
+            }
+
+            RequestNextFrameRendering();
+        }, delay);
     }
 
     private void BuildSceneIndex(string sceneSource)
@@ -388,6 +511,7 @@ public class SandboxModel3DControl : OpenGlControlBase
             SetAndRaise(IsLoadingProperty, ref _isLoading, true);
             SetAndRaise(LastLoadErrorProperty, ref _lastLoadError, null);
             _sceneLoader.Load(scene);
+            MarkInteractionActive();
         }
         catch (Exception ex)
         {

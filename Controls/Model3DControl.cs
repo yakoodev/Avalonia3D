@@ -69,8 +69,13 @@ namespace Avalonia3D.Controls
             int w = (int)Bounds.Width;
             int h = (int)Bounds.Height;
             if (w <= 0 || h <= 0) return;
+            if (fb <= 0)
+            {
+                ScheduleNextFrame(TimeSpan.Zero);
+                return;
+            }
 
-            _renderer.FrameState.OutputFramebufferId = (uint)Math.Max(0, fb);
+            _renderer.FrameState.OutputFramebufferId = (uint)fb;
             _renderer.Resize((uint)w, (uint)h);
             _renderer.RenderFrame(w, h);
 
@@ -88,7 +93,7 @@ namespace Avalonia3D.Controls
 
         protected override void OnOpenGlDeinit(GlInterface gl)
         {
-            _renderer.Clear();
+            _renderer.ReleaseContextResources();
             _gl = null;
             _frameRequestScheduled = false;
             base.OnOpenGlDeinit(gl);
