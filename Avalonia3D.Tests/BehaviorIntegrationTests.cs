@@ -1,4 +1,5 @@
 using System;
+using System.Numerics;
 using Avalonia3D.Animation;
 using Avalonia3D.Interaction.Behaviors;
 using Avalonia3D.Model;
@@ -46,6 +47,41 @@ public class BehaviorIntegrationTests
         animator.Update(1f);
 
         Assert.Equal("door.main.open", completedClip);
+    }
+
+    [Fact]
+    public void WheelRotationBehavior_CanResolveNodeByName_AndRotateUsingConfiguredAxis()
+    {
+        var scene = new Scene3D();
+        var wheelNode = new SceneNode { Name = "WheelLF", StableId = "node:wheel.lf" };
+        scene.SceneGraph.Root.AddChild(wheelNode);
+
+        var behavior = new WheelRotationBehavior("WheelLF", MathF.PI, WheelNodeTargetKeyMode.Name, Vector3.UnitY);
+        behavior.Attach(scene);
+
+        Assert.True(behavior.CanHandle(SceneCommand.Open("WheelLF")));
+        Assert.True(behavior.Handle(SceneCommand.Open("WheelLF")));
+
+        behavior.Update(1f);
+
+        var rotatedZ = Vector3.Transform(Vector3.UnitZ, wheelNode.Rotation);
+        Assert.InRange(rotatedZ.Z, -1.01f, -0.99f);
+    }
+
+    [Fact]
+    public void WheelRotationBehavior_DefaultConstructor_KeepsSemanticIdAndXAxisBehavior()
+    {
+        var scene = new Scene3D();
+        var wheelNode = new SceneNode { SemanticId = "wheel.front.left", StableId = "node:wheel.lf" };
+        scene.SceneGraph.Root.AddChild(wheelNode);
+
+        var behavior = new WheelRotationBehavior("wheel.front.left", MathF.PI);
+        behavior.Attach(scene);
+        behavior.Handle(SceneCommand.Open("wheel.front.left"));
+        behavior.Update(1f);
+
+        var rotatedZ = Vector3.Transform(Vector3.UnitZ, wheelNode.Rotation);
+        Assert.InRange(rotatedZ.Z, -1.01f, -0.99f);
     }
 
     private static AnimationClip CreateClip(string name)

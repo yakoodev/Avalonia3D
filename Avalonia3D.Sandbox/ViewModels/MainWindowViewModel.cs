@@ -17,12 +17,20 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
+using System.Numerics;
 
 namespace Avalonia3D.Sandbox.ViewModels;
 
 public sealed class MainWindowViewModel : INotifyPropertyChanged
 {
     private const string PreferredStartupSceneId = "gltf:car2/scene";
+    private const string Car2SceneId = "gltf:car2/scene";
+    private const float Car2WheelStepRadians = 1.20f;
+    private const float Car2WheelQuarterTurnRadians = MathF.PI / 2f;
+    private const float Car2WheelFullTurnRadians = MathF.PI * 2f;
+    private const float Car2WheelAutoSpinRadiansPerSecond = 10f;
+    private const float Car2MoveStep = 0.35f;
+    private const float Car2TurnStepRadians = MathF.PI / 24f;
     private readonly Scene3D _scene;
     private readonly CameraController _cameraController;
     private readonly IRenderThreadScheduler _renderThreadScheduler;
@@ -57,6 +65,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private string? _selectedSceneId;
     private readonly HashSet<string> _loadedSceneIds = new(StringComparer.OrdinalIgnoreCase);
     private string _cameraPreviewText = "camera: n/a";
+    private string _car2AnimatorStatus = "Car2 animator: load scene 'gltf:car2/scene'.";
+    private readonly Dictionary<string, NodePose> _car2PoseSnapshot = new(StringComparer.Ordinal);
+    private bool _car2WheelAutoSpinEnabled;
+    private float _car2WheelAutoSpinDirection = 1f;
+    private readonly DispatcherTimer _car2WheelAutoSpinTimer;
 
     public MainWindowViewModel(Scene3D scene, CameraController cameraController, string assetsRoot, IRenderThreadScheduler renderThreadScheduler, Action<GraphicsProfile> applyGraphicsProfile, SandboxModel3DControl viewport)
     {
@@ -80,6 +93,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 UpdateImportStatus();
                 RefreshClips();
                 UpdateCameraPreview();
+                PrepareCar2AnimatorForLoadedScene(sceneInfo.Id);
                 ExecuteOnRenderThread(() => _cameraController.CaptureHomeView());
             });
         };
@@ -170,6 +184,23 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         ResetProfileJsonCommand = new RelayCommand(_ => ResetProfileJson());
         ApplyEnvironmentMapPathCommand = new RelayCommand(_ => ApplyEnvironmentMapPath());
         LoadSceneCommand = new RelayCommand(sceneId => LoadScene(sceneId as string ?? SelectedSceneId));
+        Car2RotateWheelsForwardCommand = new RelayCommand(_ => ExecuteCar2AnimatorAction(() => RotateCar2Wheels(Car2WheelStepRadians)));
+        Car2RotateWheelsBackwardCommand = new RelayCommand(_ => ExecuteCar2AnimatorAction(() => RotateCar2Wheels(-Car2WheelStepRadians)));
+        Car2RotateWheelsQuarterForwardCommand = new RelayCommand(_ => ExecuteCar2AnimatorAction(() => RotateCar2Wheels(Car2WheelQuarterTurnRadians)));
+        Car2RotateWheelsQuarterBackwardCommand = new RelayCommand(_ => ExecuteCar2AnimatorAction(() => RotateCar2Wheels(-Car2WheelQuarterTurnRadians)));
+        Car2RotateWheelsFullForwardCommand = new RelayCommand(_ => ExecuteCar2AnimatorAction(() => RotateCar2Wheels(Car2WheelFullTurnRadians)));
+        Car2RotateWheelsFullBackwardCommand = new RelayCommand(_ => ExecuteCar2AnimatorAction(() => RotateCar2Wheels(-Car2WheelFullTurnRadians)));
+        Car2StartWheelAutoSpinForwardCommand = new RelayCommand(_ => ExecuteCar2AnimatorAction(() => SetCar2WheelAutoSpin(enabled: true, direction: 1f)));
+        Car2StartWheelAutoSpinBackwardCommand = new RelayCommand(_ => ExecuteCar2AnimatorAction(() => SetCar2WheelAutoSpin(enabled: true, direction: -1f)));
+        Car2StopWheelAutoSpinCommand = new RelayCommand(_ => ExecuteCar2AnimatorAction(() => SetCar2WheelAutoSpin(enabled: false, direction: _car2WheelAutoSpinDirection)));
+        Car2MoveForwardCommand = new RelayCommand(_ => ExecuteCar2AnimatorAction(() => MoveCar2(new Vector3(Car2MoveStep, 0f, 0f))));
+        Car2MoveBackwardCommand = new RelayCommand(_ => ExecuteCar2AnimatorAction(() => MoveCar2(new Vector3(-Car2MoveStep, 0f, 0f))));
+        Car2TurnLeftCommand = new RelayCommand(_ => ExecuteCar2AnimatorAction(() => TurnCar2(Car2TurnStepRadians)));
+        Car2TurnRightCommand = new RelayCommand(_ => ExecuteCar2AnimatorAction(() => TurnCar2(-Car2TurnStepRadians)));
+        Car2ResetPoseCommand = new RelayCommand(_ => ExecuteCar2AnimatorAction(ResetCar2Pose));
+
+        _car2WheelAutoSpinTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(33), DispatcherPriority.Background, OnCar2WheelAutoSpinTick);
+        _car2WheelAutoSpinTimer.Start();
 
         ApplyRenderQualityPreset(RenderQualityPreset.Medium);
 
@@ -215,8 +246,40 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public RelayCommand ResetProfileJsonCommand { get; }
     public RelayCommand ApplyEnvironmentMapPathCommand { get; }
     public RelayCommand LoadSceneCommand { get; }
+    public RelayCommand Car2RotateWheelsForwardCommand { get; }
+    public RelayCommand Car2RotateWheelsBackwardCommand { get; }
+    public RelayCommand Car2RotateWheelsQuarterForwardCommand { get; }
+    public RelayCommand Car2RotateWheelsQuarterBackwardCommand { get; }
+    public RelayCommand Car2RotateWheelsFullForwardCommand { get; }
+    public RelayCommand Car2RotateWheelsFullBackwardCommand { get; }
+    public RelayCommand Car2StartWheelAutoSpinForwardCommand { get; }
+    public RelayCommand Car2StartWheelAutoSpinBackwardCommand { get; }
+    public RelayCommand Car2StopWheelAutoSpinCommand { get; }
+    public RelayCommand Car2MoveForwardCommand { get; }
+    public RelayCommand Car2MoveBackwardCommand { get; }
+    public RelayCommand Car2TurnLeftCommand { get; }
+    public RelayCommand Car2TurnRightCommand { get; }
+    public RelayCommand Car2ResetPoseCommand { get; }
 
     public string CurrentCameraMode => _cameraController.ControlMode.ToString();
+    public bool IsCar2AnimatorAvailable => string.Equals(SelectedSceneId, Car2SceneId, StringComparison.OrdinalIgnoreCase);
+    public string Car2WheelAutoSpinState => _car2WheelAutoSpinEnabled
+        ? (_car2WheelAutoSpinDirection > 0 ? "Auto spin: ON (forward)" : "Auto spin: ON (reverse)")
+        : "Auto spin: OFF";
+    public string Car2AnimatorStatus
+    {
+        get => _car2AnimatorStatus;
+        private set
+        {
+            if (_car2AnimatorStatus == value)
+            {
+                return;
+            }
+
+            _car2AnimatorStatus = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Car2AnimatorStatus)));
+        }
+    }
 
 
     public bool IsLoading
@@ -279,6 +342,15 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
             _selectedSceneId = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedSceneId)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsCar2AnimatorAvailable)));
+
+            if (!IsCar2AnimatorAvailable)
+            {
+                _car2PoseSnapshot.Clear();
+                _car2WheelAutoSpinEnabled = false;
+                Car2AnimatorStatus = "Car2 animator: load scene 'gltf:car2/scene'.";
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Car2WheelAutoSpinState)));
+            }
         }
     }
 
@@ -982,6 +1054,204 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         });
     }
 
+    private void PrepareCar2AnimatorForLoadedScene(string sceneId)
+    {
+        if (!string.Equals(sceneId, Car2SceneId, StringComparison.OrdinalIgnoreCase))
+        {
+            _car2PoseSnapshot.Clear();
+            _car2WheelAutoSpinEnabled = false;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Car2WheelAutoSpinState)));
+            Car2AnimatorStatus = "Car2 animator: load scene 'gltf:car2/scene'.";
+            return;
+        }
+
+        ExecuteOnRenderThread(() =>
+        {
+            _car2PoseSnapshot.Clear();
+            CaptureCar2PoseIfNeeded();
+            var wheelCount = ResolveCar2WheelNodes().Count;
+            var root = ResolveCar2RootNode();
+            var status = root == null
+                ? "Car2 animator: root node was not found."
+                : $"Car2 animator ready. Wheels detected: {wheelCount}.";
+            Dispatcher.UIThread.Post(() => Car2AnimatorStatus = status);
+        });
+    }
+
+    private void ExecuteCar2AnimatorAction(Func<string> action)
+    {
+        if (!IsCar2AnimatorAvailable)
+        {
+            Car2AnimatorStatus = "Car2 animator is available only for scene 'gltf:car2/scene'.";
+            return;
+        }
+
+        ExecuteOnRenderThread(() =>
+        {
+            var status = action();
+            Dispatcher.UIThread.Post(() => Car2AnimatorStatus = status);
+        });
+    }
+
+    private string RotateCar2Wheels(float radians)
+    {
+        CaptureCar2PoseIfNeeded();
+        var rotatedCount = ApplyCar2WheelRotation(radians);
+        if (rotatedCount == 0)
+        {
+            return "Car2 animator: no wheel nodes found.";
+        }
+
+        return $"Car2 animator: rotated {rotatedCount} wheels by {radians:0.00} rad.";
+    }
+
+    private int ApplyCar2WheelRotation(float radians)
+    {
+        var wheels = ResolveCar2WheelNodes();
+        if (wheels.Count == 0)
+        {
+            return 0;
+        }
+
+        var delta = Quaternion.CreateFromAxisAngle(Vector3.UnitX, radians);
+        foreach (var wheel in wheels)
+        {
+            wheel.Rotation = Quaternion.Normalize(delta * wheel.Rotation);
+        }
+
+        return wheels.Count;
+    }
+
+    private string SetCar2WheelAutoSpin(bool enabled, float direction)
+    {
+        _car2WheelAutoSpinEnabled = enabled;
+        _car2WheelAutoSpinDirection = direction >= 0f ? 1f : -1f;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Car2WheelAutoSpinState)));
+
+        if (!_car2WheelAutoSpinEnabled)
+        {
+            return "Car2 animator: wheel auto spin stopped.";
+        }
+
+        var directionLabel = _car2WheelAutoSpinDirection > 0f ? "forward" : "reverse";
+        return $"Car2 animator: wheel auto spin started ({directionLabel}).";
+    }
+
+    private void OnCar2WheelAutoSpinTick(object? sender, EventArgs e)
+    {
+        if (!_car2WheelAutoSpinEnabled || !IsCar2AnimatorAvailable)
+        {
+            return;
+        }
+
+        ExecuteOnRenderThread(() =>
+        {
+            var radians = _car2WheelAutoSpinDirection * Car2WheelAutoSpinRadiansPerSecond * 0.033f;
+            ApplyCar2WheelRotation(radians);
+        });
+    }
+
+    private string MoveCar2(Vector3 delta)
+    {
+        CaptureCar2PoseIfNeeded();
+        var root = ResolveCar2RootNode();
+        if (root == null)
+        {
+            return "Car2 animator: root node was not found.";
+        }
+
+        root.Position += delta;
+        return $"Car2 animator: moved root by ({delta.X:0.00}, {delta.Y:0.00}, {delta.Z:0.00}).";
+    }
+
+    private string TurnCar2(float radians)
+    {
+        CaptureCar2PoseIfNeeded();
+        var root = ResolveCar2RootNode();
+        if (root == null)
+        {
+            return "Car2 animator: root node was not found.";
+        }
+
+        var delta = Quaternion.CreateFromAxisAngle(Vector3.UnitY, radians);
+        root.Rotation = Quaternion.Normalize(delta * root.Rotation);
+        return $"Car2 animator: yaw turn {radians:0.00} rad.";
+    }
+
+    private string ResetCar2Pose()
+    {
+        if (_car2PoseSnapshot.Count == 0)
+        {
+            CaptureCar2PoseIfNeeded();
+        }
+
+        if (_car2PoseSnapshot.Count == 0)
+        {
+            return "Car2 animator: snapshot is empty, nothing to reset.";
+        }
+
+        var restored = 0;
+        foreach (var node in EnumerateSceneNodes(_scene.SceneGraph.Root))
+        {
+            var path = node.GetPath();
+            if (!_car2PoseSnapshot.TryGetValue(path, out var pose))
+            {
+                continue;
+            }
+
+            node.Position = pose.Position;
+            node.Rotation = pose.Rotation;
+            node.Scale = pose.Scale;
+            restored++;
+        }
+
+        return $"Car2 animator: reset {restored} nodes.";
+    }
+
+    private void CaptureCar2PoseIfNeeded()
+    {
+        if (_car2PoseSnapshot.Count > 0)
+        {
+            return;
+        }
+
+        var root = ResolveCar2RootNode();
+        if (root != null)
+        {
+            _car2PoseSnapshot[root.GetPath()] = NodePose.FromNode(root);
+        }
+
+        foreach (var wheel in ResolveCar2WheelNodes())
+        {
+            _car2PoseSnapshot[wheel.GetPath()] = NodePose.FromNode(wheel);
+        }
+    }
+
+    private SceneNode? ResolveCar2RootNode()
+    {
+        return _scene.SceneGraph.Root.Children.FirstOrDefault();
+    }
+
+    private List<SceneNode> ResolveCar2WheelNodes()
+    {
+        return EnumerateSceneNodes(_scene.SceneGraph.Root)
+            .Where(node => !string.IsNullOrWhiteSpace(node.Name)
+                && node.Name.Contains("_tire_", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    private static IEnumerable<SceneNode> EnumerateSceneNodes(SceneNode root)
+    {
+        yield return root;
+        foreach (var child in root.Children)
+        {
+            foreach (var descendant in EnumerateSceneNodes(child))
+            {
+                yield return descendant;
+            }
+        }
+    }
+
     private void Play()
     {
         if (string.IsNullOrWhiteSpace(SelectedClipName))
@@ -1042,5 +1312,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
 
         Play();
+    }
+
+    private readonly record struct NodePose(Vector3 Position, Quaternion Rotation, Vector3 Scale)
+    {
+        public static NodePose FromNode(SceneNode node)
+        {
+            return new NodePose(node.Position, node.Rotation, node.Scale);
+        }
     }
 }

@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -7,10 +7,10 @@
              x:Class="Avalonia3D.Sandbox.Controls.ModelViewportPanel"
              x:DataType="viewModels:MainWindowViewModel">
   <TabControl>
-    <TabItem Header="Сцены">
+    <TabItem Header="Scenes">
       <ScrollViewer>
         <StackPanel Spacing="10" Margin="0,8,0,0">
-          <TextBlock Text="Выберите тестовую сцену" Foreground="White" FontWeight="SemiBold" />
+          <TextBlock Text="Select a test scene" Foreground="White" FontWeight="SemiBold" />
           <ItemsControl ItemsSource="{Binding Scenes}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="viewModels:SceneItemViewModel">
@@ -29,7 +29,7 @@
                         <TextBlock Text="{Binding ExtensionBadge}" Foreground="#F8D7FF" FontSize="11" />
                       </Border>
                     </WrapPanel>
-                    <Button Content="Открыть сцену" Command="{Binding LoadCommand}" HorizontalAlignment="Left" />
+                    <Button Content="Open scene" Command="{Binding LoadCommand}" HorizontalAlignment="Left" />
                   </StackPanel>
                 </Border>
               </DataTemplate>
@@ -37,7 +37,7 @@
           </ItemsControl>
 
           <Separator />
-          <TextBlock Text="Статус загрузки" Foreground="White" FontWeight="SemiBold" />
+          <TextBlock Text="Load status" Foreground="White" FontWeight="SemiBold" />
           <TextBlock Text="{Binding LoadStatusText}" Foreground="#FFD36B" TextWrapping="Wrap" />
           <ProgressBar IsIndeterminate="True" Height="6" IsVisible="{Binding IsLoading}" />
           <TextBlock Text="{Binding CacheStatusText}" Foreground="#D0D0D0" TextWrapping="Wrap" />
@@ -45,7 +45,7 @@
       </ScrollViewer>
     </TabItem>
 
-    <TabItem Header="Камера">
+    <TabItem Header="Camera">
       <ScrollViewer>
         <StackPanel Spacing="10" Margin="0,8,0,0">
           <StackPanel Orientation="Horizontal" Spacing="8">
@@ -54,10 +54,10 @@
             <Button Content="Toggle Mode" Command="{Binding ToggleCameraModeCommand}" />
           </StackPanel>
 
-          <TextBlock Text="Текущий режим камеры:" Foreground="#D6D6D6" />
+          <TextBlock Text="Current camera mode:" Foreground="#D6D6D6" />
           <TextBlock Text="{Binding CurrentCameraMode}" Foreground="White" FontWeight="SemiBold" />
 
-          <TextBlock Text="Preview камеры" Foreground="#D6D6D6" />
+          <TextBlock Text="Camera preview" Foreground="#D6D6D6" />
           <TextBlock Text="{Binding CameraPreviewText}" Foreground="#D0D0D0" TextWrapping="Wrap" />
 
           <TextBlock Text="Orbit sensitivity" Foreground="#D6D6D6" />
@@ -70,46 +70,97 @@
       </ScrollViewer>
     </TabItem>
 
-    <TabItem Header="Графика">
+    <TabItem Header="Graphics">
       <ScrollViewer>
         <StackPanel Spacing="10" Margin="0,8,0,0">
-          <TextBlock Text="Профиль качества" Foreground="White" FontWeight="SemiBold" />
+          <TextBlock Text="Quality profile" Foreground="White" FontWeight="SemiBold" />
           <ComboBox ItemsSource="{Binding QualityPresets}" SelectedItem="{Binding SelectedQualityPreset, Mode=TwoWay}" />
 
-          <CheckBox Content="Включить отражения" IsChecked="{Binding ReflectionsEnabled, Mode=TwoWay}" Foreground="#D6D6D6" />
+          <CheckBox Content="Enable reflections" IsChecked="{Binding ReflectionsEnabled, Mode=TwoWay}" Foreground="#D6D6D6" />
 
-          <TextBlock Text="Интенсивность отражений" Foreground="#D6D6D6" />
+          <TextBlock Text="Reflection intensity" Foreground="#D6D6D6" />
           <Slider Minimum="0" Maximum="2" Value="{Binding ReflectionIntensity, Mode=TwoWay}" />
-          <TextBlock Text="{Binding ReflectionIntensity, StringFormat='значение: {0:0.00}'}" Foreground="#C0C0C0" FontSize="11" />
+          <TextBlock Text="{Binding ReflectionIntensity, StringFormat='value: {0:0.00}'}" Foreground="#C0C0C0" FontSize="11" />
 
-          <TextBlock Text="Интенсивность зеркального IBL" Foreground="#D6D6D6" />
+          <TextBlock Text="Specular IBL intensity" Foreground="#D6D6D6" />
           <Slider Minimum="0" Maximum="8" Value="{Binding IblSpecularIntensity, Mode=TwoWay}" />
-          <TextBlock Text="{Binding IblSpecularIntensity, StringFormat='значение: {0:0.00}'}" Foreground="#C0C0C0" FontSize="11" />
+          <TextBlock Text="{Binding IblSpecularIntensity, StringFormat='value: {0:0.00}'}" Foreground="#C0C0C0" FontSize="11" />
 
-          <TextBlock Text="Интенсивность диффузного IBL" Foreground="#D6D6D6" />
+          <TextBlock Text="Diffuse IBL intensity" Foreground="#D6D6D6" />
           <Slider Minimum="0" Maximum="4" Value="{Binding IblDiffuseIntensity, Mode=TwoWay}" />
-          <TextBlock Text="{Binding IblDiffuseIntensity, StringFormat='значение: {0:0.00}'}" Foreground="#C0C0C0" FontSize="11" />
+          <TextBlock Text="{Binding IblDiffuseIntensity, StringFormat='value: {0:0.00}'}" Foreground="#C0C0C0" FontSize="11" />
 
-          <TextBlock Text="Кламп отражений" Foreground="#D6D6D6" />
+          <TextBlock Text="Reflection clamp" Foreground="#D6D6D6" />
           <Slider Minimum="0" Maximum="8" Value="{Binding ReflectionClamp, Mode=TwoWay}" />
-          <TextBlock Text="{Binding ReflectionClamp, StringFormat='значение: {0:0.00}'}" Foreground="#C0C0C0" FontSize="11" />
+          <TextBlock Text="{Binding ReflectionClamp, StringFormat='value: {0:0.00}'}" Foreground="#C0C0C0" FontSize="11" />
 
-          <TextBlock Text="Экспозиция" Foreground="#D6D6D6" />
+          <TextBlock Text="Exposure" Foreground="#D6D6D6" />
           <Slider Minimum="0.1" Maximum="8" Value="{Binding Exposure, Mode=TwoWay}" />
-          <TextBlock Text="{Binding Exposure, StringFormat='значение: {0:0.00}'}" Foreground="#C0C0C0" FontSize="11" />
+          <TextBlock Text="{Binding Exposure, StringFormat='value: {0:0.00}'}" Foreground="#C0C0C0" FontSize="11" />
 
-          <TextBlock Text="Белая точка" Foreground="#D6D6D6" />
+          <TextBlock Text="White point" Foreground="#D6D6D6" />
           <Slider Minimum="0.5" Maximum="16" Value="{Binding WhitePoint, Mode=TwoWay}" />
-          <TextBlock Text="{Binding WhitePoint, StringFormat='значение: {0:0.00}'}" Foreground="#C0C0C0" FontSize="11" />
+          <TextBlock Text="{Binding WhitePoint, StringFormat='value: {0:0.00}'}" Foreground="#C0C0C0" FontSize="11" />
 
           <Separator />
-          <TextBlock Text="Путь к environment map" Foreground="White" FontWeight="SemiBold" />
+          <TextBlock Text="Environment map path" Foreground="White" FontWeight="SemiBold" />
           <TextBox Text="{Binding EnvironmentMapPathEditor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Watermark="Assets/Environment/neutral_studio_fallback.ppm" />
-          <Button Content="Применить путь" Command="{Binding ApplyEnvironmentMapPathCommand}" HorizontalAlignment="Left" />
+          <Button Content="Apply path" Command="{Binding ApplyEnvironmentMapPathCommand}" HorizontalAlignment="Left" />
 
           <Separator />
           <TextBlock Text="{Binding ProfileStatusMessage}" Foreground="#8FD3FF" TextWrapping="Wrap" />
           <TextBlock Text="{Binding GraphicsTuningHint}" Foreground="#D0D0D0" TextWrapping="Wrap" />
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
+
+    <TabItem Header="Animation">
+      <ScrollViewer>
+        <StackPanel Spacing="10" Margin="0,8,0,0">
+          <TextBlock Text="Model Animation Clips" Foreground="White" FontWeight="SemiBold" />
+          <Border Background="#2D2D33" Padding="10" CornerRadius="8">
+            <StackPanel Spacing="8">
+              <TextBlock Text="Play imported glTF clips from the active model (for example droid)." Foreground="#D6D6D6" TextWrapping="Wrap" />
+              <ComboBox ItemsSource="{Binding AvailableClips}" SelectedItem="{Binding SelectedClipName, Mode=TwoWay}" />
+              <WrapPanel Orientation="Horizontal" ItemHeight="32" ItemWidth="120">
+                <Button Content="Play" Command="{Binding PlayClipCommand}" Margin="0,0,8,8" />
+                <Button Content="Pause" Command="{Binding PauseClipCommand}" Margin="0,0,8,8" />
+                <Button Content="Stop" Command="{Binding StopClipCommand}" Margin="0,0,8,8" />
+                <Button Content="Play/Pause" Command="{Binding TogglePlayPauseCommand}" Margin="0,0,8,8" />
+              </WrapPanel>
+              <CheckBox Content="Loop clip" IsChecked="{Binding IsLoopEnabled, Mode=TwoWay}" Foreground="#D6D6D6" />
+              <TextBlock Text="Playback speed" Foreground="#D6D6D6" />
+              <Slider Minimum="0.1" Maximum="3.0" Value="{Binding PlaybackSpeed, Mode=TwoWay}" />
+              <TextBlock Text="{Binding PlaybackSpeed, StringFormat='speed: {0:0.00}x'}" Foreground="#C0C0C0" FontSize="11" />
+              <TextBlock Text="{Binding ClipStateText}" Foreground="#9ED7FF" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+
+          <Separator />
+          <TextBlock Text="Car2 Animator" Foreground="White" FontWeight="SemiBold" />
+          <Border Background="#2D2D33" Padding="10" CornerRadius="8">
+            <StackPanel Spacing="8">
+              <TextBlock Text="Custom model animator control (implemented only for gltf:car2/scene)." Foreground="#D6D6D6" TextWrapping="Wrap" />
+              <WrapPanel Orientation="Horizontal" ItemHeight="32" ItemWidth="140">
+                <Button Content="Wheels +" Command="{Binding Car2RotateWheelsForwardCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="Wheels -" Command="{Binding Car2RotateWheelsBackwardCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="+90 deg" Command="{Binding Car2RotateWheelsQuarterForwardCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="-90 deg" Command="{Binding Car2RotateWheelsQuarterBackwardCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="+360 deg" Command="{Binding Car2RotateWheelsFullForwardCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="-360 deg" Command="{Binding Car2RotateWheelsFullBackwardCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="Auto >>" Command="{Binding Car2StartWheelAutoSpinForwardCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="Auto &lt;&lt;" Command="{Binding Car2StartWheelAutoSpinBackwardCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="Auto Stop" Command="{Binding Car2StopWheelAutoSpinCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="Move +" Command="{Binding Car2MoveForwardCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="Move -" Command="{Binding Car2MoveBackwardCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="Turn Left" Command="{Binding Car2TurnLeftCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="Turn Right" Command="{Binding Car2TurnRightCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+                <Button Content="Reset Pose" Command="{Binding Car2ResetPoseCommand}" Margin="0,0,8,8" IsEnabled="{Binding IsCar2AnimatorAvailable}" />
+              </WrapPanel>
+              <TextBlock Text="{Binding Car2WheelAutoSpinState}" Foreground="#FFD36B" TextWrapping="Wrap" />
+              <TextBlock Text="{Binding Car2AnimatorStatus}" Foreground="#9ED7FF" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
         </StackPanel>
       </ScrollViewer>
     </TabItem>

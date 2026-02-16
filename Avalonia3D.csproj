@@ -8,6 +8,10 @@
 		<AllowUnsafeBlocks>True</AllowUnsafeBlocks>
 	</PropertyGroup>
 	<ItemGroup>
+		<Compile Remove="artifacts\**" />
+		<EmbeddedResource Remove="artifacts\**" />
+		<None Remove="artifacts\**" />
+		<AvaloniaXaml Remove="artifacts\**" />
 		<Compile Remove="Avalonia3D.Sandbox\**" />
 		<Compile Remove="Avalonia3D.Tests\**" />
 		<EmbeddedResource Remove="Avalonia3D.Tests\**" />
