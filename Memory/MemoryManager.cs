@@ -40,7 +40,11 @@ namespace Avalonia3D.Memory
         {
             lock (_lock)
             {
-                if (_isInitialized) return;
+                if (_isInitialized)
+                {
+                    _resourceManager = resourceManager;
+                    return;
+                }
 
                 _resourceManager = resourceManager;
 

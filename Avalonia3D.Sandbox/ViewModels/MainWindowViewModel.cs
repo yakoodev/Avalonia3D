@@ -79,7 +79,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                 CurrentSceneTitle = sceneInfo.Title;
                 UpdateImportStatus();
                 RefreshClips();
-                AutoPlayFirstClipIfAvailable();
                 UpdateCameraPreview();
                 ExecuteOnRenderThread(() => _cameraController.CaptureHomeView());
             });

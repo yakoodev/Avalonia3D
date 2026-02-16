@@ -105,6 +105,13 @@ namespace Avalonia3D.Model
             }
         }
 
+        public void OnContextLost()
+        {
+            _resourceManager = null;
+            InvalidateRenderResources();
+            _buildResourcesAfterInitPending = true;
+        }
+
 
         public void ApplyGraphicsProfile(GraphicsProfile profile)
         {
@@ -330,6 +337,30 @@ namespace Avalonia3D.Model
             foreach (var obj in SceneGraph.RootObjects)
             {
                 BuildRenderResourcesRecursive(obj);
+            }
+        }
+
+        private void InvalidateRenderResources()
+        {
+            foreach (var obj in SceneGraph.RootObjects)
+            {
+                InvalidateRenderResourcesRecursive(obj);
+            }
+        }
+
+        private static void InvalidateRenderResourcesRecursive(SceneObject obj)
+        {
+            if (obj is MeshGroup meshGroup)
+            {
+                foreach (var child in meshGroup)
+                {
+                    InvalidateRenderResourcesRecursive(child);
+                }
+            }
+
+            if (obj is MeshObject meshObject)
+            {
+                meshObject.InvalidateRenderResources();
             }
         }
 

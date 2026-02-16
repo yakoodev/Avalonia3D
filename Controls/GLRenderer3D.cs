@@ -11,8 +11,10 @@ namespace Avalonia3D.Controls
 {
     public class GLRenderer3D : IRenderContext
     {
+        private const bool UseSeparateEmissiveTarget = false;
         private GL? _gl;
         private IFramePresenter? _framePresenter;
+        private Action<WriteableBitmap>? _frameReadyHandlers;
         private readonly RenderPipeline _renderPipeline = new();
         private readonly EmissiveRenderTargetManager _emissiveTargetManager = new();
         private readonly ISceneBootstrap _sceneBootstrap;
@@ -23,7 +25,22 @@ namespace Avalonia3D.Controls
         public GL? GL => _gl;
         public RenderFrameState FrameState { get; } = new();
 
-        public event Action<WriteableBitmap>? FrameReady;
+        public event Action<WriteableBitmap>? FrameReady
+        {
+            add
+            {
+                _frameReadyHandlers += value;
+                EnsureFramePresenter();
+            }
+            remove
+            {
+                _frameReadyHandlers -= value;
+                if (_frameReadyHandlers == null)
+                {
+                    DisposeFramePresenter();
+                }
+            }
+        }
 
         public GLRenderer3D(ISceneBootstrap? sceneBootstrap = null)
         {
@@ -36,7 +53,7 @@ namespace Avalonia3D.Controls
             Scene.Init(gl);
             _sceneBootstrap.Bootstrap(Scene, _renderPipeline.Profile);
             ConfigureOpenGLState();
-            InitializeFramePresenter();
+            EnsureFramePresenter();
         }
 
         public void Resize(uint width, uint height)
@@ -46,7 +63,15 @@ namespace Avalonia3D.Controls
             Scene.Camera.Width = (int)width;
             Scene.Camera.Height = (int)height;
             _framePresenter?.Resize((int)width, (int)height);
-            _emissiveTargetManager.Ensure(_gl, FrameState, (int)width, (int)height);
+            if (UseSeparateEmissiveTarget)
+            {
+                _emissiveTargetManager.Ensure(_gl, FrameState, (int)width, (int)height);
+            }
+            else
+            {
+                FrameState.EmissiveFramebufferId = 0;
+                FrameState.EmissiveTextureId = 0;
+            }
         }
 
         public void RenderFrame(int w, int h)
@@ -62,16 +87,26 @@ namespace Avalonia3D.Controls
         public void Clear()
         {
             Scene.Clear();
-            if (_framePresenter is IDisposable disposable)
-            {
-                disposable.Dispose();
-            }
-            _framePresenter = null;
+            DisposeFramePresenter();
             if (_gl != null)
             {
-            _emissiveTargetManager.Release(_gl);
+                _emissiveTargetManager.Release(_gl);
             }
             FrameState.ResetForwardTargets();
+        }
+
+        public void ReleaseContextResources()
+        {
+            DisposeFramePresenter();
+
+            if (_gl != null)
+            {
+                _emissiveTargetManager.Release(_gl);
+            }
+
+            FrameState.ResetForwardTargets();
+            Scene.OnContextLost();
+            _gl = null;
         }
 
         private void DrainResidualErrors(GL gl)
@@ -98,10 +133,30 @@ namespace Avalonia3D.Controls
             }
         }
 
-        private void InitializeFramePresenter()
+        private void EnsureFramePresenter()
         {
+            if (_frameReadyHandlers == null || _framePresenter != null)
+            {
+                return;
+            }
+
             _framePresenter = new PboFramePresenter();
-            _framePresenter.FrameReady += bitmap => FrameReady?.Invoke(bitmap);
+            _framePresenter.FrameReady += OnFrameReady;
+        }
+
+        private void DisposeFramePresenter()
+        {
+            if (_framePresenter is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
+
+            _framePresenter = null;
+        }
+
+        private void OnFrameReady(WriteableBitmap bitmap)
+        {
+            _frameReadyHandlers?.Invoke(bitmap);
         }
 
         private void ConfigureOpenGLState()

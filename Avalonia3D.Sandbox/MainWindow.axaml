@@ -36,10 +36,8 @@
                   ShowsPreview="True" />
 
     <Grid Grid.Column="2">
-      <Grid>
-        <Border Background="Gray">
-          <local:SandboxModel3DControl x:Name="Viewport" />
-        </Border>
+      <Grid Background="DarkGray">
+        <local:SandboxModel3DControl x:Name="Viewport" />
         <Border Background="Transparent"
                 IsHitTestVisible="True"
                 controls:PointerForwardingBehavior.Target="{Binding #Viewport}" />

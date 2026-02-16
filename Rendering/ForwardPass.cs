@@ -1,4 +1,5 @@
 using System;
+using Serilog;
 using Silk.NET.OpenGL;
 
 namespace Avalonia3D.Rendering
@@ -6,6 +7,7 @@ namespace Avalonia3D.Rendering
     public sealed class ForwardPass : IRenderPass
     {
         private readonly GraphicsProfile _settings;
+        private bool _loggedMrtFallback;
 
         public ForwardPass(GraphicsProfile settings)
         {
@@ -39,7 +41,19 @@ namespace Avalonia3D.Rendering
             gl.Enable(EnableCap.DepthTest);
 
             var hasEmissiveTarget = context.RenderContext.FrameState.HasEmissiveTarget;
-            ConfigureDrawBuffers(gl, hasEmissiveTarget);
+            if (hasEmissiveTarget && !TryConfigureEmissiveDrawBuffers(gl))
+            {
+                hasEmissiveTarget = false;
+                frameState.EmissiveFramebufferId = 0;
+                frameState.EmissiveTextureId = 0;
+                frameState.SeparateEmissiveTarget = false;
+
+                if (!_loggedMrtFallback)
+                {
+                    _loggedMrtFallback = true;
+                    Log.Warning("ForwardPass disabled emissive MRT for current context due to DrawBuffers/OpenGL compatibility.");
+                }
+            }
 
             if (_settings.MsaaPolicy == MsaaPolicy.Disabled)
             {
@@ -75,24 +89,19 @@ namespace Avalonia3D.Rendering
             }
         }
 
-        private void ConfigureDrawBuffers(GL gl, bool hasEmissiveTarget)
+        private bool TryConfigureEmissiveDrawBuffers(GL gl)
         {
-            if (!hasEmissiveTarget)
-            {
-                return;
-            }
-
             Span<GLEnum> drawBuffers = stackalloc GLEnum[]
             {
                 GLEnum.ColorAttachment0,
                 GLEnum.ColorAttachment1
             };
-            gl.DrawBuffers(drawBuffers);
+            return TrySetDrawBuffers(gl, drawBuffers);
         }
 
         private void ClearForwardTargets(GL gl, bool hasEmissiveTarget)
         {
-            gl.ClearColor(_settings.Background.Red, _settings.Background.Green, _settings.Background.Blue, 0f);
+            gl.ClearColor(0f, 0f, 0f, 0f);
             gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
             if (!hasEmissiveTarget)
@@ -101,12 +110,27 @@ namespace Avalonia3D.Rendering
             }
 
             Span<GLEnum> emissiveOnlyBuffer = stackalloc GLEnum[] { GLEnum.ColorAttachment1 };
-            gl.DrawBuffers(emissiveOnlyBuffer);
-            gl.ClearColor(0f, 0f, 0f, 0f);
-            gl.Clear(ClearBufferMask.ColorBufferBit);
+            if (TrySetDrawBuffers(gl, emissiveOnlyBuffer))
+            {
+                gl.ClearColor(0f, 0f, 0f, 0f);
+                gl.Clear(ClearBufferMask.ColorBufferBit);
+                TryConfigureEmissiveDrawBuffers(gl);
+                gl.ClearColor(0f, 0f, 0f, 0f);
+            }
+        }
 
-            ConfigureDrawBuffers(gl, hasEmissiveTarget: true);
-            gl.ClearColor(_settings.Background.Red, _settings.Background.Green, _settings.Background.Blue, 0f);
+        private static bool TrySetDrawBuffers(GL gl, ReadOnlySpan<GLEnum> drawBuffers)
+        {
+            GlCompatibility.DrainErrors(gl);
+            gl.DrawBuffers(drawBuffers);
+            var error = gl.GetError();
+            if (error == GLEnum.NoError)
+            {
+                return true;
+            }
+
+            GlCompatibility.DrainErrors(gl);
+            return false;
         }
 
     }

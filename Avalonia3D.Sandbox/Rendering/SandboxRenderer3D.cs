@@ -13,10 +13,12 @@ namespace Avalonia3D.Sandbox.Rendering;
 
 public sealed class SandboxRenderer3D : IRenderContext
 {
+    private const bool UseSeparateEmissiveTarget = false;
     private static readonly TimeSpan MetricsLogInterval = TimeSpan.FromSeconds(1);
 
     private GL? _gl;
     private IFramePresenter? _framePresenter;
+    private Action<WriteableBitmap>? _frameReadyHandlers;
     private readonly RenderPipeline _renderPipeline = new(GraphicsProfile.Medium);
     private readonly EmissiveRenderTargetManager _emissiveTargetManager = new();
     private DateTime _nextMetricsLogUtc = DateTime.MinValue;
@@ -27,7 +29,22 @@ public sealed class SandboxRenderer3D : IRenderContext
     public Scene3D Scene { get; } = new();
     public RenderFrameState FrameState { get; } = new();
 
-    public event Action<WriteableBitmap>? FrameReady;
+    public event Action<WriteableBitmap>? FrameReady
+    {
+        add
+        {
+            _frameReadyHandlers += value;
+            EnsureFramePresenter();
+        }
+        remove
+        {
+            _frameReadyHandlers -= value;
+            if (_frameReadyHandlers == null)
+            {
+                DisposeFramePresenter();
+            }
+        }
+    }
     public event Action? RendererInitialized;
 
     public GraphicsProfile GraphicsProfile => _renderPipeline.Profile;
@@ -47,7 +64,7 @@ public sealed class SandboxRenderer3D : IRenderContext
         SceneShaderRegistryBootstrap.Configure(Scene, _renderPipeline.Profile.MaxLights);
         ConfigureOpenGLState();
         InitializeCameraDefaults();
-        InitializeFramePresenter();
+        EnsureFramePresenter();
         LogOpenGlInfo();
         RendererInitialized?.Invoke();
     }
@@ -59,7 +76,15 @@ public sealed class SandboxRenderer3D : IRenderContext
         Scene.Camera.Width = (int)width;
         Scene.Camera.Height = (int)height;
         _framePresenter?.Resize((int)width, (int)height);
-        _emissiveTargetManager.Ensure(_gl, FrameState, (int)width, (int)height);
+        if (UseSeparateEmissiveTarget)
+        {
+            _emissiveTargetManager.Ensure(_gl, FrameState, (int)width, (int)height);
+        }
+        else
+        {
+            FrameState.EmissiveFramebufferId = 0;
+            FrameState.EmissiveTextureId = 0;
+        }
     }
 
     public void RenderFrame(int width, int height)
@@ -74,11 +99,7 @@ public sealed class SandboxRenderer3D : IRenderContext
     public void Clear()
     {
         Scene.Clear();
-        if (_framePresenter is IDisposable disposable)
-        {
-            disposable.Dispose();
-        }
-        _framePresenter = null;
+        DisposeFramePresenter();
         if (_gl != null)
         {
             _emissiveTargetManager.Release(_gl);
@@ -86,10 +107,44 @@ public sealed class SandboxRenderer3D : IRenderContext
         FrameState.ResetForwardTargets();
     }
 
-    private void InitializeFramePresenter()
+    public void ReleaseContextResources()
     {
+        DisposeFramePresenter();
+
+        if (_gl != null)
+        {
+            _emissiveTargetManager.Release(_gl);
+        }
+
+        FrameState.ResetForwardTargets();
+        Scene.OnContextLost();
+        _gl = null;
+    }
+
+    private void EnsureFramePresenter()
+    {
+        if (_frameReadyHandlers == null || _framePresenter != null)
+        {
+            return;
+        }
+
         _framePresenter = new PboFramePresenter();
-        _framePresenter.FrameReady += bitmap => FrameReady?.Invoke(bitmap);
+        _framePresenter.FrameReady += OnFrameReady;
+    }
+
+    private void DisposeFramePresenter()
+    {
+        if (_framePresenter is IDisposable disposable)
+        {
+            disposable.Dispose();
+        }
+
+        _framePresenter = null;
+    }
+
+    private void OnFrameReady(WriteableBitmap bitmap)
+    {
+        _frameReadyHandlers?.Invoke(bitmap);
     }
 
     private void ConfigureOpenGLState()
@@ -149,4 +204,5 @@ public sealed class SandboxRenderer3D : IRenderContext
         _nextMetricsLogUtc = now + MetricsLogInterval;
         Log.Information("Frame metrics: drawCalls={DrawCalls}, culled={Culled}", drawCalls, culledObjects);
     }
+
 }
