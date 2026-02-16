@@ -90,7 +90,17 @@ namespace Avalonia3D.Loaders
 
     public class GltfSceneImporter
     {
-        private readonly Dictionary<string, List<Model.Model>> _modelCache = new(StringComparer.OrdinalIgnoreCase);
+        private sealed class ModelCacheEntry
+        {
+            public required List<Model.Model> Models { get; init; }
+            public required DateTime SourceLastWriteUtc { get; init; }
+            public required DateTime LastAccessUtc { get; set; }
+        }
+
+        private readonly Dictionary<string, ModelCacheEntry> _modelCache = new(StringComparer.OrdinalIgnoreCase);
+        private readonly object _modelCacheLock = new();
+        private static readonly TimeSpan ModelCacheEntryMaxAge = TimeSpan.FromMinutes(30);
+        private const int ModelCacheSizeLimit = 32;
         private readonly IMemoryPressurePolicy _memoryPressurePolicy;
         public ImportValidationPolicy ValidationPolicy { get; set; } = ImportValidationPolicy.RelaxedWithWarnings;
 
@@ -361,6 +371,14 @@ namespace Avalonia3D.Loaders
             }
 
             _memoryPressurePolicy.OnImportCompleted("GltfSceneImporter.ImportInto");
+        }
+
+        public void ClearModelCache()
+        {
+            lock (_modelCacheLock)
+            {
+                _modelCache.Clear();
+            }
         }
 
         private MeshGroup BuildNode(SceneGraph graph, MeshGroup? parent, Node node, Dictionary<Node, string> nodeKeys, MaterialImportPolicyContext policyContext)
@@ -876,22 +894,102 @@ namespace Avalonia3D.Loaders
         private readonly record struct ResolvedBindingSpec(string ChannelTargetKey, IAnimationTargetBinding Binding);
         private List<Model.Model> LoadModelsForPath(string gltfPath)
         {
-            if (!_modelCache.TryGetValue(gltfPath, out var models))
-            {
-                var gltf = ModelRoot.Load(gltfPath);
-                var sceneOverride = MaterialImportOverrideConfiguration.ResolveForAsset(gltfPath);
-                var policyContext = new MaterialImportPolicyContext
-                {
-                    AssetPath = gltfPath,
-                    AlphaProfile = MaterialAlphaImportConfiguration.CurrentProfile,
-                    SceneOverride = sceneOverride
-                };
+            var cacheKey = Path.GetFullPath(gltfPath);
+            var sourceLastWriteUtc = TryGetSourceLastWriteUtc(cacheKey);
+            var nowUtc = DateTime.UtcNow;
 
-                models = ModelLoader.LoadModels(gltf, policyContext, _memoryPressurePolicy);
-                _modelCache[gltfPath] = models;
+            lock (_modelCacheLock)
+            {
+                TrimModelCache(nowUtc);
+
+                if (_modelCache.TryGetValue(cacheKey, out var cached))
+                {
+                    var isExpired = nowUtc - cached.LastAccessUtc > ModelCacheEntryMaxAge;
+                    var sourceChanged = cached.SourceLastWriteUtc != sourceLastWriteUtc;
+                    if (!isExpired && !sourceChanged)
+                    {
+                        cached.LastAccessUtc = nowUtc;
+                        return cached.Models;
+                    }
+
+                    _modelCache.Remove(cacheKey);
+                }
+            }
+
+            var gltf = ModelRoot.Load(cacheKey);
+            var sceneOverride = MaterialImportOverrideConfiguration.ResolveForAsset(cacheKey);
+            var policyContext = new MaterialImportPolicyContext
+            {
+                AssetPath = cacheKey,
+                AlphaProfile = MaterialAlphaImportConfiguration.CurrentProfile,
+                SceneOverride = sceneOverride
+            };
+
+            var models = ModelLoader.LoadModels(gltf, policyContext, _memoryPressurePolicy);
+            var entry = new ModelCacheEntry
+            {
+                Models = models,
+                SourceLastWriteUtc = sourceLastWriteUtc,
+                LastAccessUtc = nowUtc
+            };
+
+            lock (_modelCacheLock)
+            {
+                _modelCache[cacheKey] = entry;
+                TrimModelCache(nowUtc);
             }
 
             return models;
+        }
+
+        private static DateTime TryGetSourceLastWriteUtc(string path)
+        {
+            try
+            {
+                return File.GetLastWriteTimeUtc(path);
+            }
+            catch
+            {
+                return DateTime.MinValue;
+            }
+        }
+
+        private void TrimModelCache(DateTime nowUtc)
+        {
+            var expiredKeys = new List<string>();
+            foreach (var (key, entry) in _modelCache)
+            {
+                if (nowUtc - entry.LastAccessUtc > ModelCacheEntryMaxAge)
+                {
+                    expiredKeys.Add(key);
+                }
+            }
+
+            foreach (var key in expiredKeys)
+            {
+                _modelCache.Remove(key);
+            }
+
+            while (_modelCache.Count > ModelCacheSizeLimit)
+            {
+                string? oldestKey = null;
+                DateTime oldestAccess = DateTime.MaxValue;
+                foreach (var (key, entry) in _modelCache)
+                {
+                    if (entry.LastAccessUtc < oldestAccess)
+                    {
+                        oldestAccess = entry.LastAccessUtc;
+                        oldestKey = key;
+                    }
+                }
+
+                if (oldestKey == null)
+                {
+                    break;
+                }
+
+                _modelCache.Remove(oldestKey);
+            }
         }
 
         private static void ApplyTransform(SceneObject obj, Matrix4x4 matrix)

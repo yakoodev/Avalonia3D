@@ -272,6 +272,7 @@ namespace Avalonia3D.Model
 
             _resourceManager?.ClearAll();
             ModelLoader.ClearAllCaches();
+            Importer.ClearModelCache();
         }
 
         private SceneGraph ApplyImportResult(SceneImportResult importResult)
