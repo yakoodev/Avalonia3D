@@ -21,6 +21,9 @@ namespace Avalonia3D.Memory
             public static TimeSpan MaxCacheEntryAge { get; set; } = TimeSpan.FromMinutes(10);
             public static int MaxTextureDimension { get; set; } = 512;
             public static long MaxDecodedTextureCacheMemoryMB { get; set; } = 128;
+            public static bool PersistOriginalTextureBytes { get; set; } = false;
+            public static long MaxPersistedTextureCacheMemoryMB { get; set; } = 64;
+            public static TimeSpan PersistedTextureCacheMaxAge { get; set; } = TimeSpan.FromDays(1);
             public static long MaxTotalMemoryMB { get; set; } = 500; // 500 MB лимит
             public static bool AggressiveGC { get; set; } = false;
             public static TimeSpan CleanupCooldown { get; set; } = TimeSpan.FromSeconds(30);

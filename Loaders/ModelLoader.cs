@@ -998,22 +998,57 @@ namespace Avalonia3D.Loaders
 
         private static void PersistOriginalTextureBytes(string sourceIdentity, ReadOnlyMemory<byte> sourceData)
         {
-            var cacheRoot = Path.Combine(Path.GetTempPath(), "Avalonia3D", "asset-cache", "textures");
-            Directory.CreateDirectory(cacheRoot);
-
-            var fileName = $"{SanitizeFileName(sourceIdentity)}.bin";
-            var fullPath = Path.Combine(cacheRoot, fileName);
-            if (File.Exists(fullPath))
+            if (!MemoryManager.Settings.PersistOriginalTextureBytes || sourceData.IsEmpty)
             {
                 return;
             }
 
-            using var stream = File.Create(fullPath);
-            stream.Write(sourceData.Span);
+            var cacheRoot = Path.Combine(Path.GetTempPath(), "Avalonia3D", "asset-cache", "textures");
+            var maxSizeBytes = Math.Max(1L, MemoryManager.Settings.MaxPersistedTextureCacheMemoryMB * 1024L * 1024L);
+            var maxAge = MemoryManager.Settings.PersistedTextureCacheMaxAge <= TimeSpan.Zero
+                ? TimeSpan.FromHours(1)
+                : MemoryManager.Settings.PersistedTextureCacheMaxAge;
+
+            try
+            {
+                Directory.CreateDirectory(cacheRoot);
+                CleanupPersistedTextureCache(cacheRoot, maxSizeBytes, maxAge);
+
+                var fileName = $"{SanitizeFileName(sourceIdentity)}.bin";
+                var fullPath = Path.Combine(cacheRoot, fileName);
+                if (File.Exists(fullPath))
+                {
+                    return;
+                }
+
+                long currentSizeBytes = GetDirectorySize(cacheRoot);
+                if (currentSizeBytes + sourceData.Length > maxSizeBytes)
+                {
+                    CleanupPersistedTextureCache(cacheRoot, maxSizeBytes - sourceData.Length, maxAge);
+                    currentSizeBytes = GetDirectorySize(cacheRoot);
+                    if (currentSizeBytes + sourceData.Length > maxSizeBytes)
+                    {
+                        Log.Debug("Skipping persisted texture cache write for {SourceIdentity}: cache budget exceeded ({CurrentSize}+{IncomingSize}>{Budget})",
+                            sourceIdentity, currentSizeBytes, sourceData.Length, maxSizeBytes);
+                        return;
+                    }
+                }
+
+                File.WriteAllBytes(fullPath, sourceData.ToArray());
+            }
+            catch (Exception ex)
+            {
+                Log.Debug(ex, "Persisting original texture bytes failed for {SourceIdentity}", sourceIdentity);
+            }
         }
 
         private static string SanitizeFileName(string value)
         {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return "unknown";
+            }
+
             var invalid = Path.GetInvalidFileNameChars();
             var sb = new StringBuilder(value.Length);
             foreach (var c in value)
@@ -1023,6 +1058,77 @@ namespace Avalonia3D.Loaders
 
             var candidate = sb.ToString();
             return candidate.Length <= 80 ? candidate : candidate.Substring(0, 80);
+        }
+
+        private static void CleanupPersistedTextureCache(string cacheRoot, long maxSizeBytes, TimeSpan maxAge)
+        {
+            var directory = new DirectoryInfo(cacheRoot);
+            if (!directory.Exists)
+            {
+                return;
+            }
+
+            var nowUtc = DateTime.UtcNow;
+            foreach (var file in directory.GetFiles("*.bin"))
+            {
+                if (nowUtc - file.LastWriteTimeUtc > maxAge)
+                {
+                    TryDeleteFile(file);
+                }
+            }
+
+            maxSizeBytes = Math.Max(0, maxSizeBytes);
+            var files = directory.GetFiles("*.bin");
+            long totalSizeBytes = 0;
+            foreach (var file in files)
+            {
+                totalSizeBytes += file.Length;
+            }
+
+            if (totalSizeBytes <= maxSizeBytes)
+            {
+                return;
+            }
+
+            Array.Sort(files, static (a, b) => a.LastWriteTimeUtc.CompareTo(b.LastWriteTimeUtc));
+            foreach (var file in files)
+            {
+                TryDeleteFile(file);
+                totalSizeBytes -= file.Length;
+                if (totalSizeBytes <= maxSizeBytes)
+                {
+                    break;
+                }
+            }
+        }
+
+        private static long GetDirectorySize(string cacheRoot)
+        {
+            var directory = new DirectoryInfo(cacheRoot);
+            if (!directory.Exists)
+            {
+                return 0;
+            }
+
+            long totalSize = 0;
+            foreach (var file in directory.GetFiles("*.bin"))
+            {
+                totalSize += file.Length;
+            }
+
+            return totalSize;
+        }
+
+        private static void TryDeleteFile(FileInfo file)
+        {
+            try
+            {
+                file.Delete();
+            }
+            catch
+            {
+                // Best-effort cleanup only.
+            }
         }
 
         private static Vector4 GetChannelColor(MaterialChannel? channel, Vector4 fallback)

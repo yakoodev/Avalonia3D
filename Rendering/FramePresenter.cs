@@ -31,6 +31,7 @@ namespace Avalonia3D.Rendering
     {
         private const int BufferCount = 2;
         private readonly uint[] _pbos = new uint[BufferCount];
+        private GL? _gl;
         private bool _pboInitialized;
         private bool _hasData;
         private int _pboIndex;
@@ -125,12 +126,23 @@ namespace Avalonia3D.Rendering
 
         public void Dispose()
         {
+            if (_pboInitialized && _gl != null)
+            {
+                _gl.DeleteBuffers(_pbos);
+                Array.Clear(_pbos, 0, _pbos.Length);
+                _pboInitialized = false;
+                _allocatedBufferSize = 0;
+            }
+
             _bitmap?.Dispose();
             _bitmap = null;
+            _hasData = false;
         }
 
         private unsafe void EnsurePbos(GL gl)
         {
+            _gl = gl;
+
             if (_pboInitialized)
             {
                 if (_allocatedBufferSize != _bufferSize)
