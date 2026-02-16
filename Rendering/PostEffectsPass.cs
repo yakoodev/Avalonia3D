@@ -81,7 +81,10 @@ namespace Avalonia3D.Rendering
             _textureWidth = width;
             _textureHeight = height;
             gl.BindTexture(TextureTarget.Texture2D, _copyTexture);
-            gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, (uint)width, (uint)height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, null);
+            if (!GlCompatibility.TryAllocateRgbaTexture2D(gl, width, height))
+            {
+                return false;
+            }
             gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
             gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
             gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);

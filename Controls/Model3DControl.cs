@@ -9,6 +9,7 @@ using Avalonia3D.Interaction.CameraController;
 using Avalonia3D.Interfaces;
 using Avalonia3D.Model;
 using Avalonia3D.Rendering;
+using Serilog;
 using Silk.NET.OpenGL;
 using System;
 using System.ComponentModel;
@@ -49,6 +50,11 @@ namespace Avalonia3D.Controls
         {
             base.OnOpenGlInit(gl);
             _gl = GL.GetApi(gl.GetProcAddress);
+            Log.Information(
+                "OpenGL context initialized. Version={Version}, Vendor={Vendor}, Renderer={Renderer}",
+                _gl.GetStringS(StringName.Version),
+                _gl.GetStringS(StringName.Vendor),
+                _gl.GetStringS(StringName.Renderer));
             _renderer.Init(_gl);
             ApplySensitivity();
             MarkInteractionActive();
@@ -86,6 +92,20 @@ namespace Avalonia3D.Controls
             _gl = null;
             _frameRequestScheduled = false;
             base.OnOpenGlDeinit(gl);
+        }
+
+        protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+        {
+            base.OnPropertyChanged(change);
+
+            if (change.Property == BoundsProperty && _gl != null)
+            {
+                var newBounds = change.GetNewValue<Rect>();
+                if (newBounds.Width > 0 && newBounds.Height > 0)
+                {
+                    MarkInteractionActive();
+                }
+            }
         }
 
         private float _rotationSensitivity = 0.01f;
@@ -230,5 +250,6 @@ namespace Avalonia3D.Controls
                 RequestNextFrameRendering();
             }, delay);
         }
+
     }
 }

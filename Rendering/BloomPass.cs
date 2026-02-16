@@ -99,7 +99,10 @@ namespace Avalonia3D.Rendering
             _cachedHeight = height;
 
             gl.BindTexture(TextureTarget.Texture2D, _sceneCopyTexture);
-            gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, (uint)width, (uint)height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, null);
+            if (!GlCompatibility.TryAllocateRgbaTexture2D(gl, width, height))
+            {
+                return false;
+            }
             gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
             gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
             gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
@@ -305,7 +308,10 @@ namespace Avalonia3D.Rendering
                 var levelHeight = Math.Max(1, height >> (level + 1));
 
                 gl.BindTexture(TextureTarget.Texture2D, tex);
-                gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, (uint)levelWidth, (uint)levelHeight, 0, PixelFormat.Rgba, PixelType.UnsignedByte, null);
+                if (!GlCompatibility.TryAllocateRgbaTexture2D(gl, levelWidth, levelHeight))
+                {
+                    return false;
+                }
                 gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
                 gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
                 gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
