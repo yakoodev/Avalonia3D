@@ -67,6 +67,7 @@ namespace Avalonia3D.Model
         public GraphicsProfile ActiveGraphicsProfile { get; private set; } = GraphicsProfile.Medium.Validate();
         internal Animator Animator { get; private set; } = new();
         public AnimatorComponent AnimatorComponent { get; private set; }
+        public bool HasActiveAnimations => AnimatorComponent.HasActiveClips;
         public SceneImportReport LastImportReport { get; private set; } = SceneImportReport.Success;
         public SceneCommandBus CommandBus { get; } = new();
 
@@ -272,6 +273,7 @@ namespace Avalonia3D.Model
 
             _resourceManager?.ClearAll();
             ModelLoader.ClearAllCaches();
+            Importer.ClearModelCache();
         }
 
         private SceneGraph ApplyImportResult(SceneImportResult importResult)

@@ -93,6 +93,7 @@ namespace Avalonia3D.Shaders
         private int _separateEmissiveTargetLocation = -1;
         private int _separateEmissiveSurfaceScaleLocation = -1;
         private int _hasEnvironmentMapLocation = -1;
+        private int _environmentReflectionMaxLodLocation = -1;
         private int _transmissionFactorLocation = -1;
         private int _transmissionThicknessLocation = -1;
         private int _transmissionIorLocation = -1;
@@ -324,6 +325,7 @@ namespace Avalonia3D.Shaders
             _separateEmissiveTargetLocation = _gl.GetUniformLocation(_shaderProgram, "uSeparateEmissiveTarget");
             _separateEmissiveSurfaceScaleLocation = _gl.GetUniformLocation(_shaderProgram, "uSeparateEmissiveSurfaceScale");
             _hasEnvironmentMapLocation = _gl.GetUniformLocation(_shaderProgram, "uHasEnvironmentMap");
+            _environmentReflectionMaxLodLocation = _gl.GetUniformLocation(_shaderProgram, "uEnvironmentReflectionMaxLod");
             _transmissionFactorLocation = _gl.GetUniformLocation(_shaderProgram, "uTransmissionFactor");
             _transmissionThicknessLocation = _gl.GetUniformLocation(_shaderProgram, "uTransmissionThickness");
             _transmissionIorLocation = _gl.GetUniformLocation(_shaderProgram, "uTransmissionIor");
@@ -556,6 +558,9 @@ namespace Avalonia3D.Shaders
 
             if (_hasEnvironmentMapLocation != -1)
                 _gl.Uniform1(_hasEnvironmentMapLocation, frameState.ReflectionsEnabled && frameState.EnvironmentReflectionTextureId.HasValue ? 1 : 0);
+
+            if (_environmentReflectionMaxLodLocation != -1)
+                _gl.Uniform1(_environmentReflectionMaxLodLocation, frameState.ReflectionsEnabled ? frameState.EnvironmentReflectionMaxLod : 0f);
 
             var hasTransmission = material?.HasTransmission == true && material.TransmissionFactor > 0.001f;
             var transmissionFactor = material?.TransmissionFactor ?? 0f;

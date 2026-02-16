@@ -69,5 +69,49 @@
         </StackPanel>
       </ScrollViewer>
     </TabItem>
+
+    <TabItem Header="Графика">
+      <ScrollViewer>
+        <StackPanel Spacing="10" Margin="0,8,0,0">
+          <TextBlock Text="Профиль качества" Foreground="White" FontWeight="SemiBold" />
+          <ComboBox ItemsSource="{Binding QualityPresets}" SelectedItem="{Binding SelectedQualityPreset, Mode=TwoWay}" />
+
+          <CheckBox Content="Включить отражения" IsChecked="{Binding ReflectionsEnabled, Mode=TwoWay}" Foreground="#D6D6D6" />
+
+          <TextBlock Text="Интенсивность отражений" Foreground="#D6D6D6" />
+          <Slider Minimum="0" Maximum="2" Value="{Binding ReflectionIntensity, Mode=TwoWay}" />
+          <TextBlock Text="{Binding ReflectionIntensity, StringFormat='значение: {0:0.00}'}" Foreground="#C0C0C0" FontSize="11" />
+
+          <TextBlock Text="Интенсивность зеркального IBL" Foreground="#D6D6D6" />
+          <Slider Minimum="0" Maximum="8" Value="{Binding IblSpecularIntensity, Mode=TwoWay}" />
+          <TextBlock Text="{Binding IblSpecularIntensity, StringFormat='значение: {0:0.00}'}" Foreground="#C0C0C0" FontSize="11" />
+
+          <TextBlock Text="Интенсивность диффузного IBL" Foreground="#D6D6D6" />
+          <Slider Minimum="0" Maximum="4" Value="{Binding IblDiffuseIntensity, Mode=TwoWay}" />
+          <TextBlock Text="{Binding IblDiffuseIntensity, StringFormat='значение: {0:0.00}'}" Foreground="#C0C0C0" FontSize="11" />
+
+          <TextBlock Text="Кламп отражений" Foreground="#D6D6D6" />
+          <Slider Minimum="0" Maximum="8" Value="{Binding ReflectionClamp, Mode=TwoWay}" />
+          <TextBlock Text="{Binding ReflectionClamp, StringFormat='значение: {0:0.00}'}" Foreground="#C0C0C0" FontSize="11" />
+
+          <TextBlock Text="Экспозиция" Foreground="#D6D6D6" />
+          <Slider Minimum="0.1" Maximum="8" Value="{Binding Exposure, Mode=TwoWay}" />
+          <TextBlock Text="{Binding Exposure, StringFormat='значение: {0:0.00}'}" Foreground="#C0C0C0" FontSize="11" />
+
+          <TextBlock Text="Белая точка" Foreground="#D6D6D6" />
+          <Slider Minimum="0.5" Maximum="16" Value="{Binding WhitePoint, Mode=TwoWay}" />
+          <TextBlock Text="{Binding WhitePoint, StringFormat='значение: {0:0.00}'}" Foreground="#C0C0C0" FontSize="11" />
+
+          <Separator />
+          <TextBlock Text="Путь к environment map" Foreground="White" FontWeight="SemiBold" />
+          <TextBox Text="{Binding EnvironmentMapPathEditor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Watermark="Assets/Environment/neutral_studio_fallback.ppm" />
+          <Button Content="Применить путь" Command="{Binding ApplyEnvironmentMapPathCommand}" HorizontalAlignment="Left" />
+
+          <Separator />
+          <TextBlock Text="{Binding ProfileStatusMessage}" Foreground="#8FD3FF" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding GraphicsTuningHint}" Foreground="#D0D0D0" TextWrapping="Wrap" />
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
   </TabControl>
 </UserControl>

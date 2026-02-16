@@ -14,6 +14,7 @@ namespace Avalonia3D.Rendering
 
         private readonly GraphicsProfile _settings;
         private uint _environmentMapTexture;
+        private float _environmentMapMaxLod;
         private string? _loadedPath;
         private bool _fallbackWarningLogged;
         private bool _missingEnvironmentMapWarningLogged;
@@ -50,6 +51,7 @@ namespace Avalonia3D.Rendering
             context.Gl.BindTexture(TextureTarget.Texture2D, _environmentMapTexture);
 
             context.RenderContext.FrameState.EnvironmentReflectionTextureId = _environmentMapTexture;
+            context.RenderContext.FrameState.EnvironmentReflectionMaxLod = _environmentMapMaxLod;
             context.RenderContext.FrameState.ReflectionIntensity = _settings.Reflections.Intensity;
             context.RenderContext.FrameState.IblDiffuseIntensity = _settings.PbrTuning.IblDiffuseIntensity;
             context.RenderContext.FrameState.IblSpecularIntensity = _settings.PbrTuning.IblSpecularIntensity;
@@ -113,6 +115,7 @@ namespace Avalonia3D.Rendering
             }
 
             _environmentMapTexture = UploadEnvironmentTexture(gl, textureData);
+            _environmentMapMaxLod = CalculateMaxLod(textureData.Width, textureData.Height);
             _loadedPath = normalizedPath;
             loadedPath = normalizedPath;
             return _environmentMapTexture != 0;
@@ -184,9 +187,21 @@ namespace Avalonia3D.Rendering
             return textureId;
         }
 
+        private static float CalculateMaxLod(int width, int height)
+        {
+            var maxDimension = Math.Max(width, height);
+            if (maxDimension <= 1)
+            {
+                return 0f;
+            }
+
+            return MathF.Log2(maxDimension);
+        }
+
         private void DisableReflections(RenderPipelineContext context)
         {
             context.RenderContext.FrameState.EnvironmentReflectionTextureId = null;
+            context.RenderContext.FrameState.EnvironmentReflectionMaxLod = 0f;
             context.RenderContext.FrameState.ReflectionIntensity = 0f;
             context.RenderContext.FrameState.IblDiffuseIntensity = 0f;
             context.RenderContext.FrameState.IblSpecularIntensity = 0f;

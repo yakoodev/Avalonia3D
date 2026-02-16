@@ -42,6 +42,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private double _backgroundRed = 15;
     private double _backgroundGreen = 15;
     private double _backgroundBlue = 20;
+    private string _environmentMapPathEditor = string.Empty;
     private string _profileJsonEditor = string.Empty;
     private string _profileStatusMessage = "";
     private string _importStatusText = "Import: OK";
@@ -168,6 +169,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
         ApplyProfileJsonCommand = new RelayCommand(_ => ApplyProfileJson());
         ResetProfileJsonCommand = new RelayCommand(_ => ResetProfileJson());
+        ApplyEnvironmentMapPathCommand = new RelayCommand(_ => ApplyEnvironmentMapPath());
         LoadSceneCommand = new RelayCommand(sceneId => LoadScene(sceneId as string ?? SelectedSceneId));
 
         ApplyRenderQualityPreset(RenderQualityPreset.Medium);
@@ -212,6 +214,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public RelayCommand ToggleCameraModeCommand { get; }
     public RelayCommand ApplyProfileJsonCommand { get; }
     public RelayCommand ResetProfileJsonCommand { get; }
+    public RelayCommand ApplyEnvironmentMapPathCommand { get; }
     public RelayCommand LoadSceneCommand { get; }
 
     public string CurrentCameraMode => _cameraController.ControlMode.ToString();
@@ -383,6 +386,94 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
+    public bool ReflectionsEnabled
+    {
+        get => _graphicsProfile.Reflections.Enabled;
+        set
+        {
+            if (_graphicsProfile.Reflections.Enabled == value)
+            {
+                return;
+            }
+
+            ApplyGraphicsProfileOverride(
+                profile => profile with
+                {
+                    Reflections = profile.Reflections with
+                    {
+                        Enabled = value,
+                        Mode = value
+                            ? (profile.Reflections.Mode == ReflectionMode.Off ? ReflectionMode.IBL : profile.Reflections.Mode)
+                            : ReflectionMode.Off
+                    }
+                },
+                value ? "Отражения включены." : "Отражения выключены.");
+        }
+    }
+
+    public double ReflectionIntensity
+    {
+        get => _graphicsProfile.Reflections.Intensity;
+        set => ApplyGraphicsProfileOverride(
+            profile => profile with { Reflections = profile.Reflections with { Intensity = (float)Math.Clamp(value, 0d, 2d) } },
+            $"Интенсивность отражений: {value:0.00}");
+    }
+
+    public double IblSpecularIntensity
+    {
+        get => _graphicsProfile.PbrTuning.IblSpecularIntensity;
+        set => ApplyGraphicsProfileOverride(
+            profile => profile with { PbrTuning = profile.PbrTuning with { IblSpecularIntensity = (float)Math.Clamp(value, 0d, 8d) } },
+            $"Зеркальный IBL: {value:0.00}");
+    }
+
+    public double IblDiffuseIntensity
+    {
+        get => _graphicsProfile.PbrTuning.IblDiffuseIntensity;
+        set => ApplyGraphicsProfileOverride(
+            profile => profile with { PbrTuning = profile.PbrTuning with { IblDiffuseIntensity = (float)Math.Clamp(value, 0d, 4d) } },
+            $"Диффузный IBL: {value:0.00}");
+    }
+
+    public double ReflectionClamp
+    {
+        get => _graphicsProfile.PbrTuning.ReflectionContributionClamp;
+        set => ApplyGraphicsProfileOverride(
+            profile => profile with { PbrTuning = profile.PbrTuning with { ReflectionContributionClamp = (float)Math.Clamp(value, 0d, 8d) } },
+            $"Кламп отражений: {value:0.00}");
+    }
+
+    public double Exposure
+    {
+        get => _graphicsProfile.PbrTuning.Exposure;
+        set => ApplyGraphicsProfileOverride(
+            profile => profile with { PbrTuning = profile.PbrTuning with { Exposure = (float)Math.Clamp(value, 0.1d, 8d) } },
+            $"Экспозиция: {value:0.00}");
+    }
+
+    public double WhitePoint
+    {
+        get => _graphicsProfile.PbrTuning.PbrWhitePoint;
+        set => ApplyGraphicsProfileOverride(
+            profile => profile with { PbrTuning = profile.PbrTuning with { PbrWhitePoint = (float)Math.Clamp(value, 0.5d, 16d) } },
+            $"Белая точка: {value:0.00}");
+    }
+
+    public string EnvironmentMapPathEditor
+    {
+        get => _environmentMapPathEditor;
+        set
+        {
+            if (_environmentMapPathEditor == value)
+            {
+                return;
+            }
+
+            _environmentMapPathEditor = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EnvironmentMapPathEditor)));
+        }
+    }
+
     public double BackgroundRed
     {
         get => _backgroundRed;
@@ -406,8 +497,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public string BackgroundHex => $"#{(byte)_backgroundRed:X2}{(byte)_backgroundGreen:X2}{(byte)_backgroundBlue:X2}";
 
     public string GraphicsTuningHint =>
-        "Подсказка: High + тени 4096 + отражения IBL дают лучшую картинку, но дороже по FPS. " +
-        "Если картинка темная — поднимайте Exposure и IBL Intensity в JSON, если шум/лесенка — увеличьте MSAA и тени.";
+        "Подсказка: отражения сильнее всего зависят от зеркального IBL, клампа отражений и экспозиции. " +
+        "Если картинка плоская, сначала поднимайте интенсивность отражений и зеркальный IBL; если слишком ярко — снижайте экспозицию или кламп.";
 
     public double OrbitSensitivity
     {
@@ -710,11 +801,51 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _applyGraphicsProfile(_graphicsProfile);
 
         SyncBackgroundChannelsFromProfile(_graphicsProfile.Background);
+        _environmentMapPathEditor = _graphicsProfile.Reflections.EnvironmentMapPath ?? string.Empty;
 
         ProfileJsonEditor = ActiveProfileJson;
         ProfileStatusMessage = statusMessage;
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ActiveQualitySummary)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ActiveProfileJson)));
+        NotifyGraphicsControlsChanged();
+    }
+
+    private void ApplyEnvironmentMapPath()
+    {
+        var normalized = string.IsNullOrWhiteSpace(EnvironmentMapPathEditor)
+            ? GraphicsProfile.DefaultEnvironmentMapPath
+            : EnvironmentMapPathEditor.Trim();
+
+        ApplyGraphicsProfileOverride(
+            profile => profile with { Reflections = profile.Reflections with { EnvironmentMapPath = normalized } },
+            $"Карта окружения: {normalized}");
+    }
+
+    private void ApplyGraphicsProfileOverride(Func<GraphicsProfile, GraphicsProfile> mutator, string statusMessage)
+    {
+        var candidate = mutator(_graphicsProfile) with
+        {
+            QualityPreset = RenderQualityPreset.Custom,
+            Name = "Custom"
+        };
+
+        var validatedCandidate = candidate.Validate();
+
+        _selectedQualityPreset = RenderQualityPreset.Custom;
+        ApplyProfile(validatedCandidate, statusMessage);
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedQualityPreset)));
+    }
+
+    private void NotifyGraphicsControlsChanged()
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ReflectionsEnabled)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ReflectionIntensity)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IblSpecularIntensity)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IblDiffuseIntensity)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ReflectionClamp)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Exposure)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(WhitePoint)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EnvironmentMapPathEditor)));
     }
 
     private void SyncBackgroundChannelsFromProfile(BackgroundProfile background)

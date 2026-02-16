@@ -3,6 +3,7 @@ using Avalonia3D.Composition;
 using Avalonia3D.Interfaces;
 using Avalonia3D.Model;
 using Avalonia3D.Rendering;
+using Serilog;
 using Silk.NET.OpenGL;
 using System;
 
@@ -15,6 +16,7 @@ namespace Avalonia3D.Controls
         private readonly RenderPipeline _renderPipeline = new();
         private readonly EmissiveRenderTargetManager _emissiveTargetManager = new();
         private readonly ISceneBootstrap _sceneBootstrap;
+        private bool _loggedOpenGlErrorDrain;
 
         public Scene3D Scene { get; } = new();
 
@@ -54,6 +56,7 @@ namespace Avalonia3D.Controls
             _renderPipeline.Execute(this, w, h);
 
             _framePresenter?.Present(_gl, w, h);
+            DrainResidualErrors(_gl);
         }
 
         public void Clear()
@@ -66,9 +69,33 @@ namespace Avalonia3D.Controls
             _framePresenter = null;
             if (_gl != null)
             {
-                _emissiveTargetManager.Release(_gl);
+            _emissiveTargetManager.Release(_gl);
             }
             FrameState.ResetForwardTargets();
+        }
+
+        private void DrainResidualErrors(GL gl)
+        {
+            var drained = false;
+            GLEnum lastError = GLEnum.NoError;
+
+            for (var i = 0; i < 16; i++)
+            {
+                var error = gl.GetError();
+                if (error == GLEnum.NoError)
+                {
+                    break;
+                }
+
+                drained = true;
+                lastError = error;
+            }
+
+            if (drained && !_loggedOpenGlErrorDrain)
+            {
+                _loggedOpenGlErrorDrain = true;
+                Log.Warning("Drained residual OpenGL errors before returning control to Avalonia. LastError={LastError}", lastError);
+            }
         }
 
         private void InitializeFramePresenter()
