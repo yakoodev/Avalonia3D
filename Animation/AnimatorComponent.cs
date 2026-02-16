@@ -26,6 +26,7 @@ namespace Avalonia3D.Animation
         private readonly Dictionary<string, AnimationClipPlayer> _activePlayers = new(StringComparer.Ordinal);
 
         public event EventHandler<ClipPlaybackCompletedEventArgs>? ClipCompleted;
+        public bool HasActiveClips => _activePlayers.Count > 0;
 
         public AnimatorComponent(SceneGraph sceneGraph, Animator animator)
         {
