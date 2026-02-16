@@ -1,50 +1,37 @@
-# Material Import Policy
+# Avalonia3D Documentation
 
-Кратко: вся логика принятия решений по импорту материалов находится в `IMaterialImportPolicy` и его реализации `DefaultMaterialImportPolicy`.
+## RU
 
-## Где находится источник правды
+### Назначение
 
-- Интерфейс policy: `Loaders/Policies/IMaterialImportPolicy.cs`.
-- Дефолтная реализация: `Loaders/Policies/DefaultMaterialImportPolicy.cs`.
-- Контекст вызова policy (asset, material, animation, profile): `MaterialImportPolicyContext` в `Loaders/Policies/MaterialImportOverrideConfiguration.cs`.
+Эта папка содержит структурированную документацию по всем проектам решения `Avalonia3D.sln`.
 
-## Профили
+### Содержание
 
-Поддерживаются профили `strict`, `balanced`, `legacy` (см. `MaterialAlphaImportProfile`).
+- `ARCHITECTURE.ru.md` - сквозная архитектура: как данные проходят от загрузки ассета до кадра.
+- `PROJECT_AVALONIA3D.ru.md` - детально про ядро (`Avalonia3D`).
+- `PROJECT_SANDBOX.ru.md` - детально про sandbox (`Avalonia3D.Sandbox`).
+- `PROJECT_TESTS.ru.md` - детально про тестовый проект (`Avalonia3D.Tests`).
+- `ARCHITECTURE.en.md`, `PROJECT_*.en.md` - английские версии тех же документов.
 
-- `strict`: BLEND сохраняется максимально консервативно.
-- `balanced`: компромисс между визуальной корректностью и уменьшением лишней прозрачности.
-- `legacy`: историческое поведение, но **BLEND + emissive не схлопывается в Opaque** (контракт для emissive-ассетов).
+### Быстрый вход
 
-Профиль задаётся через:
+- Из корня репозитория: `QUICKSTART.ru.md`.
 
-- аргумент `--material-alpha-import=<strict|balanced|legacy>`
-- переменную окружения `AVALONIA3D_MATERIAL_ALPHA_IMPORT`
+## EN
 
-## Asset-level и material-level overrides
+### Purpose
 
-Конфиг overrides задаётся через:
+This folder contains structured documentation for all projects in `Avalonia3D.sln`.
 
-- аргумент `--material-import-overrides=<path>`
-- переменную окружения `AVALONIA3D_MATERIAL_IMPORT_OVERRIDES`
+### Contents
 
-Поддерживаются два уровня:
+- `ARCHITECTURE.en.md` - end-to-end architecture: how data flows from asset loading to rendered frame.
+- `PROJECT_AVALONIA3D.en.md` - detailed core engine docs (`Avalonia3D`).
+- `PROJECT_SANDBOX.en.md` - detailed sandbox docs (`Avalonia3D.Sandbox`).
+- `PROJECT_TESTS.en.md` - detailed test project docs (`Avalonia3D.Tests`).
+- `ARCHITECTURE.ru.md`, `PROJECT_*.ru.md` - Russian versions of the same docs.
 
-1. Asset-level (ключ — путь к `.gltf/.glb`).
-2. Material-level (внутри `materials`, ключ — имя материала), приоритетнее asset-level.
+### Quick entry
 
-Поддерживаемые поля override:
-
-- `alphaProfile`
-- `forceAlphaMode`
-- `preserveBlendWithoutAlphaSignalForEmissive`
-- `forceTextureTransparencySignal`
-
-## Decision-лог
-
-`DefaultMaterialImportPolicy` пишет debug-лог с reason code решения alpha mode.
-Это единственная точка, где следует расширять правила, чтобы изменения не расползались по loader-коду.
-
-## Контракт для animated emissive
-
-Для анимированных emissive-материалов (контекст `IsAnimatedMaterial=true`) действует контракт: BLEND сохраняется и не деградирует в Opaque при emissive-сигнале, независимо от профиля.
+- From repository root: `QUICKSTART.en.md`.
