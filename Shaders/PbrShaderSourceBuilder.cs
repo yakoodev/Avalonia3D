@@ -13,7 +13,7 @@ public sealed class PbrShaderSourceBuilder
     private static string BuildVertexShaderSource()
     {
         return @"#version 300 es
-precision mediump float;
+precision highp float;
 layout(location = 0) in vec3 aPosition;
 layout(location = 1) in vec3 aNormal;
 layout(location = 2) in vec2 aTexCoord;
@@ -130,14 +130,16 @@ void main()
 {
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     projCoords = projCoords * 0.5 + 0.5;
-    float closestDepth = texture(uShadowMap, projCoords.xy).r;
-    float currentDepth = projCoords.z;
-    float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.0005);
-    float shadow = 0.0;
+    if(projCoords.z > 1.0 || projCoords.x < 0.0 || projCoords.x > 1.0 || projCoords.y < 0.0 || projCoords.y > 1.0) return 0.0;
     vec2 texelSize = 1.0 / vec2(textureSize(uShadowMap, 0));
+    float currentDepth = projCoords.z;
+    float ndotl = max(dot(normal, lightDir), 0.0);
+    float minBias = 1.5 * max(texelSize.x, texelSize.y);
+    float slopeBias = 4.0 * minBias * (1.0 - ndotl);
+    float bias = max(minBias, slopeBias);
+    float shadow = 0.0;
     for(int x = -1; x <= 1; ++x){ for(int y = -1; y <= 1; ++y){ float pcfDepth = texture(uShadowMap, projCoords.xy + vec2(x, y) * texelSize).r; shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0; }}
     shadow /= 9.0;
-    if(projCoords.z > 1.0) shadow = 0.0;
     return shadow;
 }");
     }
