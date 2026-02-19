@@ -1,6 +1,7 @@
 using System;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Avalonia3D.Shaders;
 
 namespace Avalonia3D.Rendering
 {
@@ -78,6 +79,7 @@ namespace Avalonia3D.Rendering
         public PbrTuningProfile PbrTuning { get; init; } = new();
         public BackgroundProfile Background { get; init; } = new();
         public int MaxLights { get; init; } = RenderQualitySettings.DefaultMaxLights;
+        public RenderCapabilities RenderCapabilities { get; init; } = RenderCapabilities.Default;
 
         public static GraphicsProfile Low => new()
         {
@@ -371,7 +373,8 @@ namespace Avalonia3D.Rendering
                 Reflections = validatedReflections,
                 PbrTuning = validatedPbr,
                 Background = validatedBackground,
-                MaxLights = Math.Clamp(MaxLights, RenderQualitySettings.MinLights, RenderQualitySettings.MaxSupportedLights)
+                MaxLights = Math.Clamp(MaxLights, RenderQualitySettings.MinLights, RenderQualitySettings.MaxSupportedLights),
+                RenderCapabilities = RenderCapabilities ?? new RenderCapabilities(MaterialFeatureSetExtensions.PbrFeatureMask)
             };
         }
 

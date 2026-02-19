@@ -7,13 +7,18 @@ namespace Avalonia3D.Rendering;
 
 public sealed class RuntimePbrShaderFactory : IRuntimePbrShaderFactory
 {
-    public IShader3D Create(GL? gl, PbrFeatures features, int maxLights)
+    public IShader3D Create(GL? gl, MaterialFeatureSet features, int maxLights, IRenderCapabilities capabilities)
     {
         if (gl == null)
         {
             throw new InvalidOperationException("GL context is required for runtime PBR shader creation.");
         }
 
-        return GLShader.Create(gl, features, maxLights);
+        if (!capabilities.Supports(features))
+        {
+            throw new InvalidOperationException($"Requested runtime feature set '{features}' is not supported by current render capabilities '{capabilities.SupportedMaterialFeatures}'.");
+        }
+
+        return GLShader.Create(gl, features.ToPbrFeatures(), maxLights);
     }
 }

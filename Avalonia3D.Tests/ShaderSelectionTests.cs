@@ -245,6 +245,60 @@ public class ShaderSelectionTests
         Assert.Equal(ShaderIds.CreatePbrVariantId(ShaderSelectionPolicy.BuildPbrFeatures(material, scene)), shaderId);
     }
 
+
+    [Fact]
+    public void Select_UsesReducedVariant_WhenRequestedFeatureNotSupportedByProfile()
+    {
+        var scene = CreateScene();
+        scene.BindRenderMode(ShaderRenderMode.Pbr, ShaderIds.Pbr);
+        scene.RenderMode = ShaderRenderMode.Pbr;
+        scene.ApplyGraphicsProfile(scene.ActiveGraphicsProfile with
+        {
+            RenderCapabilities = new RenderCapabilities(MaterialFeatureSetExtensions.PbrFeatureMask & ~MaterialFeatureSet.Transmission)
+        });
+
+        var captureFactory = new CapturingRuntimePbrShaderFactory();
+        var policy = new ShaderSelectionPolicy(
+            pbrVariantReducer: new SingleStepPbrVariantReducer(PbrFeatures.None),
+            runtimePbrShaderFactory: captureFactory);
+
+        var material = new Material
+        {
+            HasTransmission = true,
+            TransmissionFactor = 1f
+        };
+
+        var selected = policy.Select(material, scene, gl: null);
+
+        Assert.NotNull(selected);
+        Assert.Equal(MaterialFeatureSet.None, captureFactory.LastRequestedFeatures);
+    }
+
+    [Fact]
+    public void Select_FallsBackToStaticPbr_WhenNoSupportedRuntimeVariantsAvailable()
+    {
+        var scene = CreateScene();
+        scene.BindRenderMode(ShaderRenderMode.Pbr, ShaderIds.Pbr);
+        scene.RenderMode = ShaderRenderMode.Pbr;
+        scene.ApplyGraphicsProfile(scene.ActiveGraphicsProfile with
+        {
+            RenderCapabilities = new RenderCapabilities(MaterialFeatureSet.None)
+        });
+
+        var policy = new ShaderSelectionPolicy(
+            pbrVariantReducer: new NoOpPbrVariantReducer(),
+            runtimePbrShaderFactory: new ThrowingRuntimePbrShaderFactory());
+
+        var material = new Material
+        {
+            BaseColorTexture = new TextureData()
+        };
+
+        var selected = policy.Select(material, scene, gl: null);
+
+        Assert.Same(scene.ShaderRegistry.Get(ShaderIds.Pbr), selected);
+    }
+
     [Fact]
     public void Select_UsesFallback_WhenNoMaterialAndNoSceneDefault()
     {
@@ -278,6 +332,33 @@ public class ShaderSelectionTests
     }
 
 
+
+    private sealed class SingleStepPbrVariantReducer : IPbrVariantReducer
+    {
+        private readonly PbrFeatures _reduced;
+
+        public SingleStepPbrVariantReducer(PbrFeatures reduced)
+        {
+            _reduced = reduced;
+        }
+
+        public IEnumerable<PbrFeatures> GetReductionChain(PbrFeatures requestedFeatures)
+        {
+            yield return _reduced;
+        }
+    }
+
+    private sealed class CapturingRuntimePbrShaderFactory : IRuntimePbrShaderFactory
+    {
+        public MaterialFeatureSet LastRequestedFeatures { get; private set; } = (MaterialFeatureSet)(-1);
+
+        public IShader3D Create(Silk.NET.OpenGL.GL? gl, MaterialFeatureSet features, int maxLights, IRenderCapabilities capabilities)
+        {
+            LastRequestedFeatures = features;
+            return new StubShader();
+        }
+    }
+
     private sealed class FixedRuntimePbrShaderFactory : IRuntimePbrShaderFactory
     {
         private readonly IShader3D _shader;
@@ -287,7 +368,7 @@ public class ShaderSelectionTests
             _shader = shader;
         }
 
-        public IShader3D Create(Silk.NET.OpenGL.GL? gl, PbrFeatures features, int maxLights)
+        public IShader3D Create(Silk.NET.OpenGL.GL? gl, MaterialFeatureSet features, int maxLights, IRenderCapabilities capabilities)
         {
             return _shader;
         }
@@ -295,7 +376,7 @@ public class ShaderSelectionTests
 
     private sealed class ThrowingRuntimePbrShaderFactory : IRuntimePbrShaderFactory
     {
-        public IShader3D Create(Silk.NET.OpenGL.GL? gl, PbrFeatures features, int maxLights)
+        public IShader3D Create(Silk.NET.OpenGL.GL? gl, MaterialFeatureSet features, int maxLights, IRenderCapabilities capabilities)
         {
             throw new InvalidOperationException("Simulated compile failure");
         }
