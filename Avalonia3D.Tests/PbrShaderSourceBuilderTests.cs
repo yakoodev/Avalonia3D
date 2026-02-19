@@ -7,6 +7,16 @@ namespace Avalonia3D.Tests;
 public class PbrShaderSourceBuilderTests
 {
     [Fact]
+    public void Build_UsesHighPrecisionInVertexShaderSource()
+    {
+        var builder = new PbrShaderSourceBuilder();
+
+        var (vertexSource, _) = builder.Build(PbrFeatures.None, maxLights: 4);
+
+        Assert.Contains("precision highp float;", vertexSource);
+    }
+
+    [Fact]
     public void Build_UsesHighPrecisionInFragmentShaderSource()
     {
         var builder = new PbrShaderSourceBuilder();
@@ -209,6 +219,19 @@ public class PbrShaderSourceBuilderTests
         Assert.Contains("attenuationTint=mix(vec3(1.0), clamp(uTransmissionAttenuationColor", fragmentSource);
         Assert.Contains("transmittedLight=surfaceResult*attenuationTint", fragmentSource);
         Assert.Contains("mix(surfaceResult, transmittedLight, transmissionWeight)", fragmentSource);
+    }
+
+    [Fact]
+    public void Build_ShadowCalculation_UsesTexelScaledBiasAndUvBoundsGuard()
+    {
+        var builder = new PbrShaderSourceBuilder();
+
+        var (_, fragmentSource) = builder.Build(PbrFeatures.None, maxLights: 4);
+
+        Assert.Contains("if(projCoords.z > 1.0 || projCoords.x < 0.0 || projCoords.x > 1.0 || projCoords.y < 0.0 || projCoords.y > 1.0) return 0.0;", fragmentSource);
+        Assert.Contains("float minBias = 1.5 * max(texelSize.x, texelSize.y);", fragmentSource);
+        Assert.Contains("float slopeBias = 4.0 * minBias * (1.0 - ndotl);", fragmentSource);
+        Assert.Contains("float bias = max(minBias, slopeBias);", fragmentSource);
     }
 
 }
