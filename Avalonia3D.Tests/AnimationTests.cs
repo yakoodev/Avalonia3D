@@ -350,6 +350,127 @@ public class AnimationTests
         Assert.Equal(1.5f, playingState.Speed);
     }
 
+
+    [Fact]
+    public void AnimationStateMachine_IdleMoveActionFlow_WorksWithCrossFade()
+    {
+        var graph = new SceneGraph();
+        var node = new SceneNode { Name = "Actor", StableId = "node:actor" };
+        graph.Root.AddChild(node);
+
+        var animatorComponent = new AnimatorComponent(graph, new Animator());
+        animatorComponent.RegisterClip(CreatePositionClip("IdleClip", 0f, 0f, duration: 1f));
+        animatorComponent.RegisterClip(CreatePositionClip("MoveClip", 0f, 10f, duration: 1f));
+        animatorComponent.RegisterClip(CreatePositionClip("ActionClip", 10f, 20f, duration: 0.5f));
+
+        var sm = new AnimationStateMachineComponent(animatorComponent, "IdleClip", "MoveClip", "ActionClip", defaultCrossFade: 0.2f);
+
+        sm.Update(0.1f);
+        Assert.Equal("Idle", sm.CurrentState);
+
+        sm.SetParameter(AnimationParameter.Bool("Move", true));
+        sm.Update(0.1f);
+        Assert.Equal("Idle", sm.CurrentState);
+        Assert.True(sm.IsInTransition);
+
+        sm.Update(0.2f);
+        Assert.Equal("Move", sm.CurrentState);
+        Assert.InRange(node.Position.X, 0.5f, 2.5f);
+
+        sm.SetParameter(AnimationParameter.Trigger("Action"));
+        sm.Update(0.1f);
+        sm.Update(0.2f);
+        Assert.Equal("Action", sm.CurrentState);
+
+        sm.Update(0.6f);
+        Assert.Equal("Move", sm.CurrentState);
+    }
+
+    [Fact]
+    public void AnimationStateMachine_ActionInterruptsMove_ByPriority()
+    {
+        var graph = new SceneGraph();
+        var node = new SceneNode { Name = "Actor", StableId = "node:actor" };
+        graph.Root.AddChild(node);
+
+        var animatorComponent = new AnimatorComponent(graph, new Animator());
+        animatorComponent.RegisterClip(CreatePositionClip("IdleClip", 0f, 0f, 1f));
+        animatorComponent.RegisterClip(CreatePositionClip("MoveClip", 0f, 10f, 1f));
+        animatorComponent.RegisterClip(CreatePositionClip("ActionClip", 10f, 20f, 0.25f));
+
+        var sm = new AnimationStateMachineComponent(animatorComponent, "IdleClip", "MoveClip", "ActionClip", 0.15f);
+
+        sm.SetParameter(AnimationParameter.Bool("Move", true));
+        sm.Update(0.16f);
+        sm.Update(0.16f);
+        Assert.Equal("Move", sm.CurrentState);
+
+        sm.SetParameter(AnimationParameter.Trigger("Action"));
+        sm.Update(0.05f);
+
+        Assert.True(sm.IsInTransition);
+        sm.Update(0.2f);
+        Assert.Equal("Action", sm.CurrentState);
+        Assert.True(node.Position.X > 1f);
+    }
+
+    [Fact]
+    public void AnimationStateMachine_CrossFade_LoopAndNonLoopClips_AreStable()
+    {
+        var graph = new SceneGraph();
+        var node = new SceneNode { Name = "Actor", StableId = "node:actor" };
+        graph.Root.AddChild(node);
+
+        var animatorComponent = new AnimatorComponent(graph, new Animator());
+        animatorComponent.RegisterClip(CreatePositionClip("IdleClip", 0f, 0f, duration: 1f));
+        animatorComponent.RegisterClip(CreatePositionClip("MoveClip", 0f, 10f, duration: 1f));
+        animatorComponent.RegisterClip(CreatePositionClip("ActionClip", 10f, 12f, duration: 0.3f));
+
+        var sm = new AnimationStateMachineComponent(animatorComponent, "IdleClip", "MoveClip", "ActionClip", defaultCrossFade: 0.3f);
+
+        sm.SetParameter(AnimationParameter.Bool("Move", true));
+        sm.Update(0.1f);
+        sm.Update(0.3f);
+        var beforeAction = node.Position.X;
+
+        sm.SetParameter(AnimationParameter.Trigger("Action"));
+        sm.Update(0.05f);
+        var duringBlend = node.Position.X;
+        sm.Update(0.3f);
+        var inAction = node.Position.X;
+
+        Assert.True(float.IsFinite(beforeAction));
+        Assert.True(float.IsFinite(duringBlend));
+        Assert.True(float.IsFinite(inAction));
+        Assert.NotEqual(beforeAction, duringBlend);
+
+        sm.SetParameter(AnimationParameter.Bool("Move", false));
+        sm.Update(0.35f);
+        Assert.Equal("Idle", sm.CurrentState);
+    }
+
+    [Fact]
+    public void AnimatorComponent_LowLevelApi_RemainsCompatible()
+    {
+        var (graph, node, clip) = CreateSingleNodeClip(duration: 1f);
+        var animator = new Animator();
+        var component = new AnimatorComponent(graph, animator);
+        component.RegisterClip(clip);
+
+        Assert.True(component.PlayClip(clip.Name, loop: false, speed: 1f));
+        animator.Update(0.5f);
+        Assert.InRange(node.Position.X, 4.9f, 5.1f);
+
+        Assert.True(component.PauseClip(clip.Name));
+        animator.Update(0.5f);
+        Assert.InRange(node.Position.X, 4.9f, 5.1f);
+
+        Assert.True(component.ResumeClip(clip.Name));
+        animator.Update(0.25f);
+        Assert.True(component.GetClipState(clip.Name).IsPlaying);
+        Assert.True(component.StopClip(clip.Name));
+    }
+
     private static (SceneGraph Graph, SceneNode Node, AnimationClip Clip) CreateSingleNodeClip(float duration)
     {
         var graph = new SceneGraph();
@@ -363,6 +484,17 @@ public class AnimationTests
         clip.Channels.Add(channel);
 
         return (graph, node, clip);
+    }
+
+
+    private static AnimationClip CreatePositionClip(string clipName, float fromX, float toX, float duration)
+    {
+        var clip = new AnimationClip(clipName);
+        var channel = new AnimationChannel("node:actor", AnimationTargetProperty.Position);
+        channel.AddKeyframe(0f, new Vector3(fromX, 0f, 0f));
+        channel.AddKeyframe(duration, new Vector3(toX, 0f, 0f));
+        clip.Channels.Add(channel);
+        return clip;
     }
 
     private static string GetTestAssetPath(string fileName)

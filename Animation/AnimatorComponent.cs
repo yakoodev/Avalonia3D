@@ -27,6 +27,7 @@ namespace Avalonia3D.Animation
 
         public event EventHandler<ClipPlaybackCompletedEventArgs>? ClipCompleted;
         public bool HasActiveClips => _activePlayers.Count > 0;
+        public SceneGraph SceneGraph => _sceneGraph;
 
         public AnimatorComponent(SceneGraph sceneGraph, Animator animator)
         {
@@ -94,6 +95,17 @@ namespace Avalonia3D.Animation
             return new ClipPlaybackState(clipName, true, false, false, false, 1f, 0f, clip.Duration);
         }
 
+
+        public bool TryGetClip(string clipName, out AnimationClip clip)
+        {
+            if (string.IsNullOrWhiteSpace(clipName))
+            {
+                clip = null!;
+                return false;
+            }
+
+            return _clips.TryGetValue(clipName, out clip!);
+        }
         public bool PlayClip(string clipName, bool loop = false, float speed = 1f)
         {
             if (string.IsNullOrWhiteSpace(clipName))
