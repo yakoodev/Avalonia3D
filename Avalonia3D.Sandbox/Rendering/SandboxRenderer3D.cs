@@ -20,6 +20,7 @@ public sealed class SandboxRenderer3D : IRenderContext
     private IFramePresenter? _framePresenter;
     private Action<WriteableBitmap>? _frameReadyHandlers;
     private readonly RenderPipeline _renderPipeline = new(GraphicsProfile.Medium);
+    private const bool SandboxFrustumCullingEnabled = false;
     private readonly EmissiveRenderTargetManager _emissiveTargetManager = new();
     private DateTime _nextMetricsLogUtc = DateTime.MinValue;
     private int _lastLoggedDrawCalls = -1;
@@ -59,6 +60,7 @@ public sealed class SandboxRenderer3D : IRenderContext
     public void Init(GL gl)
     {
         _gl = gl;
+        _renderPipeline.EnableFrustumCulling = SandboxFrustumCullingEnabled;
         Scene.Init(gl);
         Scene.ApplyGraphicsProfile(_renderPipeline.Profile);
         SceneShaderRegistryBootstrap.Configure(Scene, _renderPipeline.Profile.MaxLights);
