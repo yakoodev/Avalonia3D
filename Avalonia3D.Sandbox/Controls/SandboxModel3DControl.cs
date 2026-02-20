@@ -223,6 +223,7 @@ public class SandboxModel3DControl : OpenGlControlBase
         ApplySensitivity();
         MarkInteractionActive();
         RequestNextFrameRendering();
+        _lastKnownOutputFramebufferId = null;
         Log.Information("SandboxModel3DControl initialized. Bounds={Bounds}", Bounds);
     }
 
@@ -275,6 +276,7 @@ public class SandboxModel3DControl : OpenGlControlBase
         SetAndRaise(IsRendererReadyProperty, ref _isRendererReady, false);
         _gl = null;
         _frameRequestScheduled = false;
+        _lastKnownOutputFramebufferId = null;
         base.OnOpenGlDeinit(gl);
     }
 
@@ -316,6 +318,7 @@ public class SandboxModel3DControl : OpenGlControlBase
     }
 
     private int _lastFramebuffer = -1;
+    private uint? _lastKnownOutputFramebufferId;
 
     public void HandlePointerPressed(PointerPressedEventArgs e)
     {
@@ -423,10 +426,23 @@ public class SandboxModel3DControl : OpenGlControlBase
         };
     }
 
-    private static bool TryResolveOutputFramebuffer(int framebufferId, out uint outputFramebufferId)
+    private bool TryResolveOutputFramebuffer(int framebufferId, out uint outputFramebufferId)
     {
-        outputFramebufferId = framebufferId >= 0 ? (uint)framebufferId : 0;
-        return framebufferId >= 0;
+        if (framebufferId >= 0)
+        {
+            outputFramebufferId = (uint)framebufferId;
+            _lastKnownOutputFramebufferId = outputFramebufferId;
+            return true;
+        }
+
+        if (_lastKnownOutputFramebufferId.HasValue)
+        {
+            outputFramebufferId = _lastKnownOutputFramebufferId.Value;
+            return true;
+        }
+
+        outputFramebufferId = 0;
+        return false;
     }
 
     private void ApplySensitivity()
