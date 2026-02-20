@@ -30,6 +30,10 @@ public class CameraController
     public float OrbitSensitivity { get; set; } = 0.01f;
     public float PanSensitivity { get; set; } = 0.01f;
     public float DollySensitivity { get; set; } = 2f;
+    public bool AdaptiveClipPlanesEnabled { get; set; } = true;
+    public float AdaptiveNearPlaneRatio { get; set; } = 0.02f;
+    public float AdaptiveNearPlaneMin { get; set; } = 0.01f;
+    public float AdaptiveFarPlaneDistanceMultiplier { get; set; } = 3f;
 
     public void ToggleControlMode()
     {
@@ -60,6 +64,11 @@ public class CameraController
     public void Dolly(float delta)
     {
         _camera.Distance += delta * -DollySensitivity;
+
+        if (AdaptiveClipPlanesEnabled)
+        {
+            SyncClipPlanesToDistance();
+        }
     }
 
     public bool FocusSelection(Vector3 selectionMin, Vector3 selectionMax, float minDistance = 1f)
@@ -104,6 +113,15 @@ public class CameraController
         _camera.Near = MathF.Max(0.01f, _camera.Distance * 0.02f);
         _camera.Far = MathF.Max(_camera.Distance + radius * 4f, _camera.Distance * 3f);
         return true;
+    }
+
+    private void SyncClipPlanesToDistance()
+    {
+        var targetNear = MathF.Max(AdaptiveNearPlaneMin, _camera.Distance * AdaptiveNearPlaneRatio);
+        _camera.Near = targetNear;
+
+        var targetFar = MathF.Max(_camera.Distance * AdaptiveFarPlaneDistanceMultiplier, _camera.Near + 1f);
+        _camera.Far = MathF.Max(_camera.Far, targetFar);
     }
 
     private readonly record struct CameraViewState(Vector3 Target, float Distance, float Pitch, float Yaw, float Near, float Far, float Fov)
