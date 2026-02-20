@@ -218,7 +218,7 @@ public class SandboxModel3DControl : OpenGlControlBase
         base.OnOpenGlInit(gl);
         _gl = GL.GetApi(gl.GetProcAddress);
         _renderer.Init(_gl);
-        _lastValidFramebufferId = null;
+        _framebufferTargetResolver.Reset();
         SetAndRaise(IsRendererReadyProperty, ref _isRendererReady, true);
         _sceneLoader.MarkRendererReady();
         ApplySensitivity();
@@ -241,9 +241,7 @@ public class SandboxModel3DControl : OpenGlControlBase
             Log.Information("Sandbox OpenGL target framebuffer: {FramebufferId}", fb);
         }
 
-        var outputFramebufferId = FramebufferTargetResolver.Resolve(fb, _lastValidFramebufferId, out var updatedLastValidFramebufferId);
-        _lastValidFramebufferId = updatedLastValidFramebufferId;
-        _renderer.FrameState.OutputFramebufferId = outputFramebufferId;
+        _renderer.FrameState.OutputFramebufferId = _framebufferTargetResolver.Resolve(fb);
         var executedActions = _renderThreadScheduler.ExecutePending();
         _hasPendingRenderWork = false;
         _renderer.Resize((uint)width, (uint)height);
@@ -271,7 +269,7 @@ public class SandboxModel3DControl : OpenGlControlBase
         SetAndRaise(IsRendererReadyProperty, ref _isRendererReady, false);
         _gl = null;
         _frameRequestScheduled = false;
-        _lastValidFramebufferId = null;
+        _framebufferTargetResolver.Reset();
         base.OnOpenGlDeinit(gl);
     }
 
@@ -313,7 +311,7 @@ public class SandboxModel3DControl : OpenGlControlBase
     }
 
     private int _lastFramebuffer = -1;
-    private int? _lastValidFramebufferId;
+    private readonly FramebufferTargetResolver _framebufferTargetResolver = new();
 
     public void HandlePointerPressed(PointerPressedEventArgs e)
     {

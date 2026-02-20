@@ -1,22 +1,77 @@
 namespace Avalonia3D.Sandbox.Rendering;
 
-public static class FramebufferTargetResolver
+public sealed class FramebufferTargetResolver
 {
-    public static uint Resolve(int incomingFramebufferId, int? lastValidFramebufferId, out int? updatedLastValidFramebufferId)
+    private readonly int _switchStabilizationFrames;
+    private int? _stableFramebufferId;
+    private int? _candidateFramebufferId;
+    private int _candidateHitCount;
+
+    public FramebufferTargetResolver(int switchStabilizationFrames = 2)
     {
-        if (incomingFramebufferId >= 0)
+        _switchStabilizationFrames = switchStabilizationFrames < 1 ? 1 : switchStabilizationFrames;
+    }
+
+    public void Reset()
+    {
+        _stableFramebufferId = null;
+        _candidateFramebufferId = null;
+        _candidateHitCount = 0;
+    }
+
+    public uint Resolve(int incomingFramebufferId)
+    {
+        var normalizedIncoming = incomingFramebufferId >= 0
+            ? incomingFramebufferId
+            : _stableFramebufferId ?? 0;
+
+        if (!_stableFramebufferId.HasValue)
         {
-            updatedLastValidFramebufferId = incomingFramebufferId;
-            return (uint)incomingFramebufferId;
+            _stableFramebufferId = normalizedIncoming;
+            return (uint)_stableFramebufferId.Value;
         }
 
-        if (lastValidFramebufferId.HasValue)
+        if (normalizedIncoming == _stableFramebufferId.Value)
         {
-            updatedLastValidFramebufferId = lastValidFramebufferId;
-            return (uint)lastValidFramebufferId.Value;
+            ResetCandidate();
+            return (uint)_stableFramebufferId.Value;
         }
 
-        updatedLastValidFramebufferId = 0;
-        return 0;
+        if (IsSwitchBetweenDefaultAndOffscreen(_stableFramebufferId.Value, normalizedIncoming))
+        {
+            RegisterCandidate(normalizedIncoming);
+            if (_candidateHitCount < _switchStabilizationFrames)
+            {
+                return (uint)_stableFramebufferId.Value;
+            }
+        }
+
+        _stableFramebufferId = normalizedIncoming;
+        ResetCandidate();
+        return (uint)_stableFramebufferId.Value;
+    }
+
+    private static bool IsSwitchBetweenDefaultAndOffscreen(int currentFramebufferId, int nextFramebufferId)
+    {
+        return (currentFramebufferId == 0 && nextFramebufferId > 0)
+            || (currentFramebufferId > 0 && nextFramebufferId == 0);
+    }
+
+    private void RegisterCandidate(int candidateFramebufferId)
+    {
+        if (_candidateFramebufferId == candidateFramebufferId)
+        {
+            _candidateHitCount++;
+            return;
+        }
+
+        _candidateFramebufferId = candidateFramebufferId;
+        _candidateHitCount = 1;
+    }
+
+    private void ResetCandidate()
+    {
+        _candidateFramebufferId = null;
+        _candidateHitCount = 0;
     }
 }
