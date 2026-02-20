@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Avalonia3D.Model.StandObjects;
 
 namespace Avalonia3D.Model
@@ -55,28 +56,87 @@ namespace Avalonia3D.Model
 
         public SceneNode? FindByName(string name)
         {
-            return Root.FindByName(name);
+            return FindNode(name);
         }
 
         public SceneNode? FindNode(string name)
         {
-            return Root.FindByName(name);
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return null;
+            }
+
+            return FindNodes(node => string.Equals(node.Name, name, StringComparison.Ordinal)).FirstOrDefault();
+        }
+
+        public IEnumerable<SceneNode> EnumerateNodes()
+        {
+            return TraverseNodes(Root);
+        }
+
+        public IEnumerable<SceneNode> FindNodesByNameContains(
+            string value,
+            StringComparison comparison = StringComparison.OrdinalIgnoreCase)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                yield break;
+            }
+
+            foreach (var node in TraverseNodes(Root))
+            {
+                if (!string.IsNullOrEmpty(node.Name) && node.Name.Contains(value, comparison))
+                {
+                    yield return node;
+                }
+            }
+        }
+
+        public IEnumerable<SceneNode> FindNodesByNameStartsWith(
+            string value,
+            StringComparison comparison = StringComparison.OrdinalIgnoreCase)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                yield break;
+            }
+
+            foreach (var node in TraverseNodes(Root))
+            {
+                if (!string.IsNullOrEmpty(node.Name) && node.Name.StartsWith(value, comparison))
+                {
+                    yield return node;
+                }
+            }
+        }
+
+        public IEnumerable<SceneNode> FindNodes(Func<SceneNode, bool> predicate)
+        {
+            ArgumentNullException.ThrowIfNull(predicate);
+
+            foreach (var node in TraverseNodes(Root))
+            {
+                if (predicate(node))
+                {
+                    yield return node;
+                }
+            }
         }
 
 
         public SceneNode? FindNodeBySemanticId(string semanticId)
         {
-            return FindNodeByPredicate(node => string.Equals(node.SemanticId, semanticId, StringComparison.Ordinal));
+            return FindNodes(node => string.Equals(node.SemanticId, semanticId, StringComparison.Ordinal)).FirstOrDefault();
         }
 
         public SceneNode? FindNodeByStableId(string stableId)
         {
-            return FindNodeByPredicate(node => string.Equals(node.StableId, stableId, StringComparison.Ordinal));
+            return FindNodes(node => string.Equals(node.StableId, stableId, StringComparison.Ordinal)).FirstOrDefault();
         }
 
         public SceneNode? FindNodeByPath(string path)
         {
-            return FindNodeByPredicate(node => string.Equals(node.GetPath(), path, StringComparison.Ordinal));
+            return FindNodes(node => string.Equals(node.GetPath(), path, StringComparison.Ordinal)).FirstOrDefault();
         }
 
         public SceneNode? FindNodeByKey(string key)
@@ -92,28 +152,19 @@ namespace Avalonia3D.Model
                 ?? FindNode(key);
         }
 
-        private SceneNode? FindNodeByPredicate(Func<SceneNode, bool> predicate)
+        private IEnumerable<SceneNode> TraverseNodes(SceneNode startNode)
         {
-            return FindNodeByPredicate(Root, predicate);
-        }
+            ArgumentNullException.ThrowIfNull(startNode);
 
-        private static SceneNode? FindNodeByPredicate(SceneNode node, Func<SceneNode, bool> predicate)
-        {
-            if (predicate(node))
-            {
-                return node;
-            }
+            yield return startNode;
 
-            foreach (var child in node.Children)
+            foreach (var child in startNode.Children)
             {
-                var match = FindNodeByPredicate(child, predicate);
-                if (match != null)
+                foreach (var descendant in TraverseNodes(child))
                 {
-                    return match;
+                    yield return descendant;
                 }
             }
-
-            return null;
         }
     }
 }
