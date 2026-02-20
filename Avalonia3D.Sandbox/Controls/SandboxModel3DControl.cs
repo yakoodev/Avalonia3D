@@ -218,6 +218,7 @@ public class SandboxModel3DControl : OpenGlControlBase
         base.OnOpenGlInit(gl);
         _gl = GL.GetApi(gl.GetProcAddress);
         _renderer.Init(_gl);
+        _lastValidFramebufferId = null;
         SetAndRaise(IsRendererReadyProperty, ref _isRendererReady, true);
         _sceneLoader.MarkRendererReady();
         ApplySensitivity();
@@ -240,7 +241,15 @@ public class SandboxModel3DControl : OpenGlControlBase
             Log.Information("Sandbox OpenGL target framebuffer: {FramebufferId}", fb);
         }
 
-        _renderer.FrameState.OutputFramebufferId = ResolveOutputFramebuffer(fb);
+        if (!FramebufferTargetResolver.TryResolve(fb, _lastValidFramebufferId, out var outputFramebufferId, out var updatedLastValidFramebufferId))
+        {
+            _lastValidFramebufferId = updatedLastValidFramebufferId;
+            ScheduleNextFrame(TimeSpan.Zero);
+            return;
+        }
+
+        _lastValidFramebufferId = updatedLastValidFramebufferId;
+        _renderer.FrameState.OutputFramebufferId = outputFramebufferId;
         var executedActions = _renderThreadScheduler.ExecutePending();
         _hasPendingRenderWork = false;
         _renderer.Resize((uint)width, (uint)height);
@@ -269,6 +278,7 @@ public class SandboxModel3DControl : OpenGlControlBase
         SetAndRaise(IsRendererReadyProperty, ref _isRendererReady, false);
         _gl = null;
         _frameRequestScheduled = false;
+        _lastValidFramebufferId = null;
         base.OnOpenGlDeinit(gl);
     }
 
@@ -310,6 +320,7 @@ public class SandboxModel3DControl : OpenGlControlBase
     }
 
     private int _lastFramebuffer = -1;
+    private int? _lastValidFramebufferId;
 
     public void HandlePointerPressed(PointerPressedEventArgs e)
     {
@@ -415,11 +426,6 @@ public class SandboxModel3DControl : OpenGlControlBase
             _ when props.IsLeftButtonPressed => MouseButton.Left,
             _ => MouseButton.None
         };
-    }
-
-    private static uint ResolveOutputFramebuffer(int framebufferId)
-    {
-        return framebufferId >= 0 ? (uint)framebufferId : 0;
     }
 
     private void ApplySensitivity()
