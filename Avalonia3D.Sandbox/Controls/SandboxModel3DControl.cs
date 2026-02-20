@@ -66,6 +66,7 @@ public class SandboxModel3DControl : OpenGlControlBase
     private bool _frameRequestScheduled;
     private DateTime _interactionUntilUtc = DateTime.MinValue;
     private bool _hasPendingRenderWork;
+    private DateTime _nextActiveFrameUtc = DateTime.MinValue;
 
     public SandboxModel3DControl()
     {
@@ -254,12 +255,17 @@ public class SandboxModel3DControl : OpenGlControlBase
 
         if (_hasPendingRenderWork || ShouldRunActiveLoop())
         {
-            ScheduleNextFrame(TimeSpan.Zero);
+            ScheduleActiveFrame();
         }
         else if (IdleFps > 0)
         {
+            _nextActiveFrameUtc = DateTime.MinValue;
             var idleDelay = TimeSpan.FromSeconds(1.0 / IdleFps);
             ScheduleNextFrame(idleDelay);
+        }
+        else
+        {
+            _nextActiveFrameUtc = DateTime.MinValue;
         }
     }
 
@@ -434,6 +440,26 @@ public class SandboxModel3DControl : OpenGlControlBase
         }
 
         return DateTime.UtcNow < _interactionUntilUtc;
+    }
+
+    private void ScheduleActiveFrame()
+    {
+        var now = DateTime.UtcNow;
+        var interval = TimeSpan.FromSeconds(1.0 / ActiveFps);
+
+        if (_nextActiveFrameUtc < now)
+        {
+            _nextActiveFrameUtc = now;
+        }
+
+        _nextActiveFrameUtc += interval;
+        var delay = _nextActiveFrameUtc - now;
+        if (delay < TimeSpan.Zero)
+        {
+            delay = TimeSpan.Zero;
+        }
+
+        ScheduleNextFrame(delay);
     }
 
     private void MarkInteractionActive()
