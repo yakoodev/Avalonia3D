@@ -234,7 +234,7 @@ public class SandboxModel3DControl : OpenGlControlBase
         int width = (int)Bounds.Width;
         int height = (int)Bounds.Height;
         if (width <= 0 || height <= 0) return;
-        if (fb <= 0)
+        if (!IsFramebufferReady(fb))
         {
             ScheduleNextFrame(TimeSpan.Zero);
             return;
@@ -422,6 +422,8 @@ public class SandboxModel3DControl : OpenGlControlBase
             _ => MouseButton.None
         };
     }
+
+    private static bool IsFramebufferReady(int framebufferId) => framebufferId >= 0;
 
     private void ApplySensitivity()
     {
