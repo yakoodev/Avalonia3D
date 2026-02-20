@@ -262,8 +262,7 @@ public class SandboxModel3DControl : OpenGlControlBase
 
         if (_hasPendingRenderWork || ShouldRunActiveLoop())
         {
-            var activeDelay = TimeSpan.FromSeconds(1.0 / ActiveFps);
-            ScheduleNextFrame(activeDelay);
+            ScheduleNextFrame(TimeSpan.Zero);
         }
         else if (IdleFps > 0)
         {
