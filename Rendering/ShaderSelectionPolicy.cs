@@ -5,6 +5,7 @@ using Serilog;
 using Silk.NET.OpenGL;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 
 namespace Avalonia3D.Rendering;
@@ -41,14 +42,15 @@ public sealed class ShaderSelectionPolicy
         {
             if (IsPbrShaderId(requestedShaderId) && material != null)
             {
-                var featureShaderId = ResolvePbrShaderId(material, scene);
+                var materialFeatures = BuildMaterialFeatureSet(material, scene);
+                var featureShaderId = ShaderIds.CreatePbrVariantId(materialFeatures.ToPbrFeatures());
                 var byFeatures = scene.ShaderRegistry.Get(featureShaderId, gl);
                 if (byFeatures != null)
                 {
                     return byFeatures;
                 }
 
-                var dynamicPbrShader = TryCreateRuntimePbrVariant(featureShaderId, scene, gl, _pbrVariantReducer, _runtimePbrShaderFactory);
+                var dynamicPbrShader = TryCreateRuntimePbrVariant(featureShaderId, materialFeatures, scene, gl, _pbrVariantReducer, _runtimePbrShaderFactory);
                 if (dynamicPbrShader != null)
                 {
                     return dynamicPbrShader;
@@ -64,14 +66,15 @@ public sealed class ShaderSelectionPolicy
 
         if (material != null)
         {
-            var featureShaderId = ResolvePbrShaderId(material, scene);
+            var materialFeatures = BuildMaterialFeatureSet(material, scene);
+            var featureShaderId = ShaderIds.CreatePbrVariantId(materialFeatures.ToPbrFeatures());
             var byFeatures = scene.ShaderRegistry.Get(featureShaderId, gl);
             if (byFeatures != null)
             {
                 return byFeatures;
             }
 
-            var dynamicPbrShader = TryCreateRuntimePbrVariant(featureShaderId, scene, gl, _pbrVariantReducer, _runtimePbrShaderFactory);
+            var dynamicPbrShader = TryCreateRuntimePbrVariant(featureShaderId, materialFeatures, scene, gl, _pbrVariantReducer, _runtimePbrShaderFactory);
             if (dynamicPbrShader != null)
             {
                 return dynamicPbrShader;
@@ -83,188 +86,128 @@ public sealed class ShaderSelectionPolicy
 
     public static string ResolvePbrShaderId(Material material, Scene3D scene)
     {
-        var features = BuildPbrFeatures(material, scene);
-        return ShaderIds.CreatePbrVariantId(features);
+        var features = BuildMaterialFeatureSet(material, scene);
+        return ShaderIds.CreatePbrVariantId(features.ToPbrFeatures());
     }
 
     public static PbrFeatures BuildPbrFeatures(Material material, Scene3D scene)
     {
-        var features = material.Features;
+        return BuildMaterialFeatureSet(material, scene).ToPbrFeatures();
+    }
+
+    public static MaterialFeatureSet BuildMaterialFeatureSet(Material material, Scene3D scene)
+    {
+        var features = material.Features.ToMaterialFeatureSet();
 
         if (material.BaseColorTexture != null)
         {
-            features |= PbrFeatures.BaseColorMap;
+            features |= MaterialFeatureSet.BaseColorMap;
         }
 
         if (material.NormalTexture != null)
         {
-            features |= PbrFeatures.NormalMap;
+            features |= MaterialFeatureSet.NormalMap;
         }
 
         if (material.MetallicRoughnessTexture != null)
         {
-            features |= PbrFeatures.MetallicRoughnessMap;
+            features |= MaterialFeatureSet.MetallicRoughnessMap;
         }
 
         if (material.OcclusionTexture != null)
         {
-            features |= PbrFeatures.OcclusionMap;
+            features |= MaterialFeatureSet.OcclusionMap;
         }
 
         if (material.EmissiveTexture != null)
         {
-            features |= PbrFeatures.EmissiveMap;
+            features |= MaterialFeatureSet.EmissiveMap;
         }
 
         if (scene.EnvironmentLighting.ReflectionsEnabled && scene.EnvironmentLighting.ReflectionMode == ReflectionMode.IBL)
         {
-            features |= PbrFeatures.ReflectionsIbl;
+            features |= MaterialFeatureSet.ReflectionsIbl;
         }
 
         if (material.HasTransmission && material.TransmissionFactor > 0.001f)
         {
-            features |= PbrFeatures.Transmission;
+            features |= MaterialFeatureSet.Transmission;
         }
 
         if (material.ClearcoatFactor > 0.001f)
         {
-            features |= PbrFeatures.Clearcoat;
+            features |= MaterialFeatureSet.Clearcoat;
         }
 
         if (material.SheenColorFactor.LengthSquared() > 0.0001f || material.SheenRoughnessFactor > 0.001f)
         {
-            features |= PbrFeatures.Sheen;
+            features |= MaterialFeatureSet.Sheen;
         }
 
         if (Math.Abs(material.SpecularFactor - 1f) > 0.0001f || Vector3.DistanceSquared(material.SpecularColorFactor, Vector3.One) > 0.0001f)
         {
-            features |= PbrFeatures.Specular;
+            features |= MaterialFeatureSet.Specular;
         }
 
         if (Math.Abs(material.Ior - 1.5f) > 0.0001f)
         {
-            features |= PbrFeatures.Ior;
+            features |= MaterialFeatureSet.Ior;
         }
 
         if (Math.Abs(material.EmissiveStrength - 1f) > 0.0001f)
         {
-            features |= PbrFeatures.EmissiveStrength;
+            features |= MaterialFeatureSet.EmissiveStrength;
         }
 
         if (material.ExtensionTextures.ClearcoatTexture != null)
         {
-            features |= PbrFeatures.ClearcoatMap;
+            features |= MaterialFeatureSet.ClearcoatMap;
         }
 
         if (material.ExtensionTextures.ClearcoatRoughnessTexture != null)
         {
-            features |= PbrFeatures.ClearcoatRoughnessMap;
+            features |= MaterialFeatureSet.ClearcoatRoughnessMap;
         }
 
         if (material.ExtensionTextures.ClearcoatNormalTexture != null)
         {
-            features |= PbrFeatures.ClearcoatNormalMap;
+            features |= MaterialFeatureSet.ClearcoatNormalMap;
         }
 
         if (material.ExtensionTextures.SheenColorTexture != null)
         {
-            features |= PbrFeatures.SheenColorMap;
+            features |= MaterialFeatureSet.SheenColorMap;
         }
 
         if (material.ExtensionTextures.SheenRoughnessTexture != null)
         {
-            features |= PbrFeatures.SheenRoughnessMap;
+            features |= MaterialFeatureSet.SheenRoughnessMap;
         }
 
         if (material.ExtensionTextures.SpecularTexture != null)
         {
-            features |= PbrFeatures.SpecularMap;
+            features |= MaterialFeatureSet.SpecularMap;
         }
 
         if (material.ExtensionTextures.SpecularColorTexture != null)
         {
-            features |= PbrFeatures.SpecularColorMap;
+            features |= MaterialFeatureSet.SpecularColorMap;
         }
 
         if (material.ExtensionTextures.TransmissionTexture != null)
         {
-            features |= PbrFeatures.TransmissionMap;
+            features |= MaterialFeatureSet.TransmissionMap;
         }
 
         if (material.ExtensionTextures.VolumeThicknessTexture != null)
         {
-            features |= PbrFeatures.VolumeThicknessMap;
+            features |= MaterialFeatureSet.VolumeThicknessMap;
         }
 
         return features;
     }
 
-    private static bool TryResolveLegacyPbrShaderId(PbrFeatures features, out string shaderId)
-    {
-        shaderId = ShaderIds.Pbr;
-
-        var legacyMask = PbrFeatures.BaseColorMap |
-                         PbrFeatures.NormalMap |
-                         PbrFeatures.MetallicRoughnessMap |
-                         PbrFeatures.OcclusionMap |
-                         PbrFeatures.EmissiveMap |
-                         PbrFeatures.ReflectionsIbl |
-                         PbrFeatures.Transmission;
-
-        var legacyFeatures = features & legacyMask;
-        var normalizedLegacyFeatures = NormalizeLegacyFeaturesForStaticShaders(legacyFeatures);
-        var isTransmission = normalizedLegacyFeatures.HasFlag(PbrFeatures.Transmission);
-        var hasCoreMaps = HasAll(normalizedLegacyFeatures, PbrFeatures.BaseColorMap, PbrFeatures.NormalMap, PbrFeatures.MetallicRoughnessMap);
-        var hasAoEmissive = HasAll(normalizedLegacyFeatures, PbrFeatures.OcclusionMap, PbrFeatures.EmissiveMap);
-        var hasIbl = normalizedLegacyFeatures.HasFlag(PbrFeatures.ReflectionsIbl);
-
-        if (isTransmission && hasCoreMaps && hasAoEmissive && hasIbl)
-        {
-            shaderId = ShaderIds.PbrFullTransmission;
-            return true;
-        }
-
-        if (isTransmission)
-        {
-            shaderId = ShaderIds.PbrTransmission;
-            return true;
-        }
-
-        shaderId = normalizedLegacyFeatures switch
-        {
-            PbrFeatures.None => ShaderIds.Pbr,
-            PbrFeatures.BaseColorMap => ShaderIds.PbrBaseColor,
-            PbrFeatures.BaseColorMap | PbrFeatures.NormalMap => ShaderIds.PbrBaseColorNormal,
-            PbrFeatures.BaseColorMap | PbrFeatures.NormalMap | PbrFeatures.MetallicRoughnessMap => ShaderIds.PbrBaseColorNormalMetallicRoughness,
-            PbrFeatures.BaseColorMap | PbrFeatures.NormalMap | PbrFeatures.MetallicRoughnessMap | PbrFeatures.OcclusionMap | PbrFeatures.EmissiveMap => ShaderIds.PbrBaseColorNormalMetallicRoughnessAoEmissive,
-            PbrFeatures.BaseColorMap | PbrFeatures.NormalMap | PbrFeatures.MetallicRoughnessMap | PbrFeatures.OcclusionMap | PbrFeatures.EmissiveMap | PbrFeatures.ReflectionsIbl => ShaderIds.PbrFull,
-            _ => string.Empty
-        };
-
-        if (string.IsNullOrEmpty(shaderId) && hasCoreMaps)
-        {
-            shaderId = hasIbl
-                ? ShaderIds.PbrFull
-                : ShaderIds.PbrBaseColorNormalMetallicRoughnessAoEmissive;
-        }
-
-        return !string.IsNullOrEmpty(shaderId);
-    }
-
-
-    private static PbrFeatures NormalizeLegacyFeaturesForStaticShaders(PbrFeatures features)
-    {
-        var hasBaseMetallic = features.HasFlag(PbrFeatures.BaseColorMap) && features.HasFlag(PbrFeatures.MetallicRoughnessMap);
-        if (hasBaseMetallic && !features.HasFlag(PbrFeatures.NormalMap))
-        {
-            // Static legacy registry has no "base+metallic without normal" variant.
-            // Reuse the normal-capable shader and let uHasNormalMap=0 disable sampling at runtime.
-            features |= PbrFeatures.NormalMap;
-        }
-
-        return features;
-    }
-    private static IShader3D? TryCreateRuntimePbrVariant(string shaderId, Scene3D scene, GL? gl, IPbrVariantReducer pbrVariantReducer, IRuntimePbrShaderFactory runtimePbrShaderFactory)
+    private static IShader3D? TryCreateRuntimePbrVariant(string shaderId, MaterialFeatureSet requestedMaterialFeatures, Scene3D scene, GL? gl, IPbrVariantReducer pbrVariantReducer, IRuntimePbrShaderFactory runtimePbrShaderFactory)
     {
         if (!ShaderIds.TryParsePbrVariantId(shaderId, out var features))
         {
@@ -272,9 +215,18 @@ public sealed class ShaderSelectionPolicy
         }
 
         var maxLights = scene.ActiveGraphicsProfile.MaxLights;
+        var capabilities = scene.ActiveGraphicsProfile.RenderCapabilities;
 
         foreach (var candidate in EnumerateRuntimeCandidates(features, pbrVariantReducer))
         {
+            var candidateMaterialFeatures = candidate.ToMaterialFeatureSet();
+            var unsupportedByProfile = candidateMaterialFeatures & ~capabilities.SupportedMaterialFeatures;
+            if (unsupportedByProfile != MaterialFeatureSet.None)
+            {
+                LogFeatureMismatch(requestedMaterialFeatures, capabilities.SupportedMaterialFeatures, unsupportedByProfile, shaderId, ShaderIds.CreatePbrVariantId(candidate));
+                continue;
+            }
+
             var candidateShaderId = candidate == features ? shaderId : ShaderIds.CreatePbrVariantId(candidate);
             var cached = scene.ShaderRegistry.Get(candidateShaderId, gl);
             if (cached != null)
@@ -289,7 +241,7 @@ public sealed class ShaderSelectionPolicy
 
             try
             {
-                var shader = runtimePbrShaderFactory.Create(gl, candidate, maxLights);
+                var shader = runtimePbrShaderFactory.Create(gl, candidateMaterialFeatures, maxLights, capabilities);
                 scene.ShaderRegistry.RegisterInstance(candidateShaderId, shader);
 
                 if (candidate != features)
@@ -314,6 +266,16 @@ public sealed class ShaderSelectionPolicy
 
         Log.Warning("Using default shader fallback after runtime shader compilation failures. requestedShaderId={RequestedShaderId}, features={Features}, maxLights={MaxLights}", shaderId, features, maxLights);
         return scene.ShaderRegistry.GetDefault(gl);
+    }
+
+    private static void LogFeatureMismatch(MaterialFeatureSet requestedFeatures, MaterialFeatureSet supportedFeatures, MaterialFeatureSet unsupportedFeatures, string requestedShaderId, string attemptedShaderId)
+    {
+        var names = Enum.GetValues<MaterialFeatureSet>()
+            .Where(flag => flag != MaterialFeatureSet.None && unsupportedFeatures.HasFlag(flag))
+            .Select(flag => flag.ToString())
+            .ToArray();
+
+        Log.Warning("Shader feature mismatch: материал требует feature {UnsupportedFeatures}, профиль/шейдер не поддерживает. requestedShaderId={RequestedShaderId}, attemptedShaderId={AttemptedShaderId}, requestedFeatures={RequestedFeatures}, supportedFeatures={SupportedFeatures}", string.Join(", ", names), requestedShaderId, attemptedShaderId, requestedFeatures, supportedFeatures);
     }
 
     private static IEnumerable<PbrFeatures> EnumerateRuntimeCandidates(PbrFeatures features, IPbrVariantReducer reducer)
@@ -344,18 +306,5 @@ public sealed class ShaderSelectionPolicy
     private static bool IsPbrShaderId(string shaderId)
     {
         return shaderId.StartsWith(ShaderIds.Pbr, StringComparison.Ordinal);
-    }
-
-    private static bool HasAll(PbrFeatures value, params PbrFeatures[] flags)
-    {
-        foreach (var flag in flags)
-        {
-            if (!value.HasFlag(flag))
-            {
-                return false;
-            }
-        }
-
-        return true;
     }
 }

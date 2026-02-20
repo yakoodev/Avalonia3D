@@ -76,6 +76,7 @@ public static class MaterialRenderDiagnostics
             material.RoughnessFactor,
             material.OcclusionStrength,
             ShaderSelectionPolicy.BuildPbrFeatures(material, scene),
+            ShaderSelectionPolicy.BuildMaterialFeatureSet(material, scene),
             scene.PbrDebugViewMode,
             BuildGpuSnapshot(resources));
     }
@@ -115,6 +116,7 @@ public static class MaterialRenderDiagnostics
         float RoughnessFactor,
         float OcclusionStrength,
         PbrFeatures ComputedPbrFeatures,
+        MaterialFeatureSet ComputedMaterialFeatures,
         PbrDebugViewMode ActivePbrDebugViewMode,
         MaterialGpuSnapshot GpuSnapshot);
 

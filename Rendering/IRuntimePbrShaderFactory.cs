@@ -6,5 +6,5 @@ namespace Avalonia3D.Rendering;
 
 public interface IRuntimePbrShaderFactory
 {
-    IShader3D Create(GL? gl, PbrFeatures features, int maxLights);
+    IShader3D Create(GL? gl, MaterialFeatureSet features, int maxLights, IRenderCapabilities capabilities);
 }
