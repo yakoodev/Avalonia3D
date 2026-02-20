@@ -241,13 +241,7 @@ public class SandboxModel3DControl : OpenGlControlBase
             Log.Information("Sandbox OpenGL target framebuffer: {FramebufferId}", fb);
         }
 
-        if (!FramebufferTargetResolver.TryResolve(fb, _lastValidFramebufferId, out var outputFramebufferId, out var updatedLastValidFramebufferId))
-        {
-            _lastValidFramebufferId = updatedLastValidFramebufferId;
-            ScheduleNextFrame(TimeSpan.Zero);
-            return;
-        }
-
+        var outputFramebufferId = FramebufferTargetResolver.Resolve(fb, _lastValidFramebufferId, out var updatedLastValidFramebufferId);
         _lastValidFramebufferId = updatedLastValidFramebufferId;
         _renderer.FrameState.OutputFramebufferId = outputFramebufferId;
         var executedActions = _renderThreadScheduler.ExecutePending();

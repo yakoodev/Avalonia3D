@@ -7,32 +7,29 @@ namespace Avalonia3D.Tests;
 public class FramebufferTargetResolverTests
 {
     [Fact]
-    public void TryResolve_WhenIncomingIsValid_UsesIncomingAndUpdatesLastValid()
+    public void Resolve_WhenIncomingIsValid_UsesIncomingAndUpdatesLastValid()
     {
-        var ok = FramebufferTargetResolver.TryResolve(7, 0, out var output, out var updated);
+        var output = FramebufferTargetResolver.Resolve(7, 0, out var updated);
 
-        Assert.True(ok);
         Assert.Equal((uint)7, output);
         Assert.Equal(7, updated);
     }
 
     [Fact]
-    public void TryResolve_WhenIncomingIsNegativeAndLastValidIsDefault_UsesDefaultFramebuffer()
+    public void Resolve_WhenIncomingIsNegativeAndLastValidExists_ReusesLastValid()
     {
-        var ok = FramebufferTargetResolver.TryResolve(-1, 0, out var output, out var updated);
+        var output = FramebufferTargetResolver.Resolve(-1, 5, out var updated);
 
-        Assert.True(ok);
-        Assert.Equal((uint)0, output);
-        Assert.Equal(0, updated);
+        Assert.Equal((uint)5, output);
+        Assert.Equal(5, updated);
     }
 
     [Fact]
-    public void TryResolve_WhenIncomingIsNegativeAndLastValidIsNonDefault_SkipsFrame()
+    public void Resolve_WhenIncomingIsNegativeAndNoLastValid_FallsBackToDefault()
     {
-        var ok = FramebufferTargetResolver.TryResolve(-1, 5, out var output, out var updated);
+        var output = FramebufferTargetResolver.Resolve(-1, null, out var updated);
 
-        Assert.False(ok);
         Assert.Equal((uint)0, output);
-        Assert.Equal(5, updated);
+        Assert.Equal(0, updated);
     }
 }
