@@ -101,7 +101,7 @@ namespace Avalonia3D.Rendering
 
         private void ClearForwardTargets(GL gl, bool hasEmissiveTarget)
         {
-            gl.ClearColor(0f, 0f, 0f, 0f);
+            gl.ClearColor(0f, 0f, 0f, 1f);
             gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
             if (!hasEmissiveTarget)
