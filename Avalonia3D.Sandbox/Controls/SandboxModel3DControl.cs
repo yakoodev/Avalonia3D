@@ -240,13 +240,7 @@ public class SandboxModel3DControl : OpenGlControlBase
             Log.Information("Sandbox OpenGL target framebuffer: {FramebufferId}", fb);
         }
 
-        if (!TryResolveOutputFramebuffer(fb, out var outputFramebufferId))
-        {
-            ScheduleNextFrame(TimeSpan.Zero);
-            return;
-        }
-
-        _renderer.FrameState.OutputFramebufferId = outputFramebufferId;
+        _renderer.FrameState.OutputFramebufferId = ResolveOutputFramebuffer(fb);
         var executedActions = _renderThreadScheduler.ExecutePending();
         _hasPendingRenderWork = false;
         _renderer.Resize((uint)width, (uint)height);
@@ -423,10 +417,9 @@ public class SandboxModel3DControl : OpenGlControlBase
         };
     }
 
-    private static bool TryResolveOutputFramebuffer(int framebufferId, out uint outputFramebufferId)
+    private static uint ResolveOutputFramebuffer(int framebufferId)
     {
-        outputFramebufferId = framebufferId >= 0 ? (uint)framebufferId : 0;
-        return framebufferId >= 0;
+        return framebufferId >= 0 ? (uint)framebufferId : 0;
     }
 
     private void ApplySensitivity()
