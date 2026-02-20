@@ -121,7 +121,7 @@ public class CameraController
         _camera.Near = targetNear;
 
         var targetFar = MathF.Max(_camera.Distance * AdaptiveFarPlaneDistanceMultiplier, _camera.Near + 1f);
-        _camera.Far = MathF.Max(_camera.Far, targetFar);
+        _camera.Far = targetFar;
     }
 
     private readonly record struct CameraViewState(Vector3 Target, float Distance, float Pitch, float Yaw, float Near, float Far, float Fov)
