@@ -317,7 +317,7 @@ public class SandboxModel3DControl : OpenGlControlBase
     }
 
     private int _lastFramebuffer = -1;
-    private readonly FramebufferTargetResolver _framebufferTargetResolver = new();
+    private readonly FramebufferTargetResolver _framebufferTargetResolver = new(FramebufferResolutionMode.ForceDefault);
 
     public void HandlePointerPressed(PointerPressedEventArgs e)
     {

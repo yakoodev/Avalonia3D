@@ -1,14 +1,24 @@
 namespace Avalonia3D.Sandbox.Rendering;
 
+public enum FramebufferResolutionMode
+{
+    PreferIncoming,
+    ForceDefault
+}
+
 public sealed class FramebufferTargetResolver
 {
     private readonly int _switchStabilizationFrames;
+    private readonly FramebufferResolutionMode _mode;
     private int? _stableFramebufferId;
     private int? _candidateFramebufferId;
     private int _candidateHitCount;
 
-    public FramebufferTargetResolver(int switchStabilizationFrames = 2)
+    public FramebufferTargetResolver(
+        FramebufferResolutionMode mode = FramebufferResolutionMode.PreferIncoming,
+        int switchStabilizationFrames = 2)
     {
+        _mode = mode;
         _switchStabilizationFrames = switchStabilizationFrames < 1 ? 1 : switchStabilizationFrames;
     }
 
@@ -21,6 +31,13 @@ public sealed class FramebufferTargetResolver
 
     public uint Resolve(int incomingFramebufferId)
     {
+        if (_mode == FramebufferResolutionMode.ForceDefault)
+        {
+            _stableFramebufferId = 0;
+            ResetCandidate();
+            return 0;
+        }
+
         var normalizedIncoming = incomingFramebufferId >= 0
             ? incomingFramebufferId
             : _stableFramebufferId ?? 0;
