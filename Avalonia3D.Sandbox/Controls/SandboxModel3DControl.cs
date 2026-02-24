@@ -66,6 +66,7 @@ public class SandboxModel3DControl : OpenGlControlBase
     private bool _frameRequestScheduled;
     private DateTime _interactionUntilUtc = DateTime.MinValue;
     private bool _hasPendingRenderWork;
+    private DateTime _nextActiveFrameUtc = DateTime.MinValue;
 
     public SandboxModel3DControl()
     {
@@ -218,6 +219,7 @@ public class SandboxModel3DControl : OpenGlControlBase
         base.OnOpenGlInit(gl);
         _gl = GL.GetApi(gl.GetProcAddress);
         _renderer.Init(_gl);
+        _framebufferTargetResolver.Reset();
         SetAndRaise(IsRendererReadyProperty, ref _isRendererReady, true);
         _sceneLoader.MarkRendererReady();
         ApplySensitivity();
@@ -234,19 +236,13 @@ public class SandboxModel3DControl : OpenGlControlBase
         int width = (int)Bounds.Width;
         int height = (int)Bounds.Height;
         if (width <= 0 || height <= 0) return;
-        if (fb <= 0)
-        {
-            ScheduleNextFrame(TimeSpan.Zero);
-            return;
-        }
-
         if (_lastFramebuffer != fb)
         {
             _lastFramebuffer = fb;
             Log.Information("Sandbox OpenGL target framebuffer: {FramebufferId}", fb);
         }
 
-        _renderer.FrameState.OutputFramebufferId = (uint)fb;
+        _renderer.FrameState.OutputFramebufferId = _framebufferTargetResolver.Resolve(fb);
         var executedActions = _renderThreadScheduler.ExecutePending();
         _hasPendingRenderWork = false;
         _renderer.Resize((uint)width, (uint)height);
@@ -259,13 +255,17 @@ public class SandboxModel3DControl : OpenGlControlBase
 
         if (_hasPendingRenderWork || ShouldRunActiveLoop())
         {
-            var activeDelay = TimeSpan.FromSeconds(1.0 / ActiveFps);
-            ScheduleNextFrame(activeDelay);
+            ScheduleActiveFrame();
         }
         else if (IdleFps > 0)
         {
+            _nextActiveFrameUtc = DateTime.MinValue;
             var idleDelay = TimeSpan.FromSeconds(1.0 / IdleFps);
             ScheduleNextFrame(idleDelay);
+        }
+        else
+        {
+            _nextActiveFrameUtc = DateTime.MinValue;
         }
     }
 
@@ -275,6 +275,7 @@ public class SandboxModel3DControl : OpenGlControlBase
         SetAndRaise(IsRendererReadyProperty, ref _isRendererReady, false);
         _gl = null;
         _frameRequestScheduled = false;
+        _framebufferTargetResolver.Reset();
         base.OnOpenGlDeinit(gl);
     }
 
@@ -316,6 +317,7 @@ public class SandboxModel3DControl : OpenGlControlBase
     }
 
     private int _lastFramebuffer = -1;
+    private readonly FramebufferTargetResolver _framebufferTargetResolver = new(FramebufferResolutionMode.PreferIncoming, switchStabilizationFrames: 3);
 
     public void HandlePointerPressed(PointerPressedEventArgs e)
     {
@@ -438,6 +440,26 @@ public class SandboxModel3DControl : OpenGlControlBase
         }
 
         return DateTime.UtcNow < _interactionUntilUtc;
+    }
+
+    private void ScheduleActiveFrame()
+    {
+        var now = DateTime.UtcNow;
+        var interval = TimeSpan.FromSeconds(1.0 / ActiveFps);
+
+        if (_nextActiveFrameUtc < now)
+        {
+            _nextActiveFrameUtc = now;
+        }
+
+        _nextActiveFrameUtc += interval;
+        var delay = _nextActiveFrameUtc - now;
+        if (delay < TimeSpan.Zero)
+        {
+            delay = TimeSpan.Zero;
+        }
+
+        ScheduleNextFrame(delay);
     }
 
     private void MarkInteractionActive()

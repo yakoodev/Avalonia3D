@@ -137,6 +137,48 @@ public class CameraControllerTests
         Assert.InRange(camera.Fov, 0.899f, 0.901f);
     }
 
+
+    [Fact]
+    public void Dolly_WhenZoomingTooClose_ClampsDistanceToPositiveMinimum()
+    {
+        var camera = CreateCamera();
+        camera.Distance = 0.2f;
+        var controller = new CameraController(camera, new SceneGraph()) { DollySensitivity = 1f };
+
+        controller.Dolly(10f);
+
+        Assert.True(camera.Distance >= 0.05f);
+    }
+
+    [Fact]
+    public void Dolly_WhenDistanceShrinks_UpdatesNearClipPlaneToAvoidAggressiveClipping()
+    {
+        var camera = CreateCamera();
+        camera.Distance = 30f;
+        camera.Near = 2f;
+        var controller = new CameraController(camera, new SceneGraph()) { DollySensitivity = 2f };
+
+        controller.Dolly(10f);
+
+        Assert.True(camera.Distance < 30f);
+        Assert.True(camera.Near < 2f);
+        Assert.True(camera.Near >= 0.01f);
+    }
+
+    [Fact]
+    public void Dolly_WhenDistanceShrinks_AllowsFarClipPlaneToShrinkForDepthPrecision()
+    {
+        var camera = CreateCamera();
+        camera.Distance = 40f;
+        camera.Far = 2000f;
+        var controller = new CameraController(camera, new SceneGraph()) { DollySensitivity = 2f };
+
+        controller.Dolly(10f);
+
+        Assert.True(camera.Distance < 40f);
+        Assert.True(camera.Far < 2000f);
+        Assert.True(camera.Far > camera.Near);
+    }
     private static Camera CreateCamera()
     {
         return new Camera

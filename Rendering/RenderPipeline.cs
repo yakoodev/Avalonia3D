@@ -60,6 +60,7 @@ namespace Avalonia3D.Rendering
         public GraphicsProfile Profile { get; private set; }
         public RenderQualitySettings Settings => RenderQualitySettings.FromProfile(Profile);
         public IReadOnlyList<IRenderPass> Passes => _passes;
+        public bool EnableFrustumCulling { get; set; } = true;
 
         public void ApplyProfile(GraphicsProfile profile)
         {
@@ -78,7 +79,10 @@ namespace Avalonia3D.Rendering
             renderContext.FrameState.Metrics.Reset();
 
             var allObjects = CollectMeshObjects(renderContext.Scene.SceneGraph.RootObjects);
-            var visibleObjects = FrustumCullMeshObjects(renderContext.Scene.Camera, allObjects, out var culledObjects);
+            var culledObjects = 0;
+            var visibleObjects = EnableFrustumCulling
+                ? FrustumCullMeshObjects(renderContext.Scene.Camera, allObjects, out culledObjects)
+                : new List<MeshObject>(allObjects);
             var opaqueObjects = new List<MeshObject>();
             var transparentObjects = new List<MeshObject>();
 

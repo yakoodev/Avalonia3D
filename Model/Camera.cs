@@ -7,6 +7,7 @@ namespace Avalonia3D.Model
 {
     public class Camera : INotifyPropertyChanged
     {
+        private const float AbsoluteMinDistance = 0.05f;
         private Vector3 _position = new(0, 0, 5);
         private Vector3 _target = Vector3.Zero;
         private float _distance = 15.0f;
@@ -86,6 +87,8 @@ namespace Avalonia3D.Model
                 {
                     sanitized = Math.Min(sanitized, MaxDistance.Value);
                 }
+
+                sanitized = Math.Max(sanitized, AbsoluteMinDistance);
 
                 _distance = sanitized;
                 OnDistanceChanged?.Invoke();
